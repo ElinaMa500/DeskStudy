@@ -368,6 +368,8 @@ public static class NotebookLayoutTests
             ddl.TopMost = false; Pump(60);
         }
 
+        // Only Todo showing, so moving other widgets apart (1.5.1) cannot shift it during the mode switch.
+        app.SetWidgetVisible("calendar", false); app.SetWidgetVisible("ddl", false);
         todo.Bounds = new Rectangle(200, 160, 460, 560); Pump(120); todo.Remember();
         Rectangle content = Content(todo); IntPtr desktopHandle = todo.Handle;
         var saved = app.Data.Windows["todo"]; int tasksBefore = Book(app, "todo").Pages.Sum(p => p.Tasks.Count);
@@ -413,6 +415,7 @@ public static class NotebookLayoutTests
                 else if (mode == "render") RenderChecks(app, path);
                 else if (mode == "due") DueChecks(app, path);
                 else if (mode == "frame") FrameChecks(app, path);
+                else if (mode == "place" || mode == "placeread") PlacementChecks.Run(app, path, mode == "placeread");
                 else WriteChecks(app, path, mode == "card");
                 app.Shutdown();
             }

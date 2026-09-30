@@ -117,9 +117,10 @@ namespace DeskStudy
                 if ((m.Msg == 0xA1 || m.Msg == 0xA3) && m.WParam.ToInt32() == 2) return;
             }
             if (App != null && FrameWndProc(ref m)) return;
+            if (App != null) PlacementWndProc(ref m);
             base.WndProc(ref m);
             if (App != null && PositionLocked && m.Msg == 0x84 && m.Result.ToInt32() >= 10 && m.Result.ToInt32() <= 17) m.Result = new IntPtr(1);
-            if (App != null) AfterFrameWndProc(ref m);
+            if (App != null) { AfterFrameWndProc(ref m); AfterPlacementWndProc(ref m); }
         }
         public void ApplyAppearance()
         {
@@ -218,6 +219,7 @@ namespace DeskStudy
                 appearanceBaselines.Clear();
                 if (notebookHeadingFont != null) { notebookHeadingFont.Dispose(); notebookHeadingFont = null; }
                 if (hoverTimer != null) { hoverTimer.Dispose(); hoverTimer = null; }
+                if (slideTimer != null) { slideTimer.Dispose(); slideTimer = null; }
             }
         }
         protected void SetTitle(string title) { Text = title + " · 桌面课笺"; headingTitle = title; heading.Text = title + headingSuffix; }
@@ -297,6 +299,8 @@ namespace DeskStudy
             var visible = Widgets.ToDictionary(w => w.WidgetKey, w => !Data.Windows.ContainsKey(w.WidgetKey) || Data.Windows[w.WidgetKey].Visible);
             foreach (var w in Widgets) if (visible[w.WidgetKey]) w.Show();
             foreach (var w in Widgets) w.ApplyAppearance();
+            // Widgets saved partly off screen or on top of each other (older versions, a monitor since removed) are tidied once.
+            ArrangeWidgets(); WatchDisplays();
             FinishStartup(quietStart);
             if (framesConverted) QueueSave();
             powerHandler = delegate(object sender, PowerModeChangedEventArgs e)
@@ -401,14 +405,14 @@ namespace DeskStudy
         }
         private void ShowHelp()
         {
-            MessageBox.Show("桌面课笺 1.5\n\n桌面组件模式下，组件没有标题栏，也不出现在任务栏：拖动顶栏移动，拖动边缘调整大小；点击组件时它浮到前面，切到别的程序后自动回到其他窗口下面。单击托盘图标或按快捷键（默认 Ctrl+Alt+Shift+D）可把组件浮到前面。可在设置中心的「显示与布局」切回标准窗口。\n\n外观页可切换五种便签布局。点击页标题可编辑，在任务末尾连续录入；点任务下方的状态文字可设置或修改截止时间。\n\n从托盘菜单或任一组件的齿轮按钮打开设置中心。关闭设置中心后，组件与提醒继续运行。\n\n显示与布局：管理置顶、位置锁定、保存布局；窗口移出屏幕后，可使用「找回当前屏幕」。外观支持全局设置和组件单独覆盖，修改立即预览并自动保存。\n\n日历：支持周/月视图和循环课表。临时停课或调课可选择「仅这一次」；设置中心可统一管理课程系列与学期。\n\n便签：文字和任务自动保存，设置中心可管理页面名称、顺序、归档和当前页。隐藏、翻页或归档不会取消未完成任务的提醒。\n\n提醒每 5 秒检查所有页面；免打扰结束、退出后重新运行或休眠恢复后汇总补发。完全退出后不能实时通知，请保留托盘运行。\n\n数据与应用：导入、导出、备份恢复和开机启动。恢复前会先保留当前数据。重置布局或外观不会删除内容。\n\n数据目录：\n" + Store.DirectoryPath, "使用说明", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show("桌面课笺 1.5.1\n\n桌面组件模式下，组件没有标题栏，也不出现在任务栏：拖动顶栏移动，拖动边缘调整大小；靠近屏幕边缘或其他组件时自动贴齐，松手时若超出屏幕或压住其他组件会自动弹回；点击组件时它浮到前面，切到别的程序后自动回到其他窗口下面。单击托盘图标或按快捷键（默认 Ctrl+Alt+Shift+D）可把组件浮到前面。可在设置中心的「显示与布局」切回标准窗口。\n\n外观页可切换五种便签布局。点击页标题可编辑，在任务末尾连续录入；点任务下方的状态文字可设置或修改截止时间。\n\n从托盘菜单或任一组件的齿轮按钮打开设置中心。关闭设置中心后，组件与提醒继续运行。\n\n显示与布局：管理置顶、位置锁定、保存布局；窗口移出屏幕后，可使用「找回当前屏幕」。外观支持全局设置和组件单独覆盖，修改立即预览并自动保存。\n\n日历：支持周/月视图和循环课表。临时停课或调课可选择「仅这一次」；设置中心可统一管理课程系列与学期。\n\n便签：文字和任务自动保存，设置中心可管理页面名称、顺序、归档和当前页。隐藏、翻页或归档不会取消未完成任务的提醒。\n\n提醒每 5 秒检查所有页面；免打扰结束、退出后重新运行或休眠恢复后汇总补发。完全退出后不能实时通知，请保留托盘运行。\n\n数据与应用：导入、导出、备份恢复和开机启动。恢复前会先保留当前数据。重置布局或外观不会删除内容。\n\n数据目录：\n" + Store.DirectoryPath, "使用说明", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
         public void Shutdown()
         {
             foreach (var w in Widgets) w.Remember();
             if (!Flush()) return;
             Exiting = true; reminderTimer.Stop(); saveTimer.Stop(); reopenTimer.Stop();
-            SystemEvents.PowerModeChanged -= powerHandler; SystemEvents.SessionEnding -= sessionHandler;
+            SystemEvents.PowerModeChanged -= powerHandler; SystemEvents.SessionEnding -= sessionHandler; UnwatchDisplays();
             tray.Visible = false;
             ReleaseShowHotkey();
             foreach (var w in Widgets) w.Dispose();

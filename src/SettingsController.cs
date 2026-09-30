@@ -136,11 +136,12 @@ namespace DeskStudy
             w.WindowState = FormWindowState.Normal;
             Data.Windows[key] = requested;
             w.RestoreWindow();
+            if (requested.Visible) { w.Show(); SettleWidget(w, 0, false); }
             // A never-shown hidden form has not enabled Remember yet. Still publish
             // the actual clamped bounds so settings cannot display stale geometry.
             Data.Windows[key].X = w.Left; Data.Windows[key].Y = w.Top;
             Data.Windows[key].Width = w.Width; Data.Windows[key].Height = w.Height;
-            if (requested.Visible) w.Show(); else w.Hide();
+            if (!requested.Visible) w.Hide();
             w.Remember(); QueueSave(); NotifyWindowStateChanged();
         }
         public void LocateWidget(string key)
@@ -155,14 +156,17 @@ namespace DeskStudy
         public void RescueWindows()
         {
             var area = CurrentWorkArea(); int i = 0;
-            foreach (var w in Widgets)
+            WithPlacementSuspended(delegate
             {
-                var state = CopyWindow(Data.Windows[w.WidgetKey]);
-                state.Width = Math.Min(state.Width, area.Width); state.Height = Math.Min(state.Height, area.Height);
-                state.X = area.Left + Math.Min(28 + i * 54, Math.Max(0, area.Width - Math.Max(w.MinimumSize.Width, state.Width)));
-                state.Y = area.Top + Math.Min(28 + i * 44, Math.Max(0, area.Height - Math.Max(w.MinimumSize.Height, state.Height)));
-                state.Visible = true; UpdateWindow(w.WidgetKey, state); i++;
-            }
+                foreach (var w in Widgets)
+                {
+                    var state = CopyWindow(Data.Windows[w.WidgetKey]);
+                    state.Width = Math.Min(state.Width, area.Width); state.Height = Math.Min(state.Height, area.Height);
+                    state.X = area.Left + Math.Min(28 + i * 54, Math.Max(0, area.Width - Math.Max(w.MinimumSize.Width, state.Width)));
+                    state.Y = area.Top + Math.Min(28 + i * 44, Math.Max(0, area.Height - Math.Max(w.MinimumSize.Height, state.Height)));
+                    state.Visible = true; UpdateWindow(w.WidgetKey, state); i++;
+                }
+            });
             SettingsChanged();
         }
         public void SaveLayout()
@@ -175,17 +179,20 @@ namespace DeskStudy
         {
             if (Data.Settings.SavedLayout.Count == 0) return;
             var snapshot = Data.Settings.SavedLayout.ToDictionary(p => p.Key, p => CopyWindow(p.Value));
-            foreach (var w in Widgets) if (snapshot.ContainsKey(w.WidgetKey)) UpdateWindow(w.WidgetKey, snapshot[w.WidgetKey]);
+            WithPlacementSuspended(delegate { foreach (var w in Widgets) if (snapshot.ContainsKey(w.WidgetKey)) UpdateWindow(w.WidgetKey, snapshot[w.WidgetKey]); });
             SettingsChanged();
         }
         public void ResetLayout()
         {
             Rectangle area = CurrentWorkArea(); int i = 0;
-            foreach (var w in Widgets)
+            WithPlacementSuspended(delegate
             {
-                var initial = new WindowState { Width = w.WidgetKey == "calendar" ? 950 : 440, Height = w.WidgetKey == "calendar" ? 740 : 650, X = area.Left + 24 + i * 90, Y = area.Top + 24 + i * 55, Visible = true, TopMost = false, PositionLocked = false };
-                UpdateWindow(w.WidgetKey, initial); i++;
-            }
+                foreach (var w in Widgets)
+                {
+                    var initial = new WindowState { Width = w.WidgetKey == "calendar" ? 950 : 440, Height = w.WidgetKey == "calendar" ? 740 : 650, X = area.Left + 24 + i * 90, Y = area.Top + 24 + i * 55, Visible = true, TopMost = false, PositionLocked = false };
+                    UpdateWindow(w.WidgetKey, initial); i++;
+                }
+            });
             SettingsChanged();
         }
         public void ResetAppearance(string key)
@@ -260,7 +267,7 @@ namespace DeskStudy
             foreach (var w in Widgets) w.ApplyWidgetMode();
             RegisterShowHotkey();
             var state = Data.Windows.ToDictionary(p => p.Key, p => CopyWindow(p.Value));
-            foreach (var w in Widgets) UpdateWindow(w.WidgetKey, state[w.WidgetKey]);
+            WithPlacementSuspended(delegate { foreach (var w in Widgets) UpdateWindow(w.WidgetKey, state[w.WidgetKey]); });
             SettingsChanged();
             if (center != null && !center.IsDisposed) center.RefreshData();
             if (UsesSystemStartup)

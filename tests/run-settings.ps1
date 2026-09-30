@@ -5,7 +5,7 @@ $compilerPath = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.
 $artifactPath = Join-Path $projectRoot 'artifacts'
 New-Item -ItemType Directory -Force -Path $artifactPath | Out-Null
 if ($Packaged) {
-    if (-not $PackageExecutable) { $PackageExecutable = Join-Path $projectRoot 'release-1.5\DeskStudy.exe' }
+    if (-not $PackageExecutable) { $PackageExecutable = Join-Path $projectRoot 'release-1.5.1\DeskStudy.exe' }
     $smokeExe = Join-Path $artifactPath 'PackagedSmoke.exe'
     & $compilerPath /nologo /target:exe /codepage:65001 ('/out:' + $smokeExe) ('/win32manifest:' + (Join-Path $projectRoot 'src\app.manifest')) /reference:System.Windows.Forms.dll /reference:System.Core.dll (Join-Path $PSScriptRoot 'PackagedSmoke.cs')
     if ($LASTEXITCODE -ne 0) { throw 'Packaged smoke compilation failed.' }

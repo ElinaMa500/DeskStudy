@@ -77,8 +77,9 @@ public static class IntegrationTests
                     int offset = 0;
                     foreach (var w in app.Widgets)
                     {
-                        w.WindowState = FormWindowState.Normal; w.Location = new Point(80 + offset * 45, 90 + offset * 35);
-                        w.Size = new Size(Math.Max(w.MinimumSize.Width, 450 + offset * 70), Math.Max(w.MinimumSize.Height, 540));
+                        // Side by side: since 1.5.1 overlapping widgets are moved apart at startup.
+                        w.WindowState = FormWindowState.Normal; w.Location = new Point(new[] { 40, 900, 1390 }[offset], 90 + offset * 35);
+                        w.Size = new Size(Math.Max(w.MinimumSize.Width, 450 + offset * 20), Math.Max(w.MinimumSize.Height, 540));
                         w.TopMost = offset == 1; w.Remember();
                         var state = app.Data.Windows[w.WidgetKey]; expected.Add(w.WidgetKey + "|" + state.X + "|" + state.Y + "|" + state.Width + "|" + state.Height + "|" + state.TopMost);
                         offset++;

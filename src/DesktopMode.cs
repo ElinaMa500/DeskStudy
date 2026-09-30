@@ -59,6 +59,8 @@ namespace DeskStudy
             Data.Settings.WidgetMode = mode;
             ShiftAllFrames(mode == "Desktop");
             foreach (var w in Widgets) w.ApplyWidgetMode();
+            // Title bars take extra room, so neighbouring widgets may now touch.
+            ArrangeWidgets();
             foreach (var w in Widgets) w.Remember();
             SettingsChanged();
         }
