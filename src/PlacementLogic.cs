@@ -45,6 +45,27 @@ namespace DeskStudy
             return false;
         }
 
+        // Stacked on purpose: the shared area is more than two thirds of the smaller widget. Such overlaps are left alone.
+        public static bool Stacked(Rectangle a, Rectangle b)
+        {
+            Rectangle shared = Rectangle.Intersect(a, b);
+            if (shared.IsEmpty) return false;
+            long smaller = Math.Min((long)a.Width * a.Height, (long)b.Width * b.Height);
+            return (long)shared.Width * shared.Height * 3 > smaller * 2;
+        }
+        // Overlaps that should be undone: any overlap that is not a deliberate stack.
+        private static bool OverlapsLightly(Rectangle r, IEnumerable<Rectangle> others)
+        {
+            foreach (var o in others) if (r.IntersectsWith(o) && !Stacked(r, o)) return true;
+            return false;
+        }
+        private static List<Rectangle> NotStacked(Rectangle r, IEnumerable<Rectangle> others)
+        {
+            var result = new List<Rectangle>();
+            foreach (var o in others) if (!Stacked(r, o)) result.Add(o);
+            return result;
+        }
+
         // Keeps a rectangle apart from the others by at least the gap.
         private static bool Clear(Rectangle r, IList<Rectangle> others, int gap)
         {
@@ -54,11 +75,11 @@ namespace DeskStudy
 
         // The nearest place for a dropped widget that follows the screen-edge rule and does not cover another widget.
         // Only the dropped widget moves. A widget dropped on screen stays on screen; one the user put partly outside may stay outside.
-        // When nothing fits, it stays where it was dropped.
+        // When nothing fits, it stays where it was dropped. Dropped squarely on top of others (more than 2/3 covered), it stays too.
         public static Rectangle Resolve(Rectangle dropped, Rectangle work, IList<Rectangle> others, int gap)
         {
             Rectangle fitted = Contain(dropped, work);
-            if (!Overlaps(fitted, others)) return fitted;
+            if (!OverlapsLightly(fitted, others)) return fitted;
             bool onScreen = work.Contains(fitted);
             Rectangle best;
             if (Nearest(dropped, fitted, work, others, gap, onScreen, out best)) return best;
@@ -101,6 +122,8 @@ namespace DeskStudy
         // If that would make the widget smaller than its minimum, the widget is moved instead.
         public static Rectangle AfterResize(Rectangle r, int edge, Rectangle work, IList<Rectangle> others, Size minimum, int gap)
         {
+            // A widget stacked on another is resized freely over it.
+            others = NotStacked(r, others);
             int left = r.Left, top = r.Top, right = r.Right, bottom = r.Bottom;
             if (MovesLeft(edge) && left < work.Left && work.Left - left <= EdgeCatch) left = work.Left;
             if (MovesRight(edge) && right > work.Right && right - work.Right <= EdgeCatch) right = work.Right;

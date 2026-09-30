@@ -131,6 +131,13 @@ public static class PlacementChecks
         SendMessage(ddl.Handle, 0x0232, IntPtr.Zero, IntPtr.Zero); Pump(320);
         Assert(V(ddl).Right == work.Right && V(ddl).Left == wide.Left, "right edge released 40 px off screen: back to the edge, left edge stays");
 
+        // Dropped squarely on another widget (more than 2/3 covered): left stacked.
+        Put(todo, at(900, 0)); Put(ddl, at(1450, 590)); Pump(60);
+        Drop(ddl, at(950, 60));
+        Assert(V(ddl) == at(950, 60) && V(todo) == at(900, 0) && Saved(app, ddl), "dropped covering most of Todo: both stay where they are, stacked");
+        Drop(ddl, at(1150, 60));
+        Assert(Apart(app.Widgets), "moved so that only about 40% is shared: pushed clear again");
+
         // Locked widgets never move; the other one makes way.
         Put(todo, at(900, 0)); Put(ddl, at(1450, 590)); Pump(60);
         app.Data.Windows["todo"].PositionLocked = true; Rectangle lockedAt = V(todo);
@@ -141,9 +148,9 @@ public static class PlacementChecks
         // Hidden widgets are not obstacles; one coming back into view moves out of the way.
         Put(ddl, at(1450, 590)); Pump(60);
         app.SetWidgetVisible("ddl", false); Pump(80);
-        Drop(todo, at(1400, 560));
+        Drop(todo, at(1150, 560));
         Rectangle todoOverHidden = V(todo);
-        Assert(todoOverHidden == at(1400, 560), "a hidden widget is not an obstacle: " + todoOverHidden);
+        Assert(todoOverHidden == at(1150, 560), "a hidden widget is not an obstacle: " + todoOverHidden);
         app.SetWidgetVisible("ddl", true); Pump(300);
         Assert(V(todo) == todoOverHidden && Apart(app.Widgets), "a widget shown again on top of another moves out of the way, the other stays: " + V(ddl));
 
@@ -152,8 +159,10 @@ public static class PlacementChecks
         app.UpdateWindow("ddl", new WindowState { X = work.Right + 300, Y = state.Y, Width = state.Width, Height = state.Height, Visible = true });
         Assert(V(ddl).Left == work.Right - PlacementLogic.KeepVisible && Saved(app, ddl), "an X entirely beyond the screen typed in settings: 100 px brought back into view");
         var calendarState = app.Data.Windows["calendar"];
+        app.UpdateWindow("ddl", new WindowState { X = calendarState.X + 600, Y = calendarState.Y + 40, Width = state.Width, Height = state.Height, Visible = true });
+        Assert(Apart(app.Widgets) && Saved(app, ddl) && V(calendar) == calendarBefore, "coordinates typed in settings that partly overlap another widget are moved clear, and settings show the result");
         app.UpdateWindow("ddl", new WindowState { X = calendarState.X + 40, Y = calendarState.Y + 40, Width = state.Width, Height = state.Height, Visible = true });
-        Assert(Apart(app.Widgets) && Saved(app, ddl) && V(calendar) == calendarBefore, "coordinates typed in settings that overlap another widget are moved clear, and settings show the result");
+        Assert(V(calendar).Contains(V(ddl)) && Saved(app, ddl), "coordinates that put DDL entirely on the calendar are kept (stacked on purpose)");
         app.ResetLayout(); Pump(200);
         Assert(Apart(app.Widgets) && app.Widgets.All(w => work.Contains(V(w))), "恢复默认布局 lays the three widgets out without overlap: " + string.Join(" ", app.Widgets.Select(w => V(w).ToString())));
         app.RescueWindows(); Pump(200);
@@ -183,7 +192,7 @@ public static class PlacementChecks
 
         // Leave an overlapping layout, with DDL far off screen, for the restart check.
         app.Save(); Assert(app.Flush(), "placement changes saved");
-        Put(calendar, new Rectangle(work.Left, work.Top, 850, 650)); Put(todo, new Rectangle(work.Left + 50, work.Top + 50, W, H)); Put(ddl, new Rectangle(work.Right - 100, work.Top + 200, W, H)); Pump(100);
+        Put(calendar, new Rectangle(work.Left, work.Top, 850, 650)); Put(todo, new Rectangle(work.Left + 600, work.Top + 50, W, H)); Put(ddl, new Rectangle(work.Right - 100, work.Top + 200, W, H)); Pump(100);
         Assert(V(todo).IntersectsWith(V(calendar)), "an overlapping layout is left for the restart check");
         app.QueueSave(); Assert(app.Flush(), "and saved");
     }

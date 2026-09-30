@@ -153,18 +153,35 @@ namespace DeskStudy
             state.Visible = true;
             UpdateWindow(key, state); w.Reveal();
         }
+        // Calendar at the top left, the notebooks along the right edge: DDL under Todo when it fits, otherwise beside it.
+        // Anything that still collides (small screens) is sorted out by the placement rules afterwards.
+        private Dictionary<string, Point> Tiled(Rectangle area, Dictionary<string, Size> sizes)
+        {
+            const int margin = 24; int gap = PlacementLogic.Gap;
+            Size todo = sizes["todo"], ddl = sizes["ddl"];
+            var todoAt = new Point(area.Right - margin - todo.Width, area.Top + margin);
+            var ddlAt = area.Top + margin + todo.Height + gap + ddl.Height <= area.Bottom - margin
+                ? new Point(area.Right - margin - ddl.Width, todoAt.Y + todo.Height + gap)
+                : new Point(todoAt.X - gap - ddl.Width, area.Top + margin);
+            return new Dictionary<string, Point> { { "calendar", new Point(area.Left + margin, area.Top + margin) }, { "todo", todoAt }, { "ddl", ddlAt } };
+        }
+        private Size Clamped(WidgetForm w, int width, int height, Rectangle area)
+        {
+            return new Size(Math.Min(Math.Max(w.MinimumSize.Width, width), area.Width), Math.Min(Math.Max(w.MinimumSize.Height, height), area.Height));
+        }
         public void RescueWindows()
         {
-            var area = CurrentWorkArea(); int i = 0;
+            var area = CurrentWorkArea();
+            var sizes = Widgets.ToDictionary(w => w.WidgetKey, w => Clamped(w, Data.Windows[w.WidgetKey].Width, Data.Windows[w.WidgetKey].Height, area));
+            var places = Tiled(area, sizes);
             WithPlacementSuspended(delegate
             {
                 foreach (var w in Widgets)
                 {
                     var state = CopyWindow(Data.Windows[w.WidgetKey]);
-                    state.Width = Math.Min(state.Width, area.Width); state.Height = Math.Min(state.Height, area.Height);
-                    state.X = area.Left + Math.Min(28 + i * 54, Math.Max(0, area.Width - Math.Max(w.MinimumSize.Width, state.Width)));
-                    state.Y = area.Top + Math.Min(28 + i * 44, Math.Max(0, area.Height - Math.Max(w.MinimumSize.Height, state.Height)));
-                    state.Visible = true; UpdateWindow(w.WidgetKey, state); i++;
+                    state.Width = sizes[w.WidgetKey].Width; state.Height = sizes[w.WidgetKey].Height;
+                    state.X = places[w.WidgetKey].X; state.Y = places[w.WidgetKey].Y;
+                    state.Visible = true; UpdateWindow(w.WidgetKey, state);
                 }
             });
             SettingsChanged();
@@ -184,13 +201,15 @@ namespace DeskStudy
         }
         public void ResetLayout()
         {
-            Rectangle area = CurrentWorkArea(); int i = 0;
+            Rectangle area = CurrentWorkArea();
+            var sizes = Widgets.ToDictionary(w => w.WidgetKey, w => Clamped(w, w.WidgetKey == "calendar" ? 950 : 440, w.WidgetKey == "calendar" ? 740 : 650, area));
+            var places = Tiled(area, sizes);
             WithPlacementSuspended(delegate
             {
                 foreach (var w in Widgets)
                 {
-                    var initial = new WindowState { Width = w.WidgetKey == "calendar" ? 950 : 440, Height = w.WidgetKey == "calendar" ? 740 : 650, X = area.Left + 24 + i * 90, Y = area.Top + 24 + i * 55, Visible = true, TopMost = false, PositionLocked = false };
-                    UpdateWindow(w.WidgetKey, initial); i++;
+                    var initial = new WindowState { Width = sizes[w.WidgetKey].Width, Height = sizes[w.WidgetKey].Height, X = places[w.WidgetKey].X, Y = places[w.WidgetKey].Y, Visible = true, TopMost = false, PositionLocked = false };
+                    UpdateWindow(w.WidgetKey, initial);
                 }
             });
             SettingsChanged();

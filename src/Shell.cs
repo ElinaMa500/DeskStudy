@@ -289,10 +289,19 @@ namespace DeskStudy
             tray.MouseClick += delegate(object sender, MouseEventArgs e) { if (e.Button == MouseButtons.Left) RaiseWidgets(); };
             tray.BalloonTipClicked += delegate { OpenReminders(); };
             bool framesConverted = NormalizeWindowFrames();
+            bool firstRun = !Data.Windows.ContainsKey("calendar") && !Data.Windows.ContainsKey("todo") && !Data.Windows.ContainsKey("ddl");
             Widgets.Add(new CalendarForm(this)); Widgets.Add(new NotebookForm(this, "todo")); Widgets.Add(new NotebookForm(this, "ddl"));
             // Apply physical saved bounds after each derived form has completed DPI scaling,
             // including forms that stay hidden and therefore do not raise Load yet.
             foreach (var w in Widgets) w.RestoreWindow();
+            if (firstRun)
+            {
+                // Nothing saved yet: lay the three widgets out side by side instead of stacked.
+                Rectangle area = Screen.PrimaryScreen.WorkingArea;
+                var sizes = Widgets.ToDictionary(w => w.WidgetKey, w => Clamped(w, w.Width, w.Height, area));
+                var places = Tiled(area, sizes);
+                foreach (var w in Widgets) w.Bounds = new Rectangle(places[w.WidgetKey], sizes[w.WidgetKey]);
+            }
             // Capture intended visibility before Show() emits persistence callbacks.
             var visible = Widgets.ToDictionary(w => w.WidgetKey, w => !Data.Windows.ContainsKey(w.WidgetKey) || Data.Windows[w.WidgetKey].Visible);
             foreach (var w in Widgets) if (visible[w.WidgetKey]) w.Show();
