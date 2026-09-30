@@ -1,0 +1,17 @@
+# Local snapshots taken during development. Contains a copy of personal app data - never publish.
+/baselines/
+
+# Test output: compiled test runners, logs, rendered images and isolated test data.
+/artifacts/
+
+# Build output and packaged releases. Downloads are published through GitHub Releases instead.
+/build/
+/release/
+/release-*/
+/DeskStudy-*-Windows/
+/DeskStudy-*-Windows.zip
+
+# Editor and OS files
+.vs/
+*.user
+Thumbs.db

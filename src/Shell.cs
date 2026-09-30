@@ -1,0 +1,462 @@
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.IO;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using System.Text;
+using System.Threading;
+using System.Windows.Forms;
+using Microsoft.Win32;
+
+namespace DeskStudy
+{
+    public static class Ui
+    {
+        public static readonly Color Text = Color.FromArgb(37, 48, 64);
+        public static readonly Color Muted = Color.FromArgb(110, 120, 133);
+        public static readonly Color Background = Color.FromArgb(247, 248, 251);
+        public static readonly Color Border = Color.FromArgb(225, 229, 236);
+        public static readonly Color Accent = Color.FromArgb(78, 103, 204);
+        public static Button Button(string text, EventHandler action)
+        {
+            Button b = new Button { Text = text, AutoSize = true, Height = 32, MinimumSize = new Size(40, 30), FlatStyle = FlatStyle.Flat, BackColor = Color.White, ForeColor = Text, Cursor = Cursors.Hand, Margin = new Padding(3), Padding = new Padding(6, 1, 6, 1) };
+            b.FlatAppearance.BorderColor = Border;
+            if (action != null) b.Click += action;
+            return b;
+        }
+        public static Label Label(string text, float size, Color color)
+        {
+            return new Label { Text = text, AutoSize = true, ForeColor = color, Font = new Font("Microsoft YaHei UI", size), BackColor = Color.Transparent };
+        }
+    }
+
+    public class WidgetForm : Form
+    {
+        protected AppController App;
+        protected Panel Body;
+        public readonly string WidgetKey;
+        private Label heading;
+        private CheckBox pin;
+        private FlowLayoutPanel headerActions;
+        private Button settingsButton, hideButton;
+        private Panel header, stripe;
+        private Font notebookHeadingFont;
+        private string headingTitle = "", headingSuffix = "";
+        private bool referenceHeader, referenceRule;
+        private Color referenceDot, referenceRuleColor, referenceInk, referenceAccent;
+        private bool ready;
+        private bool applyingAppearance;
+        private readonly Dictionary<Control, AppearanceBaseline> appearanceBaselines = new Dictionary<Control, AppearanceBaseline>();
+        public bool PositionLocked { get { WindowState w; return App.Data.Windows.TryGetValue(WidgetKey, out w) && w.PositionLocked; } }
+        [DllImport("user32.dll")] private static extern bool ReleaseCapture();
+        [DllImport("user32.dll")] private static extern IntPtr SendMessage(IntPtr hwnd, int msg, IntPtr wparam, IntPtr lparam);
+
+        public WidgetForm(AppController app, string key, string title, Color accent, Size defaultSize)
+        {
+            SuspendLayout();
+            App = app; WidgetKey = key;
+            AutoScaleDimensions = new SizeF(96F, 96F);
+            AutoScaleMode = AutoScaleMode.Dpi;
+            Font = new Font("Microsoft YaHei UI", 9F);
+            Text = title + " · 桌面课笺"; BackColor = Ui.Background;
+            Icon = App.AppIcon; StartPosition = FormStartPosition.Manual;
+            Size = defaultSize; MinimumSize = new Size(350, 430);
+            FormBorderStyle = FormBorderStyle.Sizable; MaximizeBox = true;
+            header = new Panel { Name = "widget-header", Dock = DockStyle.Top, Height = 48, BackColor = Color.White, Padding = new Padding(12, 6, 8, 6) };
+            stripe = new Panel { Name = "widget-accent", Dock = DockStyle.Top, Height = 3, BackColor = accent };
+            headingTitle = title;
+            heading = Ui.Label(title, 12F, accent); heading.Name = "widget-heading"; heading.Dock = DockStyle.Fill; heading.TextAlign = ContentAlignment.MiddleLeft; heading.AutoSize = false;
+            heading.Paint += delegate(object sender, PaintEventArgs e)
+            {
+                if (!referenceHeader) return;
+                float d = e.Graphics.DpiX / 96F; int size = (int)Math.Round(7 * d);
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                using (var brush = new SolidBrush(referenceDot)) e.Graphics.FillEllipse(brush, 0, (heading.Height - size) / 2, size, size);
+            };
+            header.Paint += delegate(object sender, PaintEventArgs e)
+            {
+                if (!referenceHeader || !referenceRule) return;
+                using (var pen = new Pen(referenceRuleColor)) e.Graphics.DrawLine(pen, 0, header.Height - 1, header.Width, header.Height - 1);
+            };
+            var actions = new FlowLayoutPanel { Dock = DockStyle.Right, Width = 174, FlowDirection = FlowDirection.LeftToRight, WrapContents = false };
+            headerActions = actions;
+            pin = new CheckBox { Text = "置顶", AutoSize = true, Margin = new Padding(4, 7, 7, 2) };
+            pin.Name = "widget-pin";
+            pin.CheckedChanged += delegate { TopMost = pin.Checked; Remember(); if (referenceHeader) pin.ForeColor = pin.Checked ? referenceAccent : referenceInk; };
+            var menu = Ui.Button("⚙", delegate { App.OpenSettings(); }); menu.Name = "open-settings"; menu.AccessibleName = "打开设置中心"; menu.AutoSize = false; menu.Width = 40;
+            var hide = Ui.Button("隐藏", delegate { Hide(); }); hide.Name = "hide-widget"; hide.AutoSize = false; hide.Width = 54;
+            settingsButton = menu; hideButton = hide;
+            actions.Controls.Add(pin); actions.Controls.Add(menu); actions.Controls.Add(hide);
+            header.Controls.Add(heading); header.Controls.Add(actions);
+            Body = new Panel { Dock = DockStyle.Fill, Padding = new Padding(12, 6, 12, 10), BackColor = Ui.Background };
+            Controls.Add(Body); Controls.Add(header); Controls.Add(stripe);
+            MouseEventHandler drag = delegate(object sender, MouseEventArgs e) { if (!PositionLocked && e.Button == MouseButtons.Left) { ReleaseCapture(); SendMessage(Handle, 0xA1, new IntPtr(2), IntPtr.Zero); } };
+            header.MouseDown += drag; heading.MouseDown += drag;
+            RestoreWindow();
+            Move += delegate { Remember(); }; ResizeEnd += delegate { Remember(); };
+            VisibleChanged += delegate { Remember(); };
+            FormClosing += delegate(object sender, FormClosingEventArgs e) { if (!App.Exiting && e.CloseReason == CloseReason.UserClosing) { e.Cancel = true; Hide(); } else Remember(); };
+        }
+        protected override void OnLoad(EventArgs e)
+        {
+            base.OnLoad(e);
+            RestoreWindow();
+            ready = true;
+            ApplyAppearance();
+        }
+        protected override void WndProc(ref Message m)
+        {
+            if (App != null && PositionLocked)
+            {
+                int command = m.WParam.ToInt32() & 0xFFF0;
+                if (m.Msg == 0x112 && (command == 0xF010 || command == 0xF000 || command == 0xF030)) return;
+                if ((m.Msg == 0xA1 || m.Msg == 0xA3) && m.WParam.ToInt32() == 2) return;
+            }
+            base.WndProc(ref m);
+            if (App != null && PositionLocked && m.Msg == 0x84 && m.Result.ToInt32() >= 10 && m.Result.ToInt32() <= 17) m.Result = new IntPtr(1);
+        }
+        public void ApplyAppearance()
+        {
+            if (applyingAppearance || IsDisposed || App.Data.Settings == null) return;
+            if (!CanApplyAppearance()) return;
+            applyingAppearance = true;
+            try
+            {
+                var appearance = SettingsLogic.EffectiveAppearance(App.Data, WidgetKey);
+                AppearancePainter.Apply(this, appearance, appearanceBaselines);
+                Opacity = appearance.Opacity;
+                if (headerActions != null)
+                {
+                    hideButton.Width = Math.Max(hideButton.Width, TextRenderer.MeasureText("隐藏", hideButton.Font).Width + hideButton.Padding.Horizontal + 10);
+                    int height = Math.Max(hideButton.Height, hideButton.Font.Height + hideButton.Padding.Vertical + 8);
+                    hideButton.Height = height; settingsButton.Height = height;
+                    UpdateHeaderActionsWidth();
+                }
+                OnAppearanceChanged(appearance);
+            }
+            finally { applyingAppearance = false; }
+        }
+        protected virtual void OnAppearanceChanged(AppearanceOptions appearance) { }
+        protected virtual bool CanApplyAppearance() { return true; }
+        private void UpdateHeaderActionsWidth()
+        {
+            int width = (pin.AutoSize ? pin.PreferredSize.Width : pin.Width) + pin.Margin.Horizontal + settingsButton.Width + settingsButton.Margin.Horizontal + 4;
+            if (hideButton.Visible || !referenceHeader) width += hideButton.Width + hideButton.Margin.Horizontal;
+            headerActions.Width = width;
+        }
+        // Reference-style header (清爽卡片 / 手账纸页): colored dot, book label, a 置顶 toggle and a small ⚙.
+        // The window's ✕ still hides the widget, so the 隐藏 button and the accent stripe are not shown.
+        protected void SetReferenceHeader(bool on, string suffix, Color back, Color ink, Color muted, Color dot, Color accent, Color soft, Color rule, bool bottomRule)
+        {
+            float dpi; using (var g = CreateGraphics()) dpi = g.DpiY / 96F;
+            referenceHeader = on; referenceRule = bottomRule; referenceDot = dot; referenceRuleColor = rule; referenceInk = ink; referenceAccent = accent;
+            headingSuffix = on ? suffix : "";
+            heading.Text = headingTitle + headingSuffix;
+            stripe.Visible = !on; hideButton.Visible = !on;
+            pin.Appearance = on ? Appearance.Button : Appearance.Normal;
+            pin.FlatStyle = on ? FlatStyle.Flat : FlatStyle.Standard;
+            pin.TextAlign = ContentAlignment.MiddleCenter;
+            pin.FlatAppearance.BorderSize = 0;
+            if (on)
+            {
+                header.BackColor = back; heading.BackColor = back; headerActions.BackColor = back;
+                heading.ForeColor = muted;
+                heading.Padding = new Padding((int)Math.Round(15 * dpi), 0, 0, 0);
+                header.Padding = new Padding((int)Math.Round(18 * dpi), (int)Math.Round(6 * dpi), (int)Math.Round(10 * dpi), (int)Math.Round(4 * dpi));
+                pin.BackColor = back; pin.ForeColor = pin.Checked ? accent : ink;
+                pin.FlatAppearance.CheckedBackColor = soft; pin.FlatAppearance.MouseOverBackColor = soft; pin.FlatAppearance.MouseDownBackColor = soft;
+                pin.Padding = Padding.Empty;
+                pin.Margin = new Padding(0, 0, (int)Math.Round(2 * dpi), 0);
+                settingsButton.BackColor = back; settingsButton.ForeColor = muted;
+                settingsButton.FlatAppearance.BorderSize = 0; settingsButton.FlatAppearance.MouseOverBackColor = soft; settingsButton.FlatAppearance.BorderColor = back;
+                settingsButton.Width = (int)Math.Round(30 * dpi);
+                settingsButton.Margin = Padding.Empty;
+                pin.AutoSize = false;
+                pin.Size = new Size(TextRenderer.MeasureText("置顶", pin.Font).Width + (int)Math.Round(16 * dpi), settingsButton.Height);
+                header.Height = (int)Math.Max(42 * dpi, settingsButton.Height + 12 * dpi);
+            }
+            else
+            {
+                heading.Padding = Padding.Empty; header.Padding = new Padding(12, 6, 8, 6);
+                pin.Padding = Padding.Empty; pin.Margin = new Padding(4, 7, 7, 2); pin.AutoSize = true;
+                settingsButton.Width = (int)Math.Round(40 * dpi); settingsButton.Margin = hideButton.Margin;
+                settingsButton.FlatAppearance.MouseOverBackColor = Color.Empty;
+            }
+            UpdateHeaderActionsWidth();
+            header.Invalidate(); heading.Invalidate();
+        }
+        protected void SetCompactNotebookHeader(bool compact) { SetCompactNotebookHeader(compact, 9.5F); }
+        protected void SetCompactNotebookHeader(bool compact, float compactSize)
+        {
+            float dpi; using (var g = CreateGraphics()) dpi = g.DpiY / 96F;
+            heading.AutoEllipsis = true;
+            heading.Parent.Height = (int)Math.Max((compact ? 36 : 48) * dpi, hideButton.Height + 12 * dpi);
+            float size = (compact ? compactSize : 12F) * SettingsLogic.EffectiveAppearance(App.Data, WidgetKey).FontSize / 9F;
+            if (notebookHeadingFont == null || Math.Abs(notebookHeadingFont.SizeInPoints - size) > .01F)
+            {
+                Font previous = notebookHeadingFont; notebookHeadingFont = new Font("Microsoft YaHei UI", size);
+                heading.Font = notebookHeadingFont; if (previous != null) previous.Dispose();
+            }
+            else heading.Font = notebookHeadingFont;
+            settingsButton.FlatAppearance.BorderSize = hideButton.FlatAppearance.BorderSize = compact ? 0 : 1;
+        }
+        protected override void Dispose(bool disposing)
+        {
+            base.Dispose(disposing);
+            if (disposing)
+            {
+                foreach (var baseline in appearanceBaselines.Values) if (baseline.AppliedFont != null) baseline.AppliedFont.Dispose();
+                appearanceBaselines.Clear();
+                if (notebookHeadingFont != null) { notebookHeadingFont.Dispose(); notebookHeadingFont = null; }
+            }
+        }
+        protected void SetTitle(string title) { Text = title + " · 桌面课笺"; headingTitle = title; heading.Text = title + headingSuffix; }
+        public void RestoreWindow()
+        {
+            bool old = ready; ready = false;
+            WindowState ws;
+            if (App.Data.Windows.TryGetValue(WidgetKey, out ws))
+            {
+                var desired = new Rectangle(ws.X, ws.Y, Math.Max(MinimumSize.Width, ws.Width), Math.Max(MinimumSize.Height, ws.Height));
+                var work = Screen.FromRectangle(desired).WorkingArea;
+                desired.Width = Math.Min(desired.Width, work.Width); desired.Height = Math.Min(desired.Height, work.Height);
+                desired.X = Math.Max(work.Left, Math.Min(desired.X, work.Right - desired.Width));
+                desired.Y = Math.Max(work.Top, Math.Min(desired.Y, work.Bottom - desired.Height));
+                Bounds = desired; TopMost = ws.TopMost; pin.Checked = ws.TopMost;
+            }
+            else
+            {
+                var work = Screen.PrimaryScreen.WorkingArea;
+                int offset = WidgetKey == "calendar" ? 0 : WidgetKey == "todo" ? 1 : 2;
+                Location = new Point(work.Left + 24 + offset * 65, work.Top + 24 + offset * 62);
+            }
+            ready = old;
+        }
+        public void Remember()
+        {
+            if (!ready || IsDisposed || App.Exiting) return;
+            Rectangle b = WindowState == FormWindowState.Normal ? Bounds : RestoreBounds;
+            WindowState old;
+            bool existed = App.Data.Windows.TryGetValue(WidgetKey, out old);
+            var next = new WindowState { X = b.X, Y = b.Y, Width = b.Width, Height = b.Height, TopMost = TopMost, Visible = Visible, PositionLocked = existed && old.PositionLocked };
+            if (existed && old.X == next.X && old.Y == next.Y && old.Width == next.Width && old.Height == next.Height && old.TopMost == next.TopMost && old.Visible == next.Visible) return;
+            App.Data.Windows[WidgetKey] = next;
+            App.QueueSave(); App.NotifyWindowStateChanged();
+        }
+        public void Reveal() { Show(); WindowState = FormWindowState.Normal; Activate(); Remember(); }
+    }
+
+    public sealed partial class AppController : ApplicationContext
+    {
+        public AppStore Store { get; private set; }
+        public AppData Data { get { return Store.Data; } }
+        public bool Exiting { get; private set; }
+        public Icon AppIcon { get; private set; }
+        public event Action DataChanged;
+        public event Action SaveStateChanged;
+        public string SaveStatus { get { return saveErrorShown ? "保存失败" : dirty ? "保存中…" : "已保存"; } }
+        public event Action<List<ReminderRecord>> RemindersDelivered;
+        public List<WidgetForm> Widgets = new List<WidgetForm>();
+        private NotifyIcon tray;
+        private System.Windows.Forms.Timer saveTimer, reminderTimer, reopenTimer;
+        private ReminderCenter center;
+        private bool dirty, saveErrorShown;
+        private EventWaitHandle showSignal;
+        private bool notifications;
+        private readonly List<ReminderRecord> pendingDelivery = new List<ReminderRecord>();
+        private PowerModeChangedEventHandler powerHandler;
+        private SessionEndingEventHandler sessionHandler;
+        public AppController(string dataDirectory, EventWaitHandle signal, bool enableNotifications)
+        {
+            Store = new AppStore(dataDirectory); showSignal = signal; notifications = enableNotifications;
+            AppIcon = Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? SystemIcons.Application;
+            saveTimer = new System.Windows.Forms.Timer { Interval = Data.Settings.AutoSaveDelayMs };
+            saveTimer.Tick += delegate { saveTimer.Stop(); Flush(); };
+            tray = new NotifyIcon { Icon = AppIcon, Text = "桌面课笺 · 课表 / Todo / DDL", Visible = enableNotifications };
+            tray.ContextMenuStrip = CreateMenu(); tray.DoubleClick += delegate { ShowAll(); };
+            tray.BalloonTipClicked += delegate { OpenReminders(); };
+            Widgets.Add(new CalendarForm(this)); Widgets.Add(new NotebookForm(this, "todo")); Widgets.Add(new NotebookForm(this, "ddl"));
+            // Apply physical saved bounds after each derived form has completed DPI scaling,
+            // including forms that stay hidden and therefore do not raise Load yet.
+            foreach (var w in Widgets) w.RestoreWindow();
+            // Capture intended visibility before Show() emits persistence callbacks.
+            var visible = Widgets.ToDictionary(w => w.WidgetKey, w => !Data.Windows.ContainsKey(w.WidgetKey) || Data.Windows[w.WidgetKey].Visible);
+            foreach (var w in Widgets) if (visible[w.WidgetKey]) w.Show();
+            foreach (var w in Widgets) w.ApplyAppearance();
+            powerHandler = delegate(object sender, PowerModeChangedEventArgs e)
+            {
+                if (e.Mode == PowerModes.Resume && !Exiting && Widgets.Count > 0 && Widgets[0].IsHandleCreated)
+                    Widgets[0].BeginInvoke(new Action(delegate { if (!Exiting) { Data.LastCheckUtc = ""; CheckReminders(DateTime.UtcNow); } }));
+            };
+            sessionHandler = delegate
+            {
+                if (!Exiting && Widgets.Count > 0 && Widgets[0].IsHandleCreated)
+                {
+                    Action finalSave = delegate { if (!Exiting) { try { Store.Save(); } catch { } } };
+                    if (Widgets[0].InvokeRequired) Widgets[0].Invoke(finalSave); else finalSave();
+                }
+            };
+            SystemEvents.PowerModeChanged += powerHandler;
+            SystemEvents.SessionEnding += sessionHandler;
+            reminderTimer = new System.Windows.Forms.Timer { Interval = 5000 };
+            reminderTimer.Tick += delegate { CheckReminders(DateTime.UtcNow); }; reminderTimer.Start();
+            reopenTimer = new System.Windows.Forms.Timer { Interval = 700 };
+            reopenTimer.Tick += delegate { if (showSignal != null && showSignal.WaitOne(0)) ShowAll(); }; reopenTimer.Start();
+            var startup = new System.Windows.Forms.Timer { Interval = 1000 };
+            startup.Tick += delegate { startup.Stop(); startup.Dispose(); if (!Exiting) { CheckReminders(DateTime.UtcNow); if (!String.IsNullOrEmpty(Store.LoadWarning)) MessageBox.Show(Store.LoadWarning, "数据恢复", MessageBoxButtons.OK, MessageBoxIcon.Warning); } }; startup.Start();
+        }
+        public void Save() { QueueSave(); PublishChanges(); }
+        public void QueueSave() { if (Exiting) return; bool changed = !dirty; dirty = true; saveTimer.Stop(); saveTimer.Start(); if (changed && SaveStateChanged != null) SaveStateChanged(); }
+        public bool Flush()
+        {
+            if (!dirty) return true;
+            try { Store.Save(); dirty = false; saveErrorShown = false; tray.Text = "桌面课笺 · 已自动保存"; if (SaveStateChanged != null) SaveStateChanged(); return true; }
+            catch (Exception ex) { tray.Text = "桌面课笺 · 保存失败，请导出备份"; if (!saveErrorShown) { saveErrorShown = true; if (SaveStateChanged != null) SaveStateChanged(); MessageBox.Show("本次保存失败，内容仍在内存中。请检查磁盘或从菜单导出备份。\n\n" + ex.Message, "无法保存", MessageBoxButtons.OK, MessageBoxIcon.Error); } saveTimer.Start(); return false; }
+        }
+        public void CheckReminders(DateTime utcNow)
+        {
+            if (Exiting) return;
+            pendingDelivery.AddRange(ReminderEngine.Scan(Data, utcNow));
+            // Persist both delivery keys and last scan, including while every window is hidden.
+            dirty = true; if (!Flush()) return;
+            var liveTasks = Data.Books.SelectMany(b => b.Pages).SelectMany(p => p.Tasks).Where(t => !t.Completed).Select(t => t.Id).ToList();
+            var batch = pendingDelivery.Where(r => liveTasks.Contains(r.TaskId)).ToList();
+            if (SettingsLogic.IsQuietHours(Data.Settings, utcNow.ToLocalTime())) return;
+            pendingDelivery.Clear();
+            if (batch.Count == 0) return;
+            if (RemindersDelivered != null) RemindersDelivered(batch);
+            if (notifications)
+            {
+                bool catchUp = batch.Any(r => r.CatchUp);
+                string title = catchUp ? "恢复提醒 · " + batch.Count + " 项" : "课笺提醒 · " + batch.Count + " 项";
+                string message = String.Join("\n", batch.Take(3).Select(r => r.Title + "  " + r.DueLocal.Replace("T", " ")));
+                if (batch.Count > 3) message += "\n另有 " + (batch.Count - 3) + " 项，点击查看全部";
+                if (!NativeNotification.Show(tray, AppIcon, title, message, Data.Settings.Reminders.SoundEnabled))
+                { tray.Text = "桌面课笺 · 系统通知未发送，请查看提醒中心"; OpenReminders(); }
+                if (catchUp) OpenReminders();
+            }
+            if (center != null && !center.IsDisposed) center.RefreshData();
+        }
+        public ContextMenuStrip CreateMenu()
+        {
+            var menu = new ContextMenuStrip { Font = new Font("Microsoft YaHei UI", 9F) };
+            menu.Items.Add("设置中心", null, delegate { OpenSettings(); });
+            menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add("显示全部组件", null, delegate { ShowAll(); });
+            menu.Items.Add("隐藏全部组件", null, delegate { HideAll(); });
+            menu.Items.Add(new ToolStripSeparator());
+            foreach (string id in new[] { "calendar", "todo", "ddl" })
+            {
+                string key = id;
+                string name = key == "calendar" ? "日历" : (Data.Books.FirstOrDefault(b => b.Id == key) == null ? key : Data.Books.First(b => b.Id == key).Name);
+                var componentItem = menu.Items.Add("显示 / 隐藏 " + name, null, delegate { var w = Widgets.FirstOrDefault(f => f.WidgetKey == key); if (w == null) return; SetWidgetVisible(key, !w.Visible); });
+                componentItem.Tag = key;
+            }
+            menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add("提醒中心", null, delegate { OpenReminders(); });
+            menu.Items.Add("发送测试通知", null, delegate { try { SendTestNotification(); } catch (Exception ex) { MessageBox.Show(ex.Message, "通知测试", MessageBoxButtons.OK, MessageBoxIcon.Warning); } });
+            menu.Items.Add("导出数据…", null, delegate { ExportData(); });
+            menu.Items.Add("导入数据…", null, delegate { ImportData(); });
+            menu.Items.Add("使用说明", null, delegate { ShowHelp(); });
+            menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add("保存并退出", null, delegate { Shutdown(); });
+            menu.Opening += delegate { foreach (ToolStripItem item in menu.Items) { string key = item.Tag as string; if (key == "todo" || key == "ddl") item.Text = "显示 / 隐藏 " + Data.Books.First(b => b.Id == key).Name; } };
+            return menu;
+        }
+        public void ShowAll() { foreach (var w in Widgets) w.Reveal(); }
+        public void OpenReminders() { if (center == null || center.IsDisposed) center = new ReminderCenter(this); center.RefreshData(); center.Show(); center.Activate(); }
+        public void ExportData()
+        {
+            using (var dlg = new SaveFileDialog { Filter = "课笺数据 (*.json)|*.json", FileName = "课笺备份-" + DateTime.Now.ToString("yyyyMMdd-HHmm") + ".json", Title = "导出全部课表、便签和窗口设置" })
+                if (dlg.ShowDialog() == DialogResult.OK) try { Store.Export(dlg.FileName); SettingsChanged(); MessageBox.Show("备份已导出。", "导出完成"); } catch (Exception ex) { MessageBox.Show(ex.Message, "导出失败"); }
+        }
+        public void ImportData()
+        {
+            using (var dlg = new OpenFileDialog { Filter = "课笺数据 (*.json)|*.json", Title = "导入备份" })
+            {
+                if (dlg.ShowDialog() != DialogResult.OK) return;
+                if (MessageBox.Show("导入会替换当前课表、两本便签和窗口设置。当前数据将先保存为本地备份。是否继续？", "导入备份", MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK) return;
+                try
+                {
+                    RestoreBackup(dlg.FileName); MessageBox.Show("备份已恢复。", "导入完成");
+                }
+                catch (Exception ex) { MessageBox.Show(ex.Message + "\n\n导入前备份保留在本地数据目录。", "导入或界面恢复失败", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+            }
+        }
+        private void ShowHelp()
+        {
+            MessageBox.Show("桌面课笺 1.2\n\n外观页可统一切换两本便签为「原始外观 / 轻量卡片 / 纸页本」。新布局点击页标题可编辑、底部翻页、任务末尾连续录入，⋯ 菜单修改截止时间。\n\n从托盘菜单或任一组件的齿轮按钮打开设置中心。关闭设置中心后，组件与提醒继续运行。\n\n显示与布局：管理置顶、位置锁定、保存布局；窗口移出屏幕后，可使用「找回当前屏幕」。外观支持全局设置和组件单独覆盖，修改立即预览并自动保存。\n\n日历：支持周/月视图和循环课表。临时停课或调课可选择「仅这一次」；设置中心可统一管理课程系列与学期。\n\n便签：文字和任务自动保存，设置中心可管理页面名称、顺序、归档和当前页。隐藏、翻页或归档不会取消未完成任务的提醒。\n\n提醒每 5 秒检查所有页面；免打扰结束、退出后重新运行或休眠恢复后汇总补发。完全退出后不能实时通知，请保留托盘运行。\n\n数据与应用：导入、导出、备份恢复和开机启动。恢复前会先保留当前数据。重置布局或外观不会删除内容。\n\n数据目录：\n" + Store.DirectoryPath, "使用说明", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        public void Shutdown()
+        {
+            foreach (var w in Widgets) w.Remember();
+            if (!Flush()) return;
+            Exiting = true; reminderTimer.Stop(); saveTimer.Stop(); reopenTimer.Stop();
+            SystemEvents.PowerModeChanged -= powerHandler; SystemEvents.SessionEnding -= sessionHandler;
+            tray.Visible = false;
+            foreach (var w in Widgets) w.Dispose();
+            if (center != null) center.Dispose();
+            if (settingsCenter != null) settingsCenter.Dispose();
+            NativeNotification.Dispose();
+            tray.Dispose(); ExitThread();
+        }
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing) { if (!Exiting) Shutdown(); saveTimer.Dispose(); reminderTimer.Dispose(); reopenTimer.Dispose(); AppIcon.Dispose(); }
+            base.Dispose(disposing);
+        }
+    }
+
+    public class ReminderCenter : Form
+    {
+        private AppController app;
+        private ListView list;
+        public ReminderCenter(AppController controller)
+        {
+            SuspendLayout(); AutoScaleDimensions = new SizeF(96, 96); AutoScaleMode = AutoScaleMode.Dpi;
+            app = controller; Text = "提醒中心 · 桌面课笺"; Size = new Size(780, 450); MinimumSize = new Size(600, 320);
+            Font = new Font("Microsoft YaHei UI", 9F); BackColor = Ui.Background; StartPosition = FormStartPosition.CenterScreen; Icon = app.AppIcon;
+            var info = Ui.Label("所有页面的提醒记录 · 错过的提醒会在恢复运行后汇总", 10F, Ui.Muted); info.Dock = DockStyle.Top; info.Height = 52; info.AutoSize = false; info.Padding = new Padding(14);
+            list = new ListView { Dock = DockStyle.Fill, View = View.Details, FullRowSelect = true, GridLines = false, BorderStyle = BorderStyle.None };
+            list.Columns.Add("任务", 210); list.Columns.Add("来源", 170); list.Columns.Add("截止时间", 145); list.Columns.Add("提醒", 90); list.Columns.Add("记录时间", 145);
+            Controls.Add(list); Controls.Add(info);
+            ResumeLayout(true);
+        }
+        public void RefreshData()
+        {
+            list.BeginUpdate(); list.Items.Clear();
+            foreach (var r in app.Data.ReminderHistory.AsEnumerable().Reverse())
+            {
+                DateTime fired; string stamp = DateTime.TryParse(r.FiredUtc, out fired) ? fired.ToLocalTime().ToString("MM-dd HH:mm:ss") : r.FiredUtc;
+                var row = new ListViewItem(r.Title); row.SubItems.Add(r.BookName + " / " + r.PageTitle); row.SubItems.Add(r.DueLocal.Replace("T", " "));
+                row.SubItems.Add((r.CatchUp ? "补发 · " : "") + (r.Kind == "advance" ? "提前" : "截止")); row.SubItems.Add(stamp); list.Items.Add(row);
+            }
+            if (list.Items.Count == 0) list.Items.Add("暂无提醒。可从组件菜单发送测试通知。");
+            list.EndUpdate();
+        }
+    }
+
+    internal static class Program
+    {
+        [DllImport("user32.dll")] private static extern bool SetProcessDPIAware();
+        [STAThread] private static void Main(string[] args)
+        {
+            SetProcessDPIAware(); Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
+            string directory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DeskStudy");
+            for (int i = 0; i + 1 < args.Length; i++) if (args[i] == "--data-dir") directory = Path.GetFullPath(args[++i]);
+            string hash; using (var sha = SHA256.Create()) hash = BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(directory.ToLowerInvariant()))).Replace("-", "").Substring(0, 20);
+            bool created;
+            using (var signal = new EventWaitHandle(false, EventResetMode.AutoReset, "Local\\DeskStudyShow" + hash))
+            using (var mutex = new Mutex(true, "Local\\DeskStudy" + hash, out created))
+            {
+                if (!created) { signal.Set(); return; }
+                try { using (var app = new AppController(directory, signal, true)) Application.Run(app); }
+                catch (Exception ex) { MessageBox.Show("应用无法继续运行。已保存的数据仍保留在本地。\n\n" + ex.Message + "\n\n数据目录：" + directory, "桌面课笺", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+                finally { mutex.ReleaseMutex(); }
+            }
+        }
+    }
+}
+

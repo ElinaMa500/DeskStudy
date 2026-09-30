@@ -1,0 +1,20 @@
+param([switch]$Render, [switch]$CardOnly, [switch]$CompileOnly)
+$ErrorActionPreference = 'Stop'
+$projectRoot = Split-Path -Parent $PSScriptRoot
+$compilerPath = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+$artifactPath = Join-Path $projectRoot 'artifacts'
+New-Item -ItemType Directory -Force -Path $artifactPath | Out-Null
+$testExe = Join-Path $artifactPath 'NotebookLayoutTests.exe'
+$sourceFiles = Get-ChildItem -LiteralPath (Join-Path $projectRoot 'src') -Filter '*.cs' | ForEach-Object FullName
+$buildArgs = @('/nologo', '/target:exe', '/main:NotebookLayoutTests', '/codepage:65001', ('/out:' + $testExe), ('/win32manifest:' + (Join-Path $projectRoot 'src\app.manifest')), '/reference:System.dll', '/reference:System.Core.dll', '/reference:System.Drawing.dll', '/reference:System.Windows.Forms.dll', '/reference:System.Web.Extensions.dll')
+& $compilerPath @buildArgs @sourceFiles (Join-Path $PSScriptRoot 'NotebookLayoutTests.cs')
+if ($LASTEXITCODE -ne 0) { throw 'Notebook layout test compilation failed.' }
+if ($CompileOnly) { Write-Output "Compiled: $testExe"; exit 0 }
+$dataPath = Join-Path $artifactPath ('layouts-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
+if ($Render) { & $testExe $dataPath render 2>&1 | Tee-Object -FilePath (Join-Path $artifactPath 'layouts-render.log'); if ($LASTEXITCODE -ne 0) { throw 'Notebook layout rendering failed.' }; exit 0 }
+if ($CardOnly) { & $testExe $dataPath card 2>&1 | Tee-Object -FilePath (Join-Path $artifactPath 'layouts-card.log'); if ($LASTEXITCODE -ne 0) { throw 'Notebook card stage failed.' }; exit 0 }
+& $testExe $dataPath write 2>&1 | Tee-Object -FilePath (Join-Path $artifactPath 'layouts-write.log')
+if ($LASTEXITCODE -ne 0) { throw 'Notebook layout write phase failed.' }
+& $testExe $dataPath read 2>&1 | Tee-Object -FilePath (Join-Path $artifactPath 'layouts-read.log')
+if ($LASTEXITCODE -ne 0) { throw 'Notebook layout restart phase failed.' }
+Write-Output "Notebook layout data: $dataPath"
