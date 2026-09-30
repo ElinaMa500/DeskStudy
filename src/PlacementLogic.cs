@@ -4,11 +4,15 @@ using System.Drawing;
 
 namespace DeskStudy
 {
-    // Pure geometry for keeping widgets on screen and apart. All rectangles are the visible window area in screen pixels.
+    // Pure geometry for placing widgets after a drag and keeping them apart. All rectangles are the visible window area in screen pixels.
     public static class PlacementLogic
     {
         public const int SnapDistance = 10;
-        public const int Gap = 8;
+        public const int Gap = 5;
+        // Past the left, right or bottom edge by at most this much: back to the edge. Further out: left where it was put.
+        public const int EdgeCatch = 60;
+        // However far out a widget is put, this much of it stays on screen so it can be dragged back.
+        public const int KeepVisible = 100;
 
         // Moves (and if needed shrinks) a rectangle so it lies fully inside the work area.
         public static Rectangle Fit(Rectangle r, Rectangle work)
@@ -16,6 +20,22 @@ namespace DeskStudy
             int width = Math.Min(r.Width, work.Width), height = Math.Min(r.Height, work.Height);
             int x = Math.Max(work.Left, Math.Min(r.X, work.Right - width));
             int y = Math.Max(work.Top, Math.Min(r.Y, work.Bottom - height));
+            return new Rectangle(x, y, width, height);
+        }
+
+        // The screen-edge rule: never above the top; slightly past another edge snaps back to it;
+        // far past it stays there, keeping a part on screen. A widget larger than the screen is shrunk to it.
+        public static Rectangle Contain(Rectangle r, Rectangle work)
+        {
+            int width = Math.Min(r.Width, work.Width), height = Math.Min(r.Height, work.Height);
+            int x = r.X, y = r.Y;
+            int pastLeft = work.Left - x, pastRight = x + width - work.Right, pastBottom = y + height - work.Bottom;
+            if (pastLeft > 0 && pastLeft <= EdgeCatch) x = work.Left;
+            else if (pastRight > 0 && pastRight <= EdgeCatch) x = work.Right - width;
+            if (pastBottom > 0 && pastBottom <= EdgeCatch) y = work.Bottom - height;
+            int keepX = Math.Min(KeepVisible, width), keepY = Math.Min(KeepVisible, height);
+            x = Math.Max(work.Left + keepX - width, Math.Min(x, work.Right - keepX));
+            y = Math.Max(work.Top, Math.Min(y, work.Bottom - keepY));
             return new Rectangle(x, y, width, height);
         }
 
@@ -32,19 +52,21 @@ namespace DeskStudy
             return true;
         }
 
-        // The nearest place for a dropped widget: inside the work area and not covering another widget.
-        // Only the dropped widget moves. When nothing fits, it stays where it was dropped, pulled back on screen.
+        // The nearest place for a dropped widget that follows the screen-edge rule and does not cover another widget.
+        // Only the dropped widget moves. A widget dropped on screen stays on screen; one the user put partly outside may stay outside.
+        // When nothing fits, it stays where it was dropped.
         public static Rectangle Resolve(Rectangle dropped, Rectangle work, IList<Rectangle> others, int gap)
         {
-            Rectangle fitted = Fit(dropped, work);
+            Rectangle fitted = Contain(dropped, work);
             if (!Overlaps(fitted, others)) return fitted;
+            bool onScreen = work.Contains(fitted);
             Rectangle best;
-            if (Nearest(dropped, fitted, work, others, gap, out best)) return best;
-            if (gap > 0 && Nearest(dropped, fitted, work, others, 0, out best)) return best;
+            if (Nearest(dropped, fitted, work, others, gap, onScreen, out best)) return best;
+            if (gap > 0 && Nearest(dropped, fitted, work, others, 0, onScreen, out best)) return best;
             return fitted;
         }
 
-        private static bool Nearest(Rectangle dropped, Rectangle fitted, Rectangle work, IList<Rectangle> others, int gap, out Rectangle best)
+        private static bool Nearest(Rectangle dropped, Rectangle fitted, Rectangle work, IList<Rectangle> others, int gap, bool onScreen, out Rectangle best)
         {
             int w = fitted.Width, h = fitted.Height;
             var xs = new List<int> { fitted.X, work.Left, work.Right - w };
@@ -59,7 +81,8 @@ namespace DeskStudy
                 foreach (int y in ys)
                 {
                     var candidate = new Rectangle(x, y, w, h);
-                    if (!work.Contains(candidate) || !Clear(candidate, others, gap)) continue;
+                    bool allowed = onScreen ? work.Contains(candidate) : Contain(candidate, work) == candidate;
+                    if (!allowed || !Clear(candidate, others, gap)) continue;
                     long dx = x - dropped.X, dy = y - dropped.Y, distance = dx * dx + dy * dy;
                     if (distance < bestDistance) { bestDistance = distance; best = candidate; }
                 }
@@ -73,15 +96,16 @@ namespace DeskStudy
         public static bool MovesTop(int edge) { return edge == EdgeTop || edge == EdgeTopLeft || edge == EdgeTopRight; }
         public static bool MovesBottom(int edge) { return edge == EdgeBottom || edge == EdgeBottomLeft || edge == EdgeBottomRight; }
 
-        // After a resize: the dragged edges are pulled back to the screen edge, and stopped short of a neighbour.
+        // After a resize: a dragged edge slightly past the screen goes back to the screen edge (the top edge always does),
+        // and a dragged edge that ran into a neighbour stops short of it.
         // If that would make the widget smaller than its minimum, the widget is moved instead.
         public static Rectangle AfterResize(Rectangle r, int edge, Rectangle work, IList<Rectangle> others, Size minimum, int gap)
         {
             int left = r.Left, top = r.Top, right = r.Right, bottom = r.Bottom;
-            if (MovesLeft(edge)) left = Math.Max(left, work.Left);
-            if (MovesRight(edge)) right = Math.Min(right, work.Right);
+            if (MovesLeft(edge) && left < work.Left && work.Left - left <= EdgeCatch) left = work.Left;
+            if (MovesRight(edge) && right > work.Right && right - work.Right <= EdgeCatch) right = work.Right;
             if (MovesTop(edge)) top = Math.Max(top, work.Top);
-            if (MovesBottom(edge)) bottom = Math.Min(bottom, work.Bottom);
+            if (MovesBottom(edge) && bottom > work.Bottom && bottom - work.Bottom <= EdgeCatch) bottom = work.Bottom;
             for (int pass = 0; pass < others.Count; pass++)
             {
                 bool changed = false;
@@ -116,11 +140,11 @@ namespace DeskStudy
                 int height = Math.Max(minimum.Height, Math.Min(r.Height, Math.Max(result.Height, minimum.Height)));
                 result = new Rectangle(MovesLeft(edge) ? r.Right - width : r.Left, MovesTop(edge) ? r.Bottom - height : r.Top, width, height);
             }
-            if (!work.Contains(result) || Overlaps(result, others)) return Resolve(result, work, others, gap);
+            if (Contain(result, work) != result || Overlaps(result, others)) return Resolve(result, work, others, gap);
             return result;
         }
 
-        // While dragging: pulls the window onto a nearby screen edge or next to a nearby widget.
+        // On release after a drag: pulls the window onto a nearby screen edge or next to a nearby widget.
         public static Rectangle SnapMove(Rectangle r, Rectangle work, IList<Rectangle> others, int distance, int gap)
         {
             int dx = Closest(distance, new[] { work.Left - r.Left, work.Right - r.Right });
@@ -146,7 +170,7 @@ namespace DeskStudy
             return r;
         }
 
-        // While resizing: the dragged edges snap to a nearby screen edge or next to / in line with a nearby widget.
+        // On release after a resize: the dragged edges snap to a nearby screen edge or next to / in line with a nearby widget.
         public static Rectangle SnapResize(Rectangle r, int edge, Rectangle work, IList<Rectangle> others, Size minimum, int distance, int gap)
         {
             int left = r.Left, top = r.Top, right = r.Right, bottom = r.Bottom;

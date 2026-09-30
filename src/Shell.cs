@@ -230,10 +230,8 @@ namespace DeskStudy
             if (App.Data.Windows.TryGetValue(WidgetKey, out ws))
             {
                 var desired = new Rectangle(ws.X, ws.Y, Math.Max(MinimumSize.Width, ws.Width), Math.Max(MinimumSize.Height, ws.Height));
-                var work = Screen.FromRectangle(desired).WorkingArea;
-                desired.Width = Math.Min(desired.Width, work.Width); desired.Height = Math.Min(desired.Height, work.Height);
-                desired.X = Math.Max(work.Left, Math.Min(desired.X, work.Right - desired.Width));
-                desired.Y = Math.Max(work.Top, Math.Min(desired.Y, work.Bottom - desired.Height));
+                // Same rule as after a drag: a widget the user left partly off screen stays there, one that is lost comes back.
+                desired = PlacementLogic.Contain(desired, Screen.FromRectangle(desired).WorkingArea);
                 Bounds = desired; TopMost = ws.TopMost; pin.Checked = ws.TopMost;
             }
             else
@@ -405,7 +403,7 @@ namespace DeskStudy
         }
         private void ShowHelp()
         {
-            MessageBox.Show("桌面课笺 1.5.1\n\n桌面组件模式下，组件没有标题栏，也不出现在任务栏：拖动顶栏移动，拖动边缘调整大小；靠近屏幕边缘或其他组件时自动贴齐，松手时若超出屏幕或压住其他组件会自动弹回；点击组件时它浮到前面，切到别的程序后自动回到其他窗口下面。单击托盘图标或按快捷键（默认 Ctrl+Alt+Shift+D）可把组件浮到前面。可在设置中心的「显示与布局」切回标准窗口。\n\n外观页可切换五种便签布局。点击页标题可编辑，在任务末尾连续录入；点任务下方的状态文字可设置或修改截止时间。\n\n从托盘菜单或任一组件的齿轮按钮打开设置中心。关闭设置中心后，组件与提醒继续运行。\n\n显示与布局：管理置顶、位置锁定、保存布局；窗口移出屏幕后，可使用「找回当前屏幕」。外观支持全局设置和组件单独覆盖，修改立即预览并自动保存。\n\n日历：支持周/月视图和循环课表。临时停课或调课可选择「仅这一次」；设置中心可统一管理课程系列与学期。\n\n便签：文字和任务自动保存，设置中心可管理页面名称、顺序、归档和当前页。隐藏、翻页或归档不会取消未完成任务的提醒。\n\n提醒每 5 秒检查所有页面；免打扰结束、退出后重新运行或休眠恢复后汇总补发。完全退出后不能实时通知，请保留托盘运行。\n\n数据与应用：导入、导出、备份恢复和开机启动。恢复前会先保留当前数据。重置布局或外观不会删除内容。\n\n数据目录：\n" + Store.DirectoryPath, "使用说明", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show("桌面课笺 1.5.1\n\n桌面组件模式下，组件没有标题栏，也不出现在任务栏：拖动顶栏移动，拖动边缘调整大小；松手后，靠近屏幕边缘或其他组件的会自动贴齐，稍微超出屏幕的会滑回，压住其他组件的会让开；点击组件时它浮到前面，切到别的程序后自动回到其他窗口下面。单击托盘图标或按快捷键（默认 Ctrl+Alt+Shift+D）可把组件浮到前面。可在设置中心的「显示与布局」切回标准窗口。\n\n外观页可切换五种便签布局。点击页标题可编辑，在任务末尾连续录入；点任务下方的状态文字可设置或修改截止时间。\n\n从托盘菜单或任一组件的齿轮按钮打开设置中心。关闭设置中心后，组件与提醒继续运行。\n\n显示与布局：管理置顶、位置锁定、保存布局；窗口移出屏幕后，可使用「找回当前屏幕」。外观支持全局设置和组件单独覆盖，修改立即预览并自动保存。\n\n日历：支持周/月视图和循环课表。临时停课或调课可选择「仅这一次」；设置中心可统一管理课程系列与学期。\n\n便签：文字和任务自动保存，设置中心可管理页面名称、顺序、归档和当前页。隐藏、翻页或归档不会取消未完成任务的提醒。\n\n提醒每 5 秒检查所有页面；免打扰结束、退出后重新运行或休眠恢复后汇总补发。完全退出后不能实时通知，请保留托盘运行。\n\n数据与应用：导入、导出、备份恢复和开机启动。恢复前会先保留当前数据。重置布局或外观不会删除内容。\n\n数据目录：\n" + Store.DirectoryPath, "使用说明", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
         public void Shutdown()
         {

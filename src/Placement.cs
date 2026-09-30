@@ -8,7 +8,7 @@ using Microsoft.Win32;
 
 namespace DeskStudy
 {
-    // Snapping while dragging, and sliding back on screen and away from other widgets after a drag or resize.
+    // After a drag or resize is released: snapping, sliding back from the screen edges and away from other widgets.
     public partial class WidgetForm
     {
         private int sizingEdge;
@@ -48,32 +48,16 @@ namespace DeskStudy
             catch (EntryPointNotFoundException) { return false; }
         }
 
+        // While the mouse is held the widget follows it freely; snapping and bouncing happen only on release.
         private void PlacementWndProc(ref Message m)
         {
-            if (m.Msg == 0x0231) { StopSlide(); sizingEdge = 0; return; }
-            if ((m.Msg != 0x0216 && m.Msg != 0x0214) || WindowState != FormWindowState.Normal || m.LParam == IntPtr.Zero) return;
-            var rect = (RECT)Marshal.PtrToStructure(m.LParam, typeof(RECT));
-            Padding insets = VisualInsets();
-            Rectangle visual = Deflate(Rectangle.FromLTRB(rect.Left, rect.Top, rect.Right, rect.Bottom), insets);
-            Rectangle work = Screen.FromRectangle(visual).WorkingArea;
-            List<Rectangle> others = App.PlacementObstacles(this);
-            Rectangle snapped;
-            if (m.Msg == 0x0216) snapped = PlacementLogic.SnapMove(visual, work, others, PlacementLogic.SnapDistance, PlacementLogic.Gap);
-            else
-            {
-                sizingEdge = m.WParam.ToInt32();
-                snapped = PlacementLogic.SnapResize(visual, sizingEdge, work, others, VisualMinimum, PlacementLogic.SnapDistance, PlacementLogic.Gap);
-            }
-            if (snapped == visual) return;
-            Rectangle window = Inflate(snapped, insets);
-            rect.Left = window.Left; rect.Top = window.Top; rect.Right = window.Right; rect.Bottom = window.Bottom;
-            Marshal.StructureToPtr(rect, m.LParam, false);
-            m.Result = new IntPtr(1);
+            if (m.Msg == 0x0231) { StopSlide(); sizingEdge = 0; }
+            else if (m.Msg == 0x0214) sizingEdge = m.WParam.ToInt32();
         }
         private void AfterPlacementWndProc(ref Message m)
         {
-            // The drag or resize is over: settle back on screen and off other widgets.
-            if (m.Msg == 0x0232 && !IsDisposed) { int edge = sizingEdge; sizingEdge = 0; App.SettleWidget(this, edge, true); }
+            // The drag or resize is over: snap, settle on screen and off other widgets.
+            if (m.Msg == 0x0232 && !IsDisposed) { int edge = sizingEdge; sizingEdge = 0; App.SettleAfterDrag(this, edge); }
         }
 
         // Moves the widget so its visible area becomes the target, gliding there unless animations are off.
@@ -133,13 +117,22 @@ namespace DeskStudy
         public void SettleWidget(WidgetForm w, int edge, bool animate)
         {
             if (placementSuspended > 0 || Exiting || !w.Placeable) return;
-            Settle(w, edge, PlacementObstacles(w), animate);
+            Settle(w, edge, PlacementObstacles(w), animate, false);
         }
-        private static Rectangle Settle(WidgetForm w, int edge, List<Rectangle> others, bool animate)
+        // Released after a drag or resize: first snap to a screen edge or neighbour within reach, then settle.
+        public void SettleAfterDrag(WidgetForm w, int edge)
+        {
+            if (placementSuspended > 0 || Exiting || !w.Placeable) return;
+            Settle(w, edge, PlacementObstacles(w), true, true);
+        }
+        private static Rectangle Settle(WidgetForm w, int edge, List<Rectangle> others, bool animate, bool snap)
         {
             Rectangle visual = w.VisualBounds;
             Rectangle work = Screen.FromRectangle(visual).WorkingArea;
-            Rectangle target = w.PositionLocked ? PlacementLogic.Fit(visual, work)
+            if (snap && !w.PositionLocked)
+                visual = edge == 0 ? PlacementLogic.SnapMove(visual, work, others, PlacementLogic.SnapDistance, PlacementLogic.Gap)
+                    : PlacementLogic.SnapResize(visual, edge, work, others, w.VisualMinimum, PlacementLogic.SnapDistance, PlacementLogic.Gap);
+            Rectangle target = w.PositionLocked ? PlacementLogic.Contain(visual, work)
                 : edge == 0 ? PlacementLogic.Resolve(visual, work, others, PlacementLogic.Gap)
                 : PlacementLogic.AfterResize(visual, edge, work, others, w.VisualMinimum, PlacementLogic.Gap);
             w.SlideTo(target, animate);
@@ -152,8 +145,8 @@ namespace DeskStudy
             if (Exiting) return;
             var placed = new List<Rectangle>();
             var showing = Widgets.Where(w => w.Placeable).ToList();
-            foreach (var w in showing.Where(w => w.PositionLocked)) placed.Add(Settle(w, 0, placed, false));
-            foreach (var w in showing.Where(w => !w.PositionLocked)) placed.Add(Settle(w, 0, placed, false));
+            foreach (var w in showing.Where(w => w.PositionLocked)) placed.Add(Settle(w, 0, placed, false, false));
+            foreach (var w in showing.Where(w => !w.PositionLocked)) placed.Add(Settle(w, 0, placed, false, false));
         }
 
         // Several windows change together (restore layout, reset, rescue): settle once, after all of them moved.
