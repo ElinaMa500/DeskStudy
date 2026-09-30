@@ -23,14 +23,14 @@ public static class PlacementCoreTests
         var none = L();
         try
         {
-            Assert(G == 5 && D == 10 && C == 60 && K == 100, "gap 5 px, snapping within 10 px, edges catch up to 60 px past them, 100 px always stays on screen");
+            Assert(G == 5 && D == 10 && C == 100 && K == 100, "gap 5 px, snapping within 10 px, edges catch up to 100 px past them, 100 px always stays on screen");
             // Top: always back.
             Assert(PlacementLogic.Resolve(R(300, -60, 400, 500), work, none, G) == R(300, 0, 400, 500), "past the top edge: back down");
             Assert(PlacementLogic.Resolve(R(300, -400, 400, 500), work, none, G) == R(300, 0, 400, 500), "far past the top edge: still back down");
             // Other edges: slightly past snaps back, far past stays.
             Assert(PlacementLogic.Resolve(R(-40, 300, 400, 500), work, none, G) == R(0, 300, 400, 500), "40 px past the left edge: back to it");
-            Assert(PlacementLogic.Resolve(R(-C, 300, 400, 500), work, none, G) == R(0, 300, 400, 500), "exactly 60 px past the left edge: back to it");
-            Assert(PlacementLogic.Resolve(R(-C - 1, 300, 400, 500), work, none, G) == R(-C - 1, 300, 400, 500), "61 px past the left edge: left where it was put");
+            Assert(PlacementLogic.Resolve(R(-C, 300, 400, 500), work, none, G) == R(0, 300, 400, 500), "exactly 100 px past the left edge: back to it");
+            Assert(PlacementLogic.Resolve(R(-C - 1, 300, 400, 500), work, none, G) == R(-C - 1, 300, 400, 500), "101 px past the left edge: left where it was put");
             Assert(PlacementLogic.Resolve(R(1920 - 400 + 50, 300, 400, 500), work, none, G) == R(1520, 300, 400, 500), "50 px past the right edge: back to it");
             Assert(PlacementLogic.Resolve(R(1700, 300, 400, 500), work, none, G) == R(1700, 300, 400, 500), "180 px past the right edge: left there");
             Assert(PlacementLogic.Resolve(R(300, 680, 400, 500), work, none, G) == R(300, 640, 400, 500), "40 px into the taskbar: back above it");
@@ -62,14 +62,14 @@ public static class PlacementCoreTests
             Assert(moved == R(850 + G, 100, 440, 520), "with two neighbours: clear of both, nearest spot");
             // Put partly off screen on top of a widget near the edge: may stay partly off screen, but not on the widget.
             var nearEdge = R(1600, 100, 320, 520);
-            moved = PlacementLogic.Resolve(R(1700, 150, 440, 520), work, L(nearEdge), G);
+            moved = PlacementLogic.Resolve(R(1850, 150, 440, 520), work, L(nearEdge), G);
             Assert(!moved.IntersectsWith(nearEdge) && PlacementLogic.Contain(moved, work) == moved, "dropped far past the edge onto a widget: moved clear, still allowed off screen: " + moved);
-            // Stacked on purpose (more than 2/3 of the smaller widget covered): left overlapping.
+            // Stacked on purpose (more than half of the smaller widget covered): left overlapping.
             Assert(PlacementLogic.Resolve(R(1000, 200, 440, 520), work, L(todo), G) == R(1000, 200, 440, 520), "dropped covering 81% of a widget: allowed to stay stacked");
             Assert(PlacementLogic.Resolve(R(1040, 100, 440, 520), work, L(todo), G) == R(1040, 100, 440, 520), "shifted only 40 px sideways (91% shared): stays stacked");
-            Assert(PlacementLogic.Resolve(R(1147, 100, 440, 520), work, L(todo), G).X == 1440 + G, "just under 2/3 shared (293 of 440 px): pushed clear");
-            Assert(PlacementLogic.Resolve(R(1146, 100, 440, 520), work, L(todo), G).X == 1146, "just over 2/3 shared (294 of 440 px): stays stacked");
-            Assert(PlacementLogic.Stacked(R(0, 0, 300, 300), R(100, 0, 300, 300)) == false && PlacementLogic.Stacked(R(0, 0, 300, 300), R(99, 0, 300, 300)), "exactly 2/3 shared is not enough; a little more is");
+            Assert(PlacementLogic.Resolve(R(1220, 100, 440, 520), work, L(todo), G).X == 1440 + G, "exactly half shared (220 of 440 px): pushed clear");
+            Assert(PlacementLogic.Resolve(R(1219, 100, 440, 520), work, L(todo), G).X == 1219, "just over half shared (221 of 440 px): stays stacked");
+            Assert(PlacementLogic.Stacked(R(0, 0, 300, 300), R(150, 0, 300, 300)) == false && PlacementLogic.Stacked(R(0, 0, 300, 300), R(149, 0, 300, 300)), "exactly half shared is not enough; a little more is");
             Assert(PlacementLogic.Resolve(R(100, 100, 440, 520), work, L(calendar), G) == R(100, 100, 440, 520), "a notebook dropped entirely inside the calendar: stays (measured against the smaller widget)");
             Assert(PlacementLogic.AfterResize(R(1000, 100, 600, 520), PlacementLogic.EdgeRight, work, L(todo), new Size(350, 430), G) == R(1000, 100, 600, 520), "a stacked widget is resized freely over the one below it");
             var tight = R(0, 0, 1000, 1000);

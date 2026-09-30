@@ -61,7 +61,7 @@ public static class PlacementChecks
             return;
         }
         app.ShowAll(); Pump(200);
-        Assert(Apart(app.Widgets) && app.Widgets.All(w => work.Contains(V(w))), "a fresh start opens the widgets on screen without overlap");
+        Assert(Apart(app.Widgets) && app.Widgets.All(w => work.Contains(V(w))), "a fresh start opens the widgets on screen without overlap: " + string.Join(" ", app.Widgets.Select(w => V(w).ToString())));
         // Known starting layout: calendar top-left, Todo to its right, DDL below Todo. Notebooks are 440 × 540.
         const int W = 440, H = 540, C = PlacementLogic.EdgeCatch;
         Func<int, int, Rectangle> at = (x, y) => new Rectangle(work.Left + x, work.Top + y, W, H);
@@ -136,12 +136,12 @@ public static class PlacementChecks
         Drop(ddl, at(950, 60));
         Assert(V(ddl) == at(950, 60) && V(todo) == at(900, 0) && Saved(app, ddl), "dropped covering most of Todo: both stay where they are, stacked");
         Drop(ddl, at(1150, 60));
-        Assert(Apart(app.Widgets), "moved so that only about 40% is shared: pushed clear again");
+        Assert(Apart(app.Widgets), "moved so that only about 36% is shared: pushed clear again");
 
         // Locked widgets never move; the other one makes way.
         Put(todo, at(900, 0)); Put(ddl, at(1450, 590)); Pump(60);
         app.Data.Windows["todo"].PositionLocked = true; Rectangle lockedAt = V(todo);
-        Drop(ddl, at(1000, 100));
+        Drop(ddl, at(1150, 100));
         Assert(V(todo) == lockedAt && !V(ddl).IntersectsWith(lockedAt), "dropped onto a locked widget: the locked one stays, the dropped one moves");
         app.Data.Windows["todo"].PositionLocked = false;
 
@@ -159,7 +159,7 @@ public static class PlacementChecks
         app.UpdateWindow("ddl", new WindowState { X = work.Right + 300, Y = state.Y, Width = state.Width, Height = state.Height, Visible = true });
         Assert(V(ddl).Left == work.Right - PlacementLogic.KeepVisible && Saved(app, ddl), "an X entirely beyond the screen typed in settings: 100 px brought back into view");
         var calendarState = app.Data.Windows["calendar"];
-        app.UpdateWindow("ddl", new WindowState { X = calendarState.X + 600, Y = calendarState.Y + 40, Width = state.Width, Height = state.Height, Visible = true });
+        app.UpdateWindow("ddl", new WindowState { X = calendarState.X + 700, Y = calendarState.Y + 40, Width = state.Width, Height = state.Height, Visible = true });
         Assert(Apart(app.Widgets) && Saved(app, ddl) && V(calendar) == calendarBefore, "coordinates typed in settings that partly overlap another widget are moved clear, and settings show the result");
         app.UpdateWindow("ddl", new WindowState { X = calendarState.X + 40, Y = calendarState.Y + 40, Width = state.Width, Height = state.Height, Visible = true });
         Assert(V(calendar).Contains(V(ddl)) && Saved(app, ddl), "coordinates that put DDL entirely on the calendar are kept (stacked on purpose)");
@@ -192,7 +192,7 @@ public static class PlacementChecks
 
         // Leave an overlapping layout, with DDL far off screen, for the restart check.
         app.Save(); Assert(app.Flush(), "placement changes saved");
-        Put(calendar, new Rectangle(work.Left, work.Top, 850, 650)); Put(todo, new Rectangle(work.Left + 600, work.Top + 50, W, H)); Put(ddl, new Rectangle(work.Right - 100, work.Top + 200, W, H)); Pump(100);
+        Put(calendar, new Rectangle(work.Left, work.Top, 850, 650)); Put(todo, new Rectangle(work.Left + 700, work.Top + 50, W, H)); Put(ddl, new Rectangle(work.Right - 100, work.Top + 200, W, H)); Pump(100);
         Assert(V(todo).IntersectsWith(V(calendar)), "an overlapping layout is left for the restart check");
         app.QueueSave(); Assert(app.Flush(), "and saved");
     }

@@ -10,7 +10,7 @@ namespace DeskStudy
         public const int SnapDistance = 10;
         public const int Gap = 5;
         // Past the left, right or bottom edge by at most this much: back to the edge. Further out: left where it was put.
-        public const int EdgeCatch = 60;
+        public const int EdgeCatch = 100;
         // However far out a widget is put, this much of it stays on screen so it can be dragged back.
         public const int KeepVisible = 100;
 
@@ -45,13 +45,13 @@ namespace DeskStudy
             return false;
         }
 
-        // Stacked on purpose: the shared area is more than two thirds of the smaller widget. Such overlaps are left alone.
+        // Stacked on purpose: the shared area is more than half of the smaller widget. Such overlaps are left alone.
         public static bool Stacked(Rectangle a, Rectangle b)
         {
             Rectangle shared = Rectangle.Intersect(a, b);
             if (shared.IsEmpty) return false;
             long smaller = Math.Min((long)a.Width * a.Height, (long)b.Width * b.Height);
-            return (long)shared.Width * shared.Height * 3 > smaller * 2;
+            return (long)shared.Width * shared.Height * 2 > smaller;
         }
         // Overlaps that should be undone: any overlap that is not a deliberate stack.
         private static bool OverlapsLightly(Rectangle r, IEnumerable<Rectangle> others)
@@ -75,7 +75,7 @@ namespace DeskStudy
 
         // The nearest place for a dropped widget that follows the screen-edge rule and does not cover another widget.
         // Only the dropped widget moves. A widget dropped on screen stays on screen; one the user put partly outside may stay outside.
-        // When nothing fits, it stays where it was dropped. Dropped squarely on top of others (more than 2/3 covered), it stays too.
+        // When nothing fits, it stays where it was dropped. Dropped squarely on top of others (more than half covered), it stays too.
         public static Rectangle Resolve(Rectangle dropped, Rectangle work, IList<Rectangle> others, int gap)
         {
             Rectangle fitted = Contain(dropped, work);

@@ -159,6 +159,18 @@ namespace DeskStudy
         {
             const int margin = 24; int gap = PlacementLogic.Gap;
             Size todo = sizes["todo"], ddl = sizes["ddl"];
+            int column = area.Height - 2 * margin - gap;
+            if (todo.Height + ddl.Height > column)
+            {
+                // Shorten the two notebooks so they fit one above the other, as long as neither goes below its minimum.
+                int todoMin = Widgets.First(w => w.WidgetKey == "todo").MinimumSize.Height, ddlMin = Widgets.First(w => w.WidgetKey == "ddl").MinimumSize.Height;
+                int half = column / 2;
+                if (half >= todoMin && column - half >= ddlMin)
+                {
+                    todo.Height = Math.Min(todo.Height, half); ddl.Height = Math.Min(ddl.Height, column - todo.Height);
+                    sizes["todo"] = todo; sizes["ddl"] = ddl;
+                }
+            }
             var todoAt = new Point(area.Right - margin - todo.Width, area.Top + margin);
             var ddlAt = area.Top + margin + todo.Height + gap + ddl.Height <= area.Bottom - margin
                 ? new Point(area.Right - margin - ddl.Width, todoAt.Y + todo.Height + gap)

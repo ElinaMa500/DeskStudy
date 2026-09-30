@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -28,7 +28,7 @@ namespace DeskStudy
             Windows = new Dictionary<string, WindowState>();
             Windows["calendar"] = new WindowState { X = 40, Y = 70, Width = 850, Height = 650 };
             Windows["todo"] = new WindowState { X = 910, Y = 70, Width = 370, Height = 480 };
-            Windows["ddl"] = new WindowState { X = 960, Y = 260, Width = 370, Height = 480 };
+            Windows["ddl"] = new WindowState { X = 910, Y = 610, Width = 370, Height = 480 };
             ReminderHistory = new List<ReminderRecord>();
             LastCheckUtc = "";
         }
