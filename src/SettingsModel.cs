@@ -63,7 +63,9 @@ namespace DeskStudy
         public string QuietStart { get; set; }
         public string QuietEnd { get; set; }
         public bool SoundEnabled { get; set; }
-        public ReminderOptions() { DefaultLeadMinutes = 30; QuietStart = "22:00"; QuietEnd = "08:00"; SoundEnabled = true; }
+        // When a date-only deadline reminds on its due day.
+        public string DateOnlyReminderTime { get; set; }
+        public ReminderOptions() { DefaultLeadMinutes = 30; QuietStart = "22:00"; QuietEnd = "08:00"; SoundEnabled = true; DateOnlyReminderTime = "09:00"; }
     }
     public static class SettingsLogic
     {
@@ -151,6 +153,7 @@ namespace DeskStudy
             ReminderOptions r = settings.Reminders;
             Require(r != null, "缺少提醒设置。"); Require(r.DefaultLeadMinutes >= 0 && r.DefaultLeadMinutes <= 5256000, "默认提前时间无效。");
             DateTime.ParseExact(r.QuietStart, "HH:mm", CultureInfo.InvariantCulture); DateTime.ParseExact(r.QuietEnd, "HH:mm", CultureInfo.InvariantCulture);
+            DateTime.ParseExact(r.DateOnlyReminderTime, "HH:mm", CultureInfo.InvariantCulture);
             Require(settings.AutoSaveDelayMs >= 100 && settings.AutoSaveDelayMs <= 10000, "自动保存间隔应在 100 到 10000 毫秒之间。");
             Timestamp(settings.LastBackupUtc); Timestamp(settings.SavedLayoutUtc);
             Require(settings.SavedLayout != null && (settings.SavedLayout.Count == 0 || settings.SavedLayout.Count == 3), "保存的布局无效。");

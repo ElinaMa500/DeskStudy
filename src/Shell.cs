@@ -331,7 +331,7 @@ namespace DeskStudy
             {
                 bool catchUp = batch.Any(r => r.CatchUp);
                 string title = catchUp ? "恢复提醒 · " + batch.Count + " 项" : "课笺提醒 · " + batch.Count + " 项";
-                string message = String.Join("\n", batch.Take(3).Select(r => r.Title + "  " + r.DueLocal.Replace("T", " ")));
+                string message = String.Join("\n", batch.Take(3).Select(r => r.Title + "  " + TimeUtil.DueDisplay(r.DueLocal, r.DueDateOnly)));
                 if (batch.Count > 3) message += "\n另有 " + (batch.Count - 3) + " 项，点击查看全部";
                 if (!NativeNotification.Show(tray, AppIcon, title, message, Data.Settings.Reminders.SoundEnabled))
                 { tray.Text = "桌面课笺 · 系统通知未发送，请查看提醒中心"; OpenReminders(); }
@@ -430,8 +430,8 @@ namespace DeskStudy
             foreach (var r in app.Data.ReminderHistory.AsEnumerable().Reverse())
             {
                 DateTime fired; string stamp = DateTime.TryParse(r.FiredUtc, out fired) ? fired.ToLocalTime().ToString("MM-dd HH:mm:ss") : r.FiredUtc;
-                var row = new ListViewItem(r.Title); row.SubItems.Add(r.BookName + " / " + r.PageTitle); row.SubItems.Add(r.DueLocal.Replace("T", " "));
-                row.SubItems.Add((r.CatchUp ? "补发 · " : "") + (r.Kind == "advance" ? "提前" : "截止")); row.SubItems.Add(stamp); list.Items.Add(row);
+                var row = new ListViewItem(r.Title); row.SubItems.Add(r.BookName + " / " + r.PageTitle); row.SubItems.Add(TimeUtil.DueDisplay(r.DueLocal, r.DueDateOnly));
+                row.SubItems.Add((r.CatchUp ? "补发 · " : "") + (r.DueDateOnly ? "当天" : r.Kind == "advance" ? "提前" : "截止")); row.SubItems.Add(stamp); list.Items.Add(row);
             }
             if (list.Items.Count == 0) list.Items.Add("暂无提醒。可从组件菜单发送测试通知。");
             list.EndUpdate();

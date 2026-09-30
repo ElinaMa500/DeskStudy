@@ -149,6 +149,7 @@ namespace DeskStudy
                 if (IsReference) return;
                 using (var pen = new Pen(Color.FromArgb(90, _accent))) { pen.DashStyle = DashStyle.Dot; e.Graphics.DrawLine(pen, Px(4), _quickEntry.Height - 2, _quickEntry.Width - Px(4), _quickEntry.Height - 2); }
             };
+            InitializeDue();
             _quickText.Enter += delegate { _quickEntry.Invalidate(); }; _quickText.Leave += delegate { _quickEntry.Invalidate(); };
             _quickText.TextChanged += delegate { _quickEntry.Invalidate(); };
             _modern.Controls.Add(_details); _modern.Controls.Add(_modernFooter); _modern.Controls.Add(_paperTabs); _modern.Controls.Add(_saveLabel);
@@ -235,6 +236,14 @@ namespace DeskStudy
             _quickAdd.Text = "＋ 添加"; _quickText.Cue = "记下一件事，回车添加"; _quickPlus.Visible = false; _quickEntry.Margin = Padding.Empty;
             if (IsReference) StyleReferenceLayout();
             else SetReferenceHeader(false, "", bg, fg, Ui.Muted, _accent, _accent, surface, Ui.Border, false);
+            StyleQuickDue();
+            foreach (var row in _rows)
+            {
+                if (row.AddDue == null) continue;
+                row.AddDue.BackColor = row.More.BackColor; row.AddDue.ForeColor = IsReference ? Palette().Faint : Ui.Muted;
+                row.AddDue.Font = ReferenceFont(8.5F, FontStyle.Regular);
+                if (!OffersHoverDue(row)) row.AddDue.Visible = false;
+            }
             if (!IsModern)
             {
                 var page = FindPage(_displayedPageId);
@@ -418,6 +427,8 @@ namespace DeskStudy
             {
                 if (_quickPageId != null) { _quickDrafts[_quickPageId] = _quickText.Text; _quickSelections[_quickPageId] = _quickText.SelectionStart; }
                 _quickPageId = _displayedPageId;
+                // A deadline chosen for the next task belongs to the page it was chosen on.
+                if (pageChanged && _pendingDue != null) { _pendingDue = null; _quickDue.Text = "+ 截止时间"; }
                 string draft; int selection;
                 _quickText.Text = _quickDrafts.TryGetValue(_quickPageId, out draft) ? draft : "";
                 _quickText.SelectionStart = _quickSelections.TryGetValue(_quickPageId, out selection) ? Math.Min(selection, _quickText.TextLength) : _quickText.TextLength;
@@ -438,13 +449,6 @@ namespace DeskStudy
             }
             finally { _navigationSync = false; }
             UpdateNotesCaption(); UpdateSaveStatus();
-        }
-        private void SubmitQuickTask()
-        {
-            if (_quickText.IsComposing || String.IsNullOrWhiteSpace(_quickText.Text)) return;
-            var page = FindPage(_displayedPageId); if (page == null) return;
-            page.Tasks.Add(new TaskItem { Text = _quickText.Text.Trim(), ReminderMinutes = App.Data.Settings.Reminders.DefaultLeadMinutes });
-            _quickText.Clear(); Persist(); RefreshFromData(); _quickText.Focus(); _tasks.ScrollControlIntoView(_quickEntry);
         }
         private void OpenPageDirectory()
         {
@@ -526,11 +530,13 @@ namespace DeskStudy
                     row.Status.SetBounds(inset, row.Title.Bottom + Px(5), statusWidth, statusHeight);
                     row.Card.Height = (row.Status.Visible ? row.Status.Bottom : row.Title.Bottom) + pad + Px(4);
                     row.Actions.Visible = false; row.More.Visible = true;
+                    PlaceAddDue(row, row.More.Left - Px(4));
                 }
                 foreach (Control c in _tasks.Controls) if (c is Label) { c.Width = width; c.Height = Px(52); c.Text = "从下面记下一件要做的事。"; }
                 _quickEntry.Width = width; _quickEntry.Height = Math.Max(Px(42), _quickText.PreferredHeight + Px(18));
                 int addWidth = Math.Max(Px(65), TextRenderer.MeasureText(_quickAdd.Text, _quickAdd.Font).Width + Px(8));
-                _quickText.SetBounds(Px(10), Px(10), Math.Max(30, width - addWidth - Px(22)), _quickText.PreferredHeight);
+                int dueWidth = PlaceQuickDue(width - addWidth - Px(6), Px(2), _quickEntry.Height - Px(4), width - addWidth - Px(22));
+                _quickText.SetBounds(Px(10), Px(10), Math.Max(30, width - addWidth - Px(22) - dueWidth), _quickText.PreferredHeight);
                 _quickAdd.SetBounds(width - addWidth - Px(3), Px(2), addWidth, _quickEntry.Height - Px(4));
             }
             finally { _layingOut = false; }
@@ -554,14 +560,23 @@ namespace DeskStudy
                 row.Status.SetBounds(textLeft, row.Title.Bottom + Px(2), statusWidth, statusHeight);
                 row.Card.Height = (row.Status.Visible ? row.Status.Bottom : row.Title.Bottom) + vpad;
                 row.Actions.Visible = false; row.More.Visible = true;
+                PlaceAddDue(row, row.More.Left - Px(4));
             }
             foreach (Control c in _tasks.Controls) if (c is Label) { c.Width = width; c.Height = Px(56); c.Padding = new Padding(0, Px(18), 0, 0); c.Text = "写下这一页的第一件事"; }
             _quickEntry.Margin = new Padding(0, Px(6), 0, 0);
             _quickEntry.Width = width; _quickEntry.Height = Math.Max(Px(36), _quickText.PreferredHeight + Px(14));
             int plus = Px(18), add = Px(30);
             _quickPlus.SetBounds(0, 0, plus, _quickEntry.Height);
-            _quickText.SetBounds(plus + Px(8), (_quickEntry.Height - _quickText.PreferredHeight) / 2, Math.Max(30, width - plus - Px(8) - add - Px(4)), _quickText.PreferredHeight);
+            int due = PlaceQuickDue(width - add - Px(2), Px(3), _quickEntry.Height - Px(6), width - plus - Px(8) - add - Px(4));
+            _quickText.SetBounds(plus + Px(8), (_quickEntry.Height - _quickText.PreferredHeight) / 2, Math.Max(30, width - plus - Px(8) - add - Px(4) - due), _quickText.PreferredHeight);
             _quickAdd.SetBounds(width - add, Px(3), add, _quickEntry.Height - Px(6));
+        }
+        private void PlaceAddDue(TaskRow row, int right)
+        {
+            if (row.AddDue == null) return;
+            int width = TextRenderer.MeasureText(row.AddDue.Text, row.AddDue.Font).Width + Px(6);
+            row.AddDue.SetBounds(Math.Max(row.Title.Left, right - width), row.Title.Top, width, row.Title.Font.Height + 2);
+            if (!OffersHoverDue(row)) row.AddDue.Visible = false;
         }
         // e.g. 明天 23:59 · 9/28、剩余 3 天 · 9/30 18:00; DDL appends the reminder lead time.
         private string ReferenceDue(TaskItem task, out bool urgent)
@@ -581,13 +596,25 @@ namespace DeskStudy
             string time = due.ToString("HH:mm", inv), day = due.ToString("M/d", inv), full = due.ToString("M/d HH:mm", inv);
             int days = (due.Date - now.Date).Days;
             string text;
+            urgent = !task.Completed && (due - now).TotalHours <= 24;
+            if (task.DueDateOnly)
+            {
+                // Only a day was chosen: show the day, never the stored 23:59.
+                string weekday = new[] { "周日", "周一", "周二", "周三", "周四", "周五", "周六" }[(int)due.DayOfWeek];
+                if (task.Completed) text = day;
+                else if (due < now) text = "已逾期 · " + day;
+                else if (days == 0) text = "今天截止 · " + day;
+                else if (days == 1) text = "明天截止 · " + day;
+                else if (days <= 7) text = "剩余 " + days + " 天 · " + day + " " + weekday;
+                else text = day + " " + weekday;
+                return _bookId == "ddl" ? text + " · " + DayReminderText : text;
+            }
             if (task.Completed) text = full;
             else if (due < now) text = "已逾期 · " + full;
             else if (days == 0) text = "今天 " + time + " · " + day;
             else if (days == 1) text = "明天 " + time + " · " + day;
             else if (days <= 7) text = "剩余 " + days + " 天 · " + full;
             else text = full;
-            urgent = !task.Completed && (due - now).TotalHours <= 24;
             if (_bookId == "ddl") text += task.ReminderMinutes <= 0 ? " · 到期提醒" : " · 提前 " + task.ReminderMinutes + " 分钟";
             return text;
         }
@@ -612,8 +639,8 @@ namespace DeskStudy
                 DateTime now = TimeZoneInfo.ConvertTime(DateTimeOffset.Now, TimeZoneInfo.FindSystemTimeZoneById(row.Task.TimeZoneId)).DateTime;
                 int days = (due.Date - now.Date).Days;
                 string label = row.Task.Completed ? "已完成" : due < now ? "已逾期" : days == 0 ? "今天截止" : days == 1 ? "明天截止" : "剩余 " + days + " 天";
-                row.Status.Text = label + "  ·  " + due.ToString("yyyy/MM/dd HH:mm");
-                if (_bookId == "ddl") row.Status.Text += "\r\n" + (row.Task.ReminderMinutes == 0 ? "到期提醒" : "提前 " + row.Task.ReminderMinutes + " 分钟提醒");
+                row.Status.Text = label + "  ·  " + due.ToString(row.Task.DueDateOnly ? "yyyy/MM/dd" : "yyyy/MM/dd HH:mm", CultureInfo.InvariantCulture);
+                if (_bookId == "ddl") row.Status.Text += "\r\n" + (row.Task.DueDateOnly ? DayReminderText : row.Task.ReminderMinutes == 0 ? "到期提醒" : "提前 " + row.Task.ReminderMinutes + " 分钟提醒");
             }
         }
         private void DisposeNotebookLayouts()
@@ -622,6 +649,7 @@ namespace DeskStudy
             if (_layoutRetry != null) _layoutRetry.Dispose();
             if (_taskMenu != null) _taskMenu.Dispose();
             if (_quickEntry != null && _quickEntry.Parent == null) _quickEntry.Dispose();
+            if (_duePopup != null) { _duePopup.Dispose(); _duePopup = null; }
             foreach (var font in _referenceFonts.Values) font.Dispose();
             _referenceFonts.Clear();
         }

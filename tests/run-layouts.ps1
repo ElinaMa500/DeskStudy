@@ -1,4 +1,4 @@
-param([switch]$Render, [switch]$CardOnly, [switch]$CompileOnly)
+param([switch]$Render, [switch]$CardOnly, [switch]$CompileOnly, [switch]$Due)
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $compilerPath = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
@@ -11,6 +11,7 @@ $buildArgs = @('/nologo', '/target:exe', '/main:NotebookLayoutTests', '/codepage
 if ($LASTEXITCODE -ne 0) { throw 'Notebook layout test compilation failed.' }
 if ($CompileOnly) { Write-Output "Compiled: $testExe"; exit 0 }
 $dataPath = Join-Path $artifactPath ('layouts-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
+if ($Due) { & $testExe $dataPath due 2>&1 | Tee-Object -FilePath (Join-Path $artifactPath 'layouts-due.log'); if ($LASTEXITCODE -ne 0) { throw 'Notebook deadline picker checks failed.' }; exit 0 }
 if ($Render) { & $testExe $dataPath render 2>&1 | Tee-Object -FilePath (Join-Path $artifactPath 'layouts-render.log'); if ($LASTEXITCODE -ne 0) { throw 'Notebook layout rendering failed.' }; exit 0 }
 if ($CardOnly) { & $testExe $dataPath card 2>&1 | Tee-Object -FilePath (Join-Path $artifactPath 'layouts-card.log'); if ($LASTEXITCODE -ne 0) { throw 'Notebook card stage failed.' }; exit 0 }
 & $testExe $dataPath write 2>&1 | Tee-Object -FilePath (Join-Path $artifactPath 'layouts-write.log')

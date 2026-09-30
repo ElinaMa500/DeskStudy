@@ -29,7 +29,7 @@ namespace DeskStudy
         private CheckBox followingGlobal, quietEnabled, soundEnabled, startup;
         private Button backgroundColor;
         private readonly List<NotebookLayoutPreview> notebookLayouts = new List<NotebookLayoutPreview>();
-        private DateTimePicker semesterStart, semesterEnd, teachingWeekOne, quietStart, quietEnd;
+        private DateTimePicker semesterStart, semesterEnd, teachingWeekOne, quietStart, quietEnd, dateOnlyReminder;
         private TextBox bookName, pageName;
         private ListView courses, pageList, pendingTasks, backups;
         private Label appearanceHint, layoutSaved, pageDetail, lastBackup, storagePath;
@@ -435,6 +435,8 @@ namespace DeskStudy
         {
             var page = NewPage("提醒", "提醒会检查两本便签的所有页面，包括隐藏和归档页面。完成任务后停止后续提醒，错过的提醒会在恢复后汇总。");
             var card = Card(page, "提醒方式"); leadMinutes = Number("reminder-default-lead", 0, 525600, 5); Field(card, "默认提前（分钟）", leadMinutes);
+            dateOnlyReminder = TimePicker("reminder-dateonly-time"); Field(card, "只有日期的任务", Buttons(dateOnlyReminder, Ui.Label("当天这个时间提醒一次", 9F, Ui.Muted)));
+            dateOnlyReminder.ValueChanged += delegate { ChangeSetting(delegate { app.Data.Settings.Reminders.DateOnlyReminderTime = dateOnlyReminder.Value.ToString("HH:mm", CultureInfo.InvariantCulture); }); };
             quietEnabled = Check("reminder-quiet-enabled", "启用免打扰时段"); Field(card, "免打扰", quietEnabled);
             quietStart = TimePicker("reminder-quiet-start"); quietEnd = TimePicker("reminder-quiet-end"); Field(card, "开始 / 结束", Buttons(quietStart, Ui.Label("至", 9F, Ui.Muted), quietEnd));
             soundEnabled = Check("reminder-sound-enabled", "播放提醒声音"); Field(card, "声音", soundEnabled);
@@ -501,7 +503,7 @@ namespace DeskStudy
                 RefreshCourses(); RefreshBooks();
                 SetNumber(leadMinutes, app.Data.Settings.Reminders.DefaultLeadMinutes); quietEnabled.Checked = app.Data.Settings.Reminders.QuietHoursEnabled;
                 quietStart.Enabled = quietEnabled.Checked; quietEnd.Enabled = quietEnabled.Checked;
-                SetTime(quietStart, app.Data.Settings.Reminders.QuietStart); SetTime(quietEnd, app.Data.Settings.Reminders.QuietEnd); soundEnabled.Checked = app.Data.Settings.Reminders.SoundEnabled;
+                SetTime(quietStart, app.Data.Settings.Reminders.QuietStart); SetTime(quietEnd, app.Data.Settings.Reminders.QuietEnd); SetTime(dateOnlyReminder, app.Data.Settings.Reminders.DateOnlyReminderTime); soundEnabled.Checked = app.Data.Settings.Reminders.SoundEnabled;
                 RefreshPending(); SelectId(saveDelay, app.Data.Settings.AutoSaveDelayMs.ToString(CultureInfo.InvariantCulture)); startup.Checked = app.StartupEnabled;
                 storagePath.Text = "数据位置：" + app.Store.DirectoryPath + (String.IsNullOrEmpty(app.StartupWarning) ? "" : "\n" + app.StartupWarning);
                 lastBackup.Text = String.IsNullOrEmpty(app.Store.LatestBackupUtc) ? "最近备份：尚无备份" : "最近备份：" + LocalStamp(app.Store.LatestBackupUtc);
@@ -557,7 +559,7 @@ namespace DeskStudy
                 string state = "待提醒";
                 try { DateTime due = TimeUtil.LocalToUtc(TimeUtil.ParseLocal(task.DueLocal), task.TimeZoneId); state = due < now ? "已逾期" : (due - now).TotalHours <= 24 ? "临近截止" : "待提醒"; if (due >= now && !String.IsNullOrEmpty(task.DueNotifiedKey)) state = "已发送提醒"; }
                 catch { state = "检查截止时间"; }
-                rows.Add(new[] { task.Id, task.Text, book.Name + " / " + note.Title + (note.Archived ? "（归档）" : ""), task.DueLocal.Replace("T", " ").Substring(0, Math.Min(16, task.DueLocal.Length)), state });
+                rows.Add(new[] { task.Id, task.Text, book.Name + " / " + note.Title + (note.Archived ? "（归档）" : ""), TimeUtil.DueDisplay(task.DueLocal, task.DueDateOnly), state });
             }
             rows = rows.OrderBy(r => r[3], StringComparer.Ordinal).ToList();
             string signature = String.Join("|", rows.Select(r => String.Join("~", r))); if (signature == pendingSignature) return; pendingSignature = signature;

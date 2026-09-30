@@ -19,6 +19,7 @@
 | 5. 1.1 回归与交付 | 验证显示切换、双向同步、窗口找回、归档提醒、免打扰、数据迁移、备份恢复和独立进程重启，检查界面并打包。 | 原 14 组核心测试及旧功能集成回归通过；最终设置集成、10 条编辑器／默认值检查、七页设置与 14 pt 字号视觉复查通过，编辑器裁切已修复。Windows Shell 静音通知请求被接受。交付路径为 `release-1.1` 与 `DeskStudy-1.1-Windows.zip`。 |
 | 6. 1.2 三种便签布局 | 保留基准后实现轻量卡片（默认）与纸页本，原始外观可切回；设置中心「外观」加入三张布局卡片，保存与重启恢复；旧数据迁移备份。 | 1.2 已实现；2026-09-29 重新运行 14 组核心、11 组设置核心测试，布局、设置与旧功能集成检查（207 项）及打包冒烟测试均通过，详见 `VERIFICATION.md`。交付路径为 `release-1.2` 与 `DeskStudy-1.2-Windows.zip`。 |
 | 7. 1.3 参考样式布局 | 按 `desktop-notebook-preview.html` 新增清爽卡片（Clean）与手账纸页（Journal），保留原三种；参考样式顶栏（圆点名称、置顶、⚙，✕ 隐藏）、创建日期摘要、细线任务、合并提醒的 DDL 截止行、底部页码；设置中心五张布局卡片；新布局数据写为版本 3 以防 1.2 误当损坏数据。 | 1.3 已实现；2026-09-30 全部核心、布局、设置与旧功能集成测试通过，真实 1.2 程序对版本 3 数据的拒绝行为已实测，详见 `VERIFICATION.md`。交付路径为 `release-1.3` 与 `DeskStudy-1.3-Windows.zip`。 |
+| 8. 1.4 截止时间面板 | 共用的截止时间面板（常用日期、自绘月历、常用时间、提前量、上次用过的值），两套外观；DDL 回车弹出面板、再次回车不设时间直接添加；输入行「+ 截止时间」；点击状态文字修改；Todo 悬停入口；仅日期截止（当天固定时间提醒一次，不在 23:59 提醒）；提醒页新增该时间设置。 | 1.4 已实现，尚未发布；2026-09-30 截止时间核心 17 项、面板流程 27 项及全部回归测试通过，真实键鼠操作待手动确认，详见 `VERIFICATION.md`。构建输出 `release-1.4`。 |
 
 ## 设置中心范围
 
@@ -50,8 +51,9 @@
 - `src/Shell.cs`、`src/SettingsController.cs`：窗口、托盘、生命周期及设置动作。
 - `src/SettingsForm.cs`：七页设置中心。
 - `src/CalendarForm.cs`、`src/NotebookForm.cs`：桌面日历和双便签界面。
-- `src/NotebookLayouts.cs`、`src/NotebookLayoutPreview.cs`：三种便签布局及设置中心的布局预览卡片。
+- `src/NotebookLayouts.cs`、`src/NotebookLayoutPreview.cs`：便签布局及设置中心的布局预览卡片。
+- `src/DuePicker.cs`、`src/NotebookDue.cs`：截止时间面板，以及便签里打开它的各个入口。
 - `tests`：核心、布局与桌面集成测试。
-- `build.ps1`：默认构建至 `release-1.3`；`package.ps1`：构建并生成分发包。
+- `build.ps1`：默认构建至 `release-1.4`；`package.ps1`：构建并生成分发包。
 - `README.md`：使用说明；`LAYOUTS.md`：便签布局说明；`VERIFICATION.md`：实际验证事实与限制。
-- `DeskStudy-1.3-Windows.zip`：最终便携分发包（含 `screenshots`）。
+- `DeskStudy-1.4-Windows.zip`：最终便携分发包（含 `screenshots`）。

@@ -436,7 +436,7 @@ namespace DeskStudy
             StringBuilder key = new StringBuilder(page.Id);
             foreach (TaskItem task in page.Tasks)
                 key.Append('\n').Append(task.Id).Append('\t').Append(task.Text).Append('\t').Append(task.Completed)
-                    .Append('\t').Append(task.DueLocal).Append('\t').Append(task.TimeZoneId).Append('\t').Append(task.ReminderMinutes);
+                    .Append('\t').Append(task.DueLocal).Append('\t').Append(task.TimeZoneId).Append('\t').Append(task.ReminderMinutes).Append('\t').Append(task.DueDateOnly);
             return key.ToString();
         }
 
@@ -590,6 +590,7 @@ namespace DeskStudy
             row.Card.Controls.Add(row.Status);
             row.Card.Controls.Add(row.Actions);
             row.Card.Controls.Add(row.More);
+            WireDueRow(row);
             return row;
         }
 
@@ -640,6 +641,7 @@ namespace DeskStudy
                     }
                     row.Actions.WrapContents = true;
                     row.Actions.SetBounds(inset, row.Status.Bottom + (int)(2 * scale), textWidth, actionHeight * actionRows);
+                    if (row.AddDue != null) row.AddDue.Visible = false;
                     row.Card.Height = row.Actions.Bottom + (int)(9 * scale);
                 }
                 if (_rows.Count == 0 && _tasks.Controls.Count > 0) _tasks.Controls[0].Width = width;
@@ -654,7 +656,7 @@ namespace DeskStudy
             {
                 string text;
                 Color color;
-                GetTaskStatus(row.Task, out text, out color);
+                GetTaskStatus(row.Task, DayReminderText, out text, out color);
                 if (dark)
                     color = Color.FromArgb(Math.Min(255, color.R + 65), Math.Min(255, color.G + 65), Math.Min(255, color.B + 65));
                 row.Status.Text = text;
@@ -663,7 +665,7 @@ namespace DeskStudy
             if (IsModern) RefreshModernStatus();
         }
 
-        private static void GetTaskStatus(TaskItem task, out string text, out Color color)
+        private static void GetTaskStatus(TaskItem task, string dayReminder, out string text, out Color color)
         {
             color = Ui.Muted;
             DateTime due;
@@ -671,7 +673,7 @@ namespace DeskStudy
                 DateTimeStyles.None, out due);
             if (task.Completed)
             {
-                text = "已完成" + (hasDue ? "  ·  截止 " + due.ToString("MM/dd HH:mm") : "");
+                text = "已完成" + (hasDue ? "  ·  截止 " + due.ToString(task.DueDateOnly ? "MM/dd" : "MM/dd HH:mm", CultureInfo.InvariantCulture) : "");
                 color = Color.FromArgb(89, 132, 116);
                 return;
             }
@@ -696,6 +698,7 @@ namespace DeskStudy
                 color = Color.FromArgb(176, 114, 41);
             }
             else { status = "待完成"; }
+            if (task.DueDateOnly) { text = status + "  ·  " + due.ToString("yyyy/MM/dd", CultureInfo.InvariantCulture) + "\r\n" + dayReminder; return; }
             string reminder = task.ReminderMinutes <= 0 ? "到期提醒" : "提前 " + task.ReminderMinutes + " 分钟提醒";
             text = status + "  ·  " + due.ToString("yyyy/MM/dd HH:mm") + "\r\n" + reminder;
         }
@@ -714,13 +717,18 @@ namespace DeskStudy
                 if (page == null) return;
                 TaskItem task = taskId == null ? new TaskItem() : page.Tasks.Find(delegate(TaskItem item) { return item.Id == taskId; });
                 if (task == null) return;
-                bool scheduleChanged = task.DueLocal != dialog.DueLocal || task.ReminderMinutes != dialog.ReminderMinutes || task.TimeZoneId != dialog.TimeZoneId;
+                bool scheduleChanged = task.DueLocal != dialog.DueLocal || task.ReminderMinutes != dialog.ReminderMinutes || task.TimeZoneId != dialog.TimeZoneId || task.DueDateOnly != dialog.DueDateOnly;
                 if (taskId == null) task.Id = Guid.NewGuid().ToString("N");
                 task.Text = dialog.TaskText;
                 task.DueLocal = dialog.DueLocal;
+                task.DueDateOnly = dialog.DueDateOnly;
                 task.ReminderMinutes = dialog.ReminderMinutes;
                 task.TimeZoneId = dialog.TimeZoneId;
-                if (scheduleChanged || taskId == null) ReminderEngine.Reset(task);
+                if (scheduleChanged || taskId == null)
+                {
+                    ReminderEngine.Reset(task);
+                    ReminderEngine.SkipPassedDateOnlyReminder(task, App.Data.Settings, DateTime.UtcNow);
+                }
                 if (taskId == null) page.Tasks.Add(task);
                 Persist();
                 RefreshFromData();
@@ -789,6 +797,7 @@ namespace DeskStudy
             public Label Status;
             public FlowLayoutPanel Actions;
             public Button More;
+            public Label AddDue;
         }
 
         private sealed class TaskCardPanel : Panel
@@ -904,10 +913,12 @@ namespace DeskStudy
         private readonly DateTimePicker _date;
         private readonly DateTimePicker _time;
         private readonly NumericUpDown _advance;
+        private readonly CheckBox _dateOnly;
         private readonly string _originalTimeZone;
         private readonly string _originalDue;
         public string TaskText { get { return _text.Text.Trim(); } }
-        public string DueLocal { get { return _hasDue.Checked ? SelectedDue.ToString("yyyy-MM-dd'T'HH:mm:ss", CultureInfo.InvariantCulture) : ""; } }
+        public bool DueDateOnly { get { return _hasDue.Checked && _dateOnly.Checked; } }
+        public string DueLocal { get { return !_hasDue.Checked ? "" : _dateOnly.Checked ? TimeUtil.DateOnlyDue(_date.Value) : SelectedDue.ToString("yyyy-MM-dd'T'HH:mm:ss", CultureInfo.InvariantCulture); } }
         public string TimeZoneId { get { return _hasDue.Checked && DueLocal == _originalDue ? _originalTimeZone : System.TimeZoneInfo.Local.Id; } }
         public int ReminderMinutes { get { return (int)_advance.Value; } }
         private DateTime SelectedDue { get { return _date.Value.Date.Add(_time.Value.TimeOfDay).AddTicks(-(_time.Value.Ticks % TimeSpan.TicksPerMinute)); } }
@@ -921,7 +932,7 @@ namespace DeskStudy
             Text = task == null ? "添加任务" : "编辑任务";
             Font = new Font("Microsoft YaHei UI", 9f);
             AutoScaleMode = AutoScaleMode.Dpi;
-            ClientSize = new Size(412, 386);
+            ClientSize = new Size(412, 416);
             FormBorderStyle = FormBorderStyle.FixedDialog;
             StartPosition = FormStartPosition.CenterParent;
             MaximizeBox = false;
@@ -963,22 +974,28 @@ namespace DeskStudy
             _time.Value = due;
             _hasDue.Checked = hasDue;
 
+            _dateOnly = new CheckBox();
+            _dateOnly.Name = "task-date-only";
+            _dateOnly.Text = "只设日期，不设具体时间（当天提醒一次）";
+            _dateOnly.SetBounds(22, 216, 366, 25);
+            _dateOnly.Checked = hasDue && task.DueDateOnly;
+            _dateOnly.CheckedChanged += delegate { UpdateEnabled(); };
             Label advance = Ui.Label("提前提醒", 9f, Ui.Text);
-            advance.SetBounds(22, 225, 90, 27);
+            advance.SetBounds(22, 255, 90, 27);
             _advance = new NumericUpDown();
-            _advance.SetBounds(113, 224, 116, 28);
+            _advance.SetBounds(113, 254, 116, 28);
             _advance.Minimum = 0;
             _advance.Maximum = 525600;
             _advance.ThousandsSeparator = true;
             _advance.Value = Math.Max(0, Math.Min(525600, task == null ? defaultLeadMinutes : task.ReminderMinutes));
             Label minutes = Ui.Label("分钟（0 = 到期提醒）", 8.5f, Ui.Muted);
-            minutes.SetBounds(240, 225, 151, 27);
+            minutes.SetBounds(240, 255, 151, 27);
             Label explanation = Ui.Label("翻到其他页面仍会提醒；完成后停止提醒。\r\n时间使用当前本地时区，提醒在应用运行时生效。", 8.5f, Ui.Muted);
-            explanation.SetBounds(22, 269, 366, 43);
+            explanation.SetBounds(22, 299, 366, 43);
             _hasDue.CheckedChanged += delegate { UpdateEnabled(); };
 
             Button cancel = Ui.Button("取消", delegate { DialogResult = DialogResult.Cancel; });
-            cancel.SetBounds(221, 331, 78, 34);
+            cancel.SetBounds(221, 361, 78, 34);
             Button save = Ui.Button("保存任务", delegate
             {
                 if (TaskText.Length == 0)
@@ -987,7 +1004,7 @@ namespace DeskStudy
                     _text.Focus();
                     return;
                 }
-                if (_hasDue.Checked && System.TimeZoneInfo.Local.IsInvalidTime(DateTime.SpecifyKind(SelectedDue, DateTimeKind.Unspecified)))
+                if (_hasDue.Checked && !_dateOnly.Checked && System.TimeZoneInfo.Local.IsInvalidTime(DateTime.SpecifyKind(SelectedDue, DateTimeKind.Unspecified)))
                 {
                     MessageBox.Show(this, "此时间处于夏令时跳转区间，请选择一个有效的本地时间。", "时间不可用", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     return;
@@ -996,12 +1013,13 @@ namespace DeskStudy
             });
             save.BackColor = accent;
             save.ForeColor = Color.White;
-            save.SetBounds(309, 331, 79, 34);
+            save.SetBounds(309, 361, 79, 34);
             Controls.Add(name);
             Controls.Add(_text);
             Controls.Add(_hasDue);
             Controls.Add(_date);
             Controls.Add(_time);
+            Controls.Add(_dateOnly);
             Controls.Add(advance);
             Controls.Add(_advance);
             Controls.Add(minutes);
@@ -1017,8 +1035,9 @@ namespace DeskStudy
         private void UpdateEnabled()
         {
             _date.Enabled = _hasDue.Checked;
-            _time.Enabled = _hasDue.Checked;
-            _advance.Enabled = _hasDue.Checked;
+            _dateOnly.Enabled = _hasDue.Checked;
+            _time.Enabled = _hasDue.Checked && !_dateOnly.Checked;
+            _advance.Enabled = _hasDue.Checked && !_dateOnly.Checked;
         }
     }
 }

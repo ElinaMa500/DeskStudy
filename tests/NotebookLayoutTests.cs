@@ -104,7 +104,7 @@ public static class NotebookLayoutTests
                 var summary = ((Label)typeof(NotebookForm).GetField("_taskCount", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(form)).Text;
                 var ddlSummary = ((Label)typeof(NotebookForm).GetField("_taskCount", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(ddlForm)).Text;
                 Assert(System.Text.RegularExpressions.Regex.IsMatch(summary, @"^\d+ 月 \d+ 日 · 1/2 完成$") && System.Text.RegularExpressions.Regex.IsMatch(ddlSummary, @"^\d+ 月 \d+ 日 · \d+ 项待完成$"), layout + " summary shows created date and real counts: " + summary + " / " + ddlSummary);
-                var ddlDue = Find<CheckBox>(ddlForm, "task-checkbox-" + ddl.Pages[1].Tasks[1].Id).Parent.Controls.OfType<Label>().Last().Text;
+                var ddlDue = StatusOf(ddlForm, ddl.Pages[1].Tasks[1]).Text;
                 Assert(ddlDue.StartsWith("剩余 3 天 · ") && ddlDue.EndsWith(" · 提前 30 分钟"), layout + " DDL due line merges remaining days and reminder: " + ddlDue);
                 Assert(!Find<Label>(form, "save-status").Visible, layout + " hides normal save status");
             }
@@ -238,6 +238,83 @@ public static class NotebookLayoutTests
         using (var g = Form(app, "todo").CreateGraphics()) Console.WriteLine("Rendered actual system DPI: " + g.DpiX);
         File.WriteAllText(Path.Combine(path, "CAPTURE-NOTES.txt"), "Images are DrawToBitmap renders of actual running WinForms controls, with isolated test data. They are not full desktop screenshots. Actual system DPI is logged. Genuine IME candidate selection, OS notification presentation, and other display scales still require manual checks.");
     }
+    static void ClickLabel(Control label) { typeof(Control).GetMethod("OnClick", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(label, new object[] { EventArgs.Empty }); Pump(60); }
+    static Label StatusOf(NotebookForm form, TaskItem task) { return Find<CheckBox>(form, "task-checkbox-" + task.Id).Parent.Controls.OfType<Label>().First(l => !l.Name.StartsWith("add-due-") && l.Tag as string != "appearance-custom-font"); }
+    static void DueChecks(AppController app, string path)
+    {
+        var todoForm = Form(app, "todo"); var ddlForm = Form(app, "ddl"); var todo = Book(app, "todo"); var ddl = Book(app, "ddl");
+        var page = ddl.Pages[0]; var quick = Find<TextBox>(ddlForm, "quick-task"); var add = Find<Button>(ddlForm, "quick-add"); var chip = Find<Button>(ddlForm, "quick-due");
+        DateTime today = DateTime.Today;
+        Assert(chip.Visible && chip.Text == "+ 截止时间" && !Find<Button>(todoForm, "quick-due").Visible, "DDL entry row offers the deadline chip; Todo entry row does not");
+
+        quick.Text = "不设截止时间"; add.PerformClick(); Pump(80);
+        Assert(ddlForm.OpenDuePanel != null && page.Tasks.Count == 0, "DDL: Enter without a deadline opens the picker and adds nothing yet");
+        ddlForm.OpenDuePanel.Complete(); Pump(80);
+        Assert(ddlForm.OpenDuePanel == null && page.Tasks.Count == 1 && page.Tasks[0].DueLocal == "" && quick.Text == "", "DDL: a second Enter with nothing chosen adds the task without a deadline");
+
+        quick.Text = "取消不添加"; add.PerformClick(); Pump(80); ddlForm.OpenDuePanel.SelectDate(today.AddDays(2)); ddlForm.OpenDuePanel.Cancel(); Pump(80);
+        Assert(ddlForm.OpenDuePanel == null && page.Tasks.Count == 1 && quick.Text == "取消不添加", "DDL: Esc or clicking away cancels, adds nothing and keeps the typed text");
+
+        quick.Text = "只选日期"; add.PerformClick(); Pump(80); var panel = ddlForm.OpenDuePanel;
+        panel.SelectDate(today.AddDays(2));
+        Assert(panel.SelectedDate == today.AddDays(2) && panel.SelectedTime == null && ddlForm.OpenDuePanel != null, "picking a date keeps the picker open");
+        panel.Complete(); Pump(80);
+        var dateOnly = page.Tasks[1];
+        Assert(dateOnly.Text == "只选日期" && dateOnly.DueDateOnly && dateOnly.DueLocal == TimeUtil.DateOnlyDue(today.AddDays(2)) && dateOnly.AdvanceNotifiedKey == "", "a date alone makes a date-only deadline that will remind that morning");
+        string status = StatusOf(ddlForm, dateOnly).Text;
+        Assert(status.Contains("剩余 2 天") && status.Contains("当天 09:00 提醒") && !status.Contains("23:59"), "date-only deadlines display the day and the morning reminder, not 23:59: " + status.Replace("\r\n", " / "));
+
+        quick.Text = "日期加时间"; add.PerformClick(); Pump(80); panel = ddlForm.OpenDuePanel;
+        panel.SelectDate(today.AddDays(10)); panel.SelectTime(new TimeSpan(20, 0, 0)); panel.SelectLead(60); panel.Complete(); Pump(80);
+        var timed = page.Tasks[2];
+        Assert(!timed.DueDateOnly && timed.DueLocal == today.AddDays(10).AddHours(20).ToString(TimeUtil.LocalFormat) && timed.ReminderMinutes == 60, "date, time and reminder lead are all applied");
+        Assert(ddl.LastDueDate == today.AddDays(10).ToString("yyyy-MM-dd") && ddl.LastDueTime == "20:00" && todo.LastDueDate == "", "the last used date and time are remembered per notebook");
+
+        chip.PerformClick(); Pump(80); panel = ddlForm.OpenDuePanel;
+        Assert(panel != null && panel.DateChipTexts.Contains("上次 " + today.AddDays(10).Month + "/" + today.AddDays(10).Day) && panel.TimeChipTexts.Contains("上次 20:00"), "the picker offers the last used date and time as shortcuts");
+        panel.SelectDate(today.AddDays(1)); panel.SelectTime(new TimeSpan(18, 0, 0)); panel.Complete(); Pump(80);
+        Assert(page.Tasks.Count == 3 && chip.Text.Contains("18:00") && chip.Text.EndsWith("×"), "choosing a deadline from the chip sets it for the next task without adding anything");
+        quick.Text = "先选时间再回车"; add.PerformClick(); Pump(80);
+        Assert(ddlForm.OpenDuePanel == null && page.Tasks.Count == 4 && page.Tasks[3].DueLocal == today.AddDays(1).AddHours(18).ToString(TimeUtil.LocalFormat) && chip.Text == "+ 截止时间", "Enter with a deadline already chosen adds directly, then the chip resets");
+
+        ClickLabel(StatusOf(ddlForm, page.Tasks[0])); panel = ddlForm.OpenDuePanel;
+        Assert(panel != null && panel.SelectedDate == null, "clicking 未设置截止时间 opens the picker for that task");
+        panel.SelectDate(today); panel.Complete(); Pump(80);
+        bool afterMorning = DateTime.Now.TimeOfDay >= new TimeSpan(9, 0, 0);
+        Assert(page.Tasks[0].DueDateOnly && page.Tasks[0].DueLocal == TimeUtil.DateOnlyDue(today) && (page.Tasks[0].AdvanceNotifiedKey != "") == afterMorning, "a deadline set today from the status line is date-only and stays silent if 09:00 has passed");
+        ClickLabel(StatusOf(ddlForm, page.Tasks[0])); panel = ddlForm.OpenDuePanel;
+        Assert(panel != null && panel.SelectedDate == today && Find<Button>(panel, "due-clear").Visible, "clicking an existing deadline reopens the picker with it selected and a clear option");
+        Find<Button>(panel, "due-clear").PerformClick(); Pump(80);
+        Assert(page.Tasks[0].DueLocal == "" && !page.Tasks[0].DueDateOnly && page.Tasks[0].AdvanceNotifiedKey == "", "clearing removes the deadline and its reminder state");
+
+        var todoQuick = Find<TextBox>(todoForm, "quick-task"); todoQuick.Text = "Todo 不弹面板"; Find<Button>(todoForm, "quick-add").PerformClick(); Pump(80);
+        var plain = todo.Pages[0].Tasks.Last();
+        Assert(todoForm.OpenDuePanel == null && plain.Text == "Todo 不弹面板" && plain.DueLocal == "", "Todo: Enter adds immediately without opening the picker");
+        var hover = Find<Label>(todoForm, "add-due-" + plain.Id);
+        Assert(!hover.Visible && hover.Text == "+ 截止时间", "Todo: the + 截止时间 affordance exists and stays hidden until hover");
+        ClickLabel(hover); panel = todoForm.OpenDuePanel; panel.SelectDate(today.AddDays(3)); panel.Complete(); Pump(80);
+        Assert(plain.DueDateOnly && plain.DueLocal == TimeUtil.DateOnlyDue(today.AddDays(3)), "Todo: the hover affordance sets a deadline through the same picker");
+
+        foreach (var layout in Layouts)
+        {
+            Switch(app, layout);
+            var form = layout == "Original" ? todoForm : ddlForm; var target = layout == "Original" ? plain : page.Tasks[1];
+            ClickLabel(StatusOf(form, target)); panel = form.OpenDuePanel;
+            string expected = layout == "Paper" || layout == "Journal" ? "#FAF8F1" : "#FFFFFF";
+            Assert(panel != null && panel.BackColor.ToArgb() == ColorTranslator.FromHtml(expected).ToArgb(), layout + " uses the " + (expected == "#FFFFFF" ? "清爽卡片" : "手账纸页") + " picker skin");
+            if (layout == "Clean" || layout == "Journal")
+            {
+                using (var bitmap = new Bitmap(panel.Width, panel.Height)) { panel.DrawToBitmap(bitmap, new Rectangle(Point.Empty, panel.Size)); bitmap.Save(Path.Combine(path, "picker-" + layout.ToLowerInvariant() + ".png"), System.Drawing.Imaging.ImageFormat.Png); }
+                int dateOnlyHeight = panel.Height; panel.SelectTime(new TimeSpan(18, 0, 0)); Pump(60);
+                Assert(panel.Height > dateOnlyHeight && Find<Button>(panel, "due-lead-60").Visible, layout + " picker shows the reminder choices once a time is set");
+                using (var bitmap = new Bitmap(panel.Width, panel.Height)) { panel.DrawToBitmap(bitmap, new Rectangle(Point.Empty, panel.Size)); bitmap.Save(Path.Combine(path, "picker-" + layout.ToLowerInvariant() + "-timed.png"), System.Drawing.Imaging.ImageFormat.Png); }
+            }
+            panel.Cancel(); Pump(60);
+        }
+        Switch(app, "Clean"); ddlForm.Size = new Size(500, 640); todoForm.Size = new Size(500, 640); Pump(120);
+        Capture(ddlForm, Path.Combine(path, "due-ddl-clean.png")); Capture(todoForm, Path.Combine(path, "due-todo-clean.png"));
+        app.Save(); Assert(app.Flush(), "deadline changes saved");
+    }
     [STAThread] public static int Main(string[] args)
     {
         Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
@@ -249,6 +326,7 @@ public static class NotebookLayoutTests
                 Pump(150);
                 if (mode == "read") ReadChecks(app, path);
                 else if (mode == "render") RenderChecks(app, path);
+                else if (mode == "due") DueChecks(app, path);
                 else WriteChecks(app, path, mode == "card");
                 app.Shutdown();
             }

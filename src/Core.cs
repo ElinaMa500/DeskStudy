@@ -50,8 +50,12 @@ namespace DeskStudy
         public string Name { get; set; }
         public string CurrentPageId { get; set; }
         public List<NotePage> Pages { get; set; }
+        // Offered again as "上次" in the due picker: yyyy-MM-dd and HH:mm, or empty.
+        public string LastDueDate { get; set; }
+        public string LastDueTime { get; set; }
         public Notebook()
         {
+            LastDueDate = ""; LastDueTime = "";
             Id = Guid.NewGuid().ToString("N"); Name = "便签";
             Pages = new List<NotePage> { new NotePage() };
             CurrentPageId = Pages[0].Id;
@@ -81,6 +85,9 @@ namespace DeskStudy
         public string DueNotifiedKey { get; set; }
         public int ReminderMinutes { get; set; }
         public bool Completed { get; set; }
+        // Due on a day with no specific time: DueLocal holds that day's 23:59 and the only
+        // reminder fires that morning (ReminderOptions.DateOnlyReminderTime).
+        public bool DueDateOnly { get; set; }
         public TaskItem()
         {
             Id = Guid.NewGuid().ToString("N"); Text = ""; DueLocal = "";
@@ -148,10 +155,19 @@ namespace DeskStudy
         public string FiredUtc { get; set; }
         public string Kind { get; set; }
         public bool CatchUp { get; set; }
+        public bool DueDateOnly { get; set; }
     }
 
     public static class TimeUtil
     {
+        public const string LocalFormat = "yyyy-MM-dd'T'HH:mm:ss";
+        public static string DateOnlyDue(DateTime date) { return date.Date.AddHours(23).AddMinutes(59).ToString(LocalFormat, CultureInfo.InvariantCulture); }
+        // "2026-10-02 18:00", or just the date for a date-only deadline.
+        public static string DueDisplay(string dueLocal, bool dateOnly)
+        {
+            if (String.IsNullOrEmpty(dueLocal)) return "";
+            return dateOnly ? dueLocal.Substring(0, Math.Min(10, dueLocal.Length)) : dueLocal.Replace("T", " ").Substring(0, Math.Min(16, dueLocal.Length));
+        }
         public static DateTime ParseDate(string value)
         {
             return DateTime.SpecifyKind(DateTime.ParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None), DateTimeKind.Unspecified);
@@ -241,6 +257,23 @@ namespace DeskStudy
     public static class ReminderEngine
     {
         public static void Reset(TaskItem task) { task.AdvanceNotifiedKey = ""; task.DueNotifiedKey = ""; }
+        // Independent of the reminder time, so changing that setting never re-sends a delivered reminder.
+        public static string DateOnlyKey(TaskItem task)
+        {
+            return task.DueLocal + "|" + task.TimeZoneId + "|day";
+        }
+        // The morning of the due day, in the task's own time zone.
+        public static DateTime DateOnlyReminderUtc(TaskItem task, AppSettings settings)
+        {
+            TimeSpan time = DateTime.ParseExact(settings.Reminders.DateOnlyReminderTime, "HH:mm", CultureInfo.InvariantCulture).TimeOfDay;
+            return TimeUtil.LocalToUtc(TimeUtil.ParseLocal(task.DueLocal).Date.Add(time), task.TimeZoneId);
+        }
+        // A date-only deadline set after that morning's reminder time stays silent: the user just chose it.
+        public static void SkipPassedDateOnlyReminder(TaskItem task, AppSettings settings, DateTime utcNow)
+        {
+            if (!task.DueDateOnly || String.IsNullOrWhiteSpace(task.DueLocal) || utcNow < DateOnlyReminderUtc(task, settings)) return;
+            task.AdvanceNotifiedKey = task.DueNotifiedKey = DateOnlyKey(task);
+        }
         public static List<ReminderRecord> Scan(AppData data, DateTime utcNow)
         {
             utcNow = utcNow.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(utcNow, DateTimeKind.Utc) : utcNow.ToUniversalTime();
@@ -261,7 +294,17 @@ namespace DeskStudy
                 string advanceKey = dueKey + "|" + task.ReminderMinutes.ToString(CultureInfo.InvariantCulture);
                 DateTime threshold = due;
                 string kind = null;
-                if (utcNow >= due)
+                if (task.DueDateOnly)
+                {
+                    // One reminder that morning and none at 23:59. If the whole day was missed it is delivered late, once.
+                    string dayKey = DateOnlyKey(task);
+                    DateTime remind = DateOnlyReminderUtc(task, data.Settings);
+                    if (utcNow >= remind && task.AdvanceNotifiedKey != dayKey)
+                    {
+                        task.AdvanceNotifiedKey = task.DueNotifiedKey = dayKey; kind = utcNow >= due ? "due" : "advance"; threshold = remind;
+                    }
+                }
+                else if (utcNow >= due)
                 {
                     // Consume both stages if the application missed the due time.
                     task.AdvanceNotifiedKey = advanceKey;
@@ -275,7 +318,7 @@ namespace DeskStudy
                 ReminderRecord record = new ReminderRecord
                 {
                     Id = Guid.NewGuid().ToString("N"), TaskId = task.Id, Title = task.Text, BookName = book.Name, PageTitle = page.Title,
-                    DueLocal = task.DueLocal, FiredUtc = utcNow.ToString("o"), Kind = kind,
+                    DueLocal = task.DueLocal, FiredUtc = utcNow.ToString("o"), Kind = kind, DueDateOnly = task.DueDateOnly,
                     CatchUp = (utcNow - threshold).TotalSeconds > 30
                 };
                 result.Add(record); data.ReminderHistory.Add(record);
@@ -568,6 +611,8 @@ namespace DeskStudy
             {
                 Text(book.Name, 200, "便签名称", true); Require(book.Pages != null && book.Pages.Count > 0 && book.Pages.Count <= 20000, "便签页面列表无效。");
                 Require(book.Pages.Any(p => p != null && p.Id == book.CurrentPageId), "当前便签页不存在。");
+                if (!String.IsNullOrEmpty(book.LastDueDate)) Date(book.LastDueDate);
+                if (!String.IsNullOrEmpty(book.LastDueTime)) DateTime.ParseExact(book.LastDueTime, "HH:mm", CultureInfo.InvariantCulture);
                 foreach (NotePage page in book.Pages)
                 {
                     Require(page != null, "页面不能为空。"); Id(page.Id, ids); Text(page.Title, 1000, "页面标题", false); Text(page.Text, 1000000, "页面内容", false); Utc(page.CreatedUtc, false);
@@ -578,6 +623,7 @@ namespace DeskStudy
                         Require(task != null, "任务不能为空。"); Id(task.Id, ids); Text(task.Text, 10000, "任务内容", false); Zone(task.TimeZoneId);
                         Require(task.ReminderMinutes >= 0 && task.ReminderMinutes <= 5256000, "提前提醒时间无效。");
                         Text(task.DueLocal, 40, "截止时间", false); if (task.DueLocal.Length > 0) TimeUtil.ParseLocal(task.DueLocal);
+                        Require(!task.DueDateOnly || task.DueLocal.Length > 0, "仅日期的截止时间缺少日期。");
                         Text(task.AdvanceNotifiedKey, 500, "提醒状态", false); Text(task.DueNotifiedKey, 500, "提醒状态", false);
                     }
                 }
