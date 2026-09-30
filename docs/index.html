@@ -259,7 +259,7 @@ footer a{color:var(--sub)}
       <div class="pain reveal">
         <p class="q">待办应用要打开才看得到</p>
         <p>写进去的时候很认真，之后就再没打开过。看不到的清单，等于没有清单。</p>
-        <div class="a"><span>三个窗口常驻桌面，可置顶、可半透明，不占用注意力。</span></div>
+        <div class="a"><span>三个无边框的小组件常驻桌面，平时待在其他窗口下面，可置顶、可半透明。</span></div>
       </div>
       <div class="pain reveal">
         <p class="q">课表和临时变动对不上</p>
@@ -339,7 +339,7 @@ footer a{color:var(--sub)}
       <div class="cell reveal"><div class="t">提醒</div><h3>提前量逐项设置</h3><p>每个任务单独设置提前多久提醒，提前和截止时各提醒一次。</p></div>
       <div class="cell reveal"><div class="t">补发</div><h3>错过的会补上</h3><p>电脑休眠或程序没开时错过的提醒，恢复运行后汇总补发。</p></div>
       <div class="cell reveal"><div class="t">录入</div><h3>打字，回车</h3><p>在便签底部输入，回车就是一条任务，可以连续输入。</p></div>
-      <div class="cell reveal"><div class="t">常驻</div><h3>在，但不打扰</h3><p>置顶、透明度、字号、位置锁定都可调。点 ✕ 只是隐藏，提醒照常。</p></div>
+      <div class="cell reveal"><div class="t">常驻</div><h3>在，但不打扰</h3><p>不占任务栏。点一下浮到前面，切去别的程序后自动回到其他窗口下面；一个快捷键随时叫出来。</p></div>
     </div>
   </div>
 </section>
@@ -430,6 +430,7 @@ footer a{color:var(--sub)}
       <li><span><b>不支持多人协作。</b>它是个人用的工具。</span></li>
       <li><span><b>没有数字签名。</b>首次运行时 Windows 会弹出安全提示，需要手动确认。</span></li>
       <li><span><b>提醒需要程序在运行。</b>建议打开「登录 Windows 后自动启动」。</span></li>
+      <li><span><b>按 Win+D 显示桌面时，组件可能一起被收起。</b>单击托盘图标或按快捷键可以叫回来。</span></li>
     </ul>
   </div>
 </section>
@@ -465,7 +466,8 @@ footer a{color:var(--sub)}
     <div class="faq reveal">
       <details><summary>要钱吗？有没有广告或内购？</summary><p>都没有。桌面课笺免费，以 MIT 许可证开源。</p></details>
       <details><summary>会不会上传我的数据？</summary><p>不会。程序不联网，所有内容只保存在你电脑上的本地数据文件夹里。源码公开，可以自己核实。</p></details>
-      <details><summary>点了窗口的 ✕，程序就关了吗？</summary><p>没有，只是把窗口隐藏了，提醒照常。双击任务栏右下角托盘里的图标可以重新显示；要彻底退出，右键托盘图标选「保存并退出」。</p></details>
+      <details><summary>点了窗口的 ✕，程序就关了吗？</summary><p>没有，只是把组件隐藏了，提醒照常。双击任务栏右下角托盘里的图标可以重新显示；要彻底退出，右键托盘图标选「保存并退出」。</p></details>
+      <details><summary>任务栏上为什么找不到它？</summary><p>三个组件是桌面小组件，不占任务栏，只在托盘里有一个图标。被别的窗口挡住时，单击托盘图标或按快捷键（默认 Ctrl+Alt+Shift+D）就能叫到前面。不习惯的话，可以在设置里切换成带标题栏的标准窗口。</p></details>
       <details><summary>为什么没有收到提醒？</summary><p>提醒需要程序在运行，任务要设置了截止时间并且没有打勾。再检查一下 Windows 的通知设置和勿扰模式。</p></details>
       <details><summary>换电脑或重装系统怎么办？</summary><p>在设置中心导出全部数据，得到一个文件，拷到新电脑后导入即可。</p></details>
       <details><summary>卸载会留下什么？</summary><p>程序本身只有解压出来的那个文件夹，删掉即可。你的数据保存在本机用户目录下的 DeskStudy 文件夹里，不需要时可以一并删除。如果开启过「登录 Windows 后自动启动」，删除前先在设置中心把它关掉。</p></details>

@@ -24,5 +24,5 @@ foreach ($key in @('todo','ddl')) {
     $index++
 }
 $data | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath (Join-Path $previewPath 'data.json') -Encoding UTF8
-Copy-Item -LiteralPath (Join-Path $projectRoot 'release-1.4\DeskStudy.exe'),(Join-Path $projectRoot 'release-1.4\DeskStudy.exe.config') -Destination $previewApp -Force
+Copy-Item -LiteralPath (Join-Path $projectRoot 'release-1.5\DeskStudy.exe'),(Join-Path $projectRoot 'release-1.5\DeskStudy.exe.config') -Destination $previewApp -Force
 Start-Process -FilePath (Join-Path $previewApp 'DeskStudy.exe') -ArgumentList @('--data-dir', ('"' + $previewPath + '"')) -WindowStyle Normal -PassThru | Select-Object Id,ProcessName

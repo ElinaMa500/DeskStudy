@@ -169,8 +169,8 @@ namespace DeskStudy
             bool hot = false;
             row.Status.Cursor = Cursors.Hand; row.Status.AccessibleName = "设置截止时间";
             row.Status.Click += delegate { OpenTaskDue(row, row.Status); };
-            row.Status.MouseEnter += delegate { hot = true; row.Status.Invalidate(); };
-            row.Status.MouseLeave += delegate { hot = false; row.Status.Invalidate(); };
+            row.Status.MouseEnter += delegate { hot = true; if (!row.Status.IsDisposed) row.Status.Invalidate(); };
+            row.Status.MouseLeave += delegate { hot = false; if (!row.Status.IsDisposed) row.Status.Invalidate(); };
             row.Status.Paint += delegate(object sender, PaintEventArgs e)
             {
                 if (!hot || row.Status.Text.Length == 0) return;
@@ -182,8 +182,10 @@ namespace DeskStudy
             row.AddDue.Name = "add-due-" + row.Task.Id;
             row.AddDue.Click += delegate { OpenTaskDue(row, row.AddDue); };
             row.Card.Controls.Add(row.AddDue);
-            EventHandler enter = delegate { if (OffersHoverDue(row)) { row.AddDue.Visible = true; row.AddDue.BringToFront(); } };
-            EventHandler leave = delegate { if (!row.Card.ClientRectangle.Contains(row.Card.PointToClient(Cursor.Position))) row.AddDue.Visible = false; };
+            // Rows are rebuilt while the pointer may still be over them; a row being torn down must not be touched.
+            Func<bool> alive = delegate { return !row.Card.IsDisposed && !row.Card.Disposing && row.Card.IsHandleCreated && !row.AddDue.IsDisposed; };
+            EventHandler enter = delegate { if (alive() && OffersHoverDue(row)) { row.AddDue.Visible = true; row.AddDue.BringToFront(); } };
+            EventHandler leave = delegate { if (alive() && !row.Card.ClientRectangle.Contains(row.Card.PointToClient(Cursor.Position))) row.AddDue.Visible = false; };
             foreach (Control c in new Control[] { row.Card, row.Toggle, row.Title, row.More, row.AddDue }) { c.MouseEnter += enter; c.MouseLeave += leave; }
         }
         private bool OffersHoverDue(TaskRow row)

@@ -255,6 +255,10 @@ namespace DeskStudy
             // Import reads and validates the source before rotating data.previous.json.
             Store.Import(path);
             pendingDelivery.Clear();
+            // A backup from before 1.5 carries framed bounds, and any backup may select the other window mode.
+            NormalizeWindowFrames();
+            foreach (var w in Widgets) w.ApplyWidgetMode();
+            RegisterShowHotkey();
             var state = Data.Windows.ToDictionary(p => p.Key, p => CopyWindow(p.Value));
             foreach (var w in Widgets) UpdateWindow(w.WidgetKey, state[w.WidgetKey]);
             SettingsChanged();
@@ -311,9 +315,18 @@ namespace DeskStudy
         {
             using (var key = Registry.CurrentUser.CreateSubKey(RunKey))
             {
-                if (enabled) key.SetValue("DeskStudy", "\"" + Application.ExecutablePath + "\"", RegistryValueKind.String);
+                if (enabled) key.SetValue("DeskStudy", Command, RegistryValueKind.String);
                 else key.DeleteValue("DeskStudy", false);
             }
+        }
+        // --startup tells the app it was launched at sign-in, so it starts quietly behind other windows.
+        private static string Command { get { return "\"" + Application.ExecutablePath + "\" --startup"; } }
+        // Keeps an enabled entry pointing at the running program, including after the folder moved or a newer version was started.
+        public static void Refresh()
+        {
+            using (var key = Registry.CurrentUser.OpenSubKey(RunKey, true))
+                if (key != null && key.GetValue("DeskStudy") != null && !String.Equals(key.GetValue("DeskStudy") as string, Command, StringComparison.OrdinalIgnoreCase))
+                    key.SetValue("DeskStudy", Command, RegistryValueKind.String);
         }
     }
 

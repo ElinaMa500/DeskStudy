@@ -28,8 +28,16 @@ public static class NotebookLayoutTests
     static void Capture(Form form, string path)
     {
         File.WriteAllLines(path + ".layout.txt", Descendants(form).Where(c => c.Visible).Select(c => c.GetType().Name + " | " + c.Name + " | " + c.Text.Replace("\n", " ").Replace("\r", "") + " | " + c.Bounds + " | Font=" + c.Font.SizeInPoints + " | parent=" + c.Parent.Bounds).ToArray());
-        using (var bitmap = new Bitmap(form.Width, form.Height)) { form.DrawToBitmap(bitmap, new Rectangle(Point.Empty, form.Size)); bitmap.Save(path, System.Drawing.Imaging.ImageFormat.Png); }
+        // PrintWindow with full-content rendering captures what the screen shows. DrawToBitmap would paint a title bar the borderless widgets do not have.
+        using (var bitmap = new Bitmap(form.Width, form.Height))
+        {
+            bool printed;
+            using (Graphics g = Graphics.FromImage(bitmap)) { IntPtr dc = g.GetHdc(); printed = PrintWindow(form.Handle, dc, 2); g.ReleaseHdc(dc); }
+            if (!printed) form.DrawToBitmap(bitmap, new Rectangle(Point.Empty, form.Size));
+            bitmap.Save(path, System.Drawing.Imaging.ImageFormat.Png);
+        }
     }
+    [DllImport("user32.dll")] private static extern bool PrintWindow(IntPtr hwnd, IntPtr hdc, uint flags);
     static void Seed(AppController app)
     {
         foreach (var book in app.Data.Books)
@@ -315,6 +323,83 @@ public static class NotebookLayoutTests
         Capture(ddlForm, Path.Combine(path, "due-ddl-clean.png")); Capture(todoForm, Path.Combine(path, "due-todo-clean.png"));
         app.Save(); Assert(app.Flush(), "deadline changes saved");
     }
+    [DllImport("user32.dll", EntryPoint = "GetWindowLong")] private static extern int GetWindowStyle(IntPtr hwnd, int index);
+    [DllImport("user32.dll")] private static extern IntPtr GetWindow(IntPtr hwnd, uint command);
+    static int Hit(Control target, Point screen) { return (int)SendMessage(target.Handle, 0x84, IntPtr.Zero, new IntPtr((screen.Y << 16) | (screen.X & 0xFFFF))).ToInt64(); }
+    static bool IsBelow(Form lower, Form upper) { for (IntPtr h = GetWindow(upper.Handle, 2); h != IntPtr.Zero; h = GetWindow(h, 2)) if (h == lower.Handle) return true; return false; }
+    static Rectangle Content(Form form) { return form.RectangleToScreen(form.ClientRectangle); }
+    static void FrameChecks(AppController app, string path)
+    {
+        var todo = Form(app, "todo"); var ddl = Form(app, "ddl"); var calendar = app.Widgets.First(w => w.WidgetKey == "calendar");
+        app.ShowAll(); todo.Bounds = new Rectangle(200, 160, 460, 560); Pump(150);
+        Assert(app.Data.Settings.WidgetMode == "Desktop" && app.Widgets.All(w => w.DesktopMode && !w.ShowInTaskbar), "new data starts in desktop widget mode with no taskbar buttons");
+        Assert(app.Widgets.All(w => (GetWindowStyle(w.Handle, -20) & 0x80) != 0 && (GetWindowStyle(w.Handle, -20) & 0x40000) == 0), "widgets are tool windows, so they stay out of Alt+Tab");
+        Assert(app.Widgets.All(w => w.ClientSize == w.Size && !w.MaximizeBox && !w.MinimizeBox), "desktop widgets have no title bar or frame: the client area is the whole window");
+
+        Rectangle b = todo.Bounds; int midX = b.Left + b.Width / 2, midY = b.Top + b.Height / 2;
+        Assert(Hit(todo, new Point(b.Left + 2, midY)) == 10 && Hit(todo, new Point(b.Right - 2, midY)) == 11 && Hit(todo, new Point(midX, b.Top + 2)) == 12 && Hit(todo, new Point(midX, b.Bottom - 2)) == 15, "the four edges resize");
+        Assert(Hit(todo, new Point(b.Left + 3, b.Top + 3)) == 13 && Hit(todo, new Point(b.Right - 3, b.Top + 3)) == 14 && Hit(todo, new Point(b.Left + 3, b.Bottom - 3)) == 16 && Hit(todo, new Point(b.Right - 3, b.Bottom - 3)) == 17, "the four corners resize diagonally");
+        Assert(Hit(todo, new Point(midX, midY)) == 1, "the middle of the widget is ordinary content");
+        var header = Find<Panel>(todo, "widget-header");
+        Assert(Hit(header, new Point(midX, b.Top + 2)) == -1 && Hit(header, new Point(midX, b.Top + header.Height / 2)) != -1, "the header lets the top resize edge through but keeps its own area");
+        app.Data.Windows["todo"].PositionLocked = true;
+        Assert(Hit(todo, new Point(b.Left + 2, midY)) == 1 && Hit(todo, new Point(b.Right - 3, b.Bottom - 3)) == 1, "a locked widget cannot be resized from its edges");
+        app.Data.Windows["todo"].PositionLocked = false;
+
+        Switch(app, "Clean");
+        Assert(Find<Button>(todo, "close-widget").Visible && !Find<Button>(todo, "hide-widget").Visible, "清爽卡片 carries its own ✕ in desktop mode");
+        Switch(app, "Card");
+        Assert(!Find<Button>(todo, "close-widget").Visible && Find<Button>(todo, "hide-widget").Visible, "轻量卡片 keeps its 隐藏 button and shows no extra ✕");
+        Switch(app, "Clean"); Find<Button>(todo, "close-widget").PerformClick(); Pump(80);
+        Assert(!todo.Visible && !app.Data.Windows["todo"].Visible && !app.Exiting, "the ✕ hides the widget and leaves the app running");
+        app.RaiseWidgets(); Pump(80);
+        Assert(!todo.Visible && ddl.Visible, "raising widgets leaves a hidden widget hidden");
+        app.HideAll(); Pump(60); app.RaiseWidgets(); Pump(100);
+        Assert(app.Widgets.All(w => w.Visible), "with every widget hidden, raising shows them all");
+
+        using (var other = new Form { Text = "another window", StartPosition = FormStartPosition.Manual, Bounds = new Rectangle(240, 200, 420, 360) })
+        {
+            other.Show(); Pump(80); todo.Reveal(); Pump(80);
+            Assert(IsBelow(other, todo), "clicking a widget brings it above other windows");
+            SendMessage(todo.Handle, 0x1C, IntPtr.Zero, IntPtr.Zero); Pump(120);
+            Assert(IsBelow(todo, other), "when another program is activated the widget sinks behind other windows");
+            ddl.TopMost = true; Pump(60); SendMessage(ddl.Handle, 0x1C, IntPtr.Zero, IntPtr.Zero); Pump(120);
+            Assert((GetWindowStyle(ddl.Handle, -20) & 0x8) != 0 && !IsBelow(ddl, other), "a pinned widget stays on top");
+            ddl.TopMost = false; Pump(60);
+        }
+
+        todo.Bounds = new Rectangle(200, 160, 460, 560); Pump(120); todo.Remember();
+        Rectangle content = Content(todo); IntPtr desktopHandle = todo.Handle;
+        var saved = app.Data.Windows["todo"]; int tasksBefore = Book(app, "todo").Pages.Sum(p => p.Tasks.Count);
+        app.SetWidgetMode("Standard"); Pump(200);
+        Assert(app.Data.Settings.WidgetMode == "Standard" && app.Widgets.All(w => !w.DesktopMode && w.ShowInTaskbar && w.ClientSize.Height < w.Height), "standard mode restores the title bar and taskbar buttons");
+        Assert((GetWindowStyle(todo.Handle, -20) & 0x80) == 0 && Hit(todo, new Point(midX, midY)) == 1, "standard windows are ordinary application windows again");
+        Assert(Content(todo) == content, "switching to standard windows keeps the content area exactly where it was: " + Content(todo) + " vs " + content);
+        Assert(Find<Button>(todo, "close-widget").Visible == false && Applied(todo) == "Clean", "standard mode uses the system ✕ and keeps the chosen layout");
+        app.SetWidgetMode("Desktop"); Pump(200);
+        Assert(todo.DesktopMode && todo.Bounds == content && Content(todo) == content && Book(app, "todo").Pages.Sum(p => p.Tasks.Count) == tasksBefore, "switching back returns the same bounds and content");
+
+        Assert(app.HotkeyStatus.Contains("隔离") && app.Data.Settings.ShowHotkey == "Ctrl+Alt+Shift+D", "isolated runs never register the global shortcut; the default is Ctrl+Alt+Shift+D");
+        app.SetShowHotkey("Ctrl+Alt+K"); Assert(app.Data.Settings.ShowHotkey == "Ctrl+Alt+K", "the shortcut can be changed");
+        bool rejected = false; try { app.SetShowHotkey("K"); } catch (InvalidOperationException) { rejected = true; }
+        Assert(rejected && app.Data.Settings.ShowHotkey == "Ctrl+Alt+K", "a shortcut without Ctrl, Alt or Win is rejected");
+        app.SetShowHotkey(""); Assert(app.Data.Settings.ShowHotkey == "", "the shortcut can be turned off");
+
+        app.OpenSettings(); Pump(100);
+        var settings = Application.OpenForms.OfType<SettingsForm>().Single(); Find<ListBox>(settings, "settings-nav").SelectedIndex = 1; Pump(100);
+        var modeBox = Find<ComboBox>(settings, "widget-mode"); var hotkeyBox = Find<TextBox>(settings, "show-hotkey");
+        Assert(modeBox.SelectedIndex == 0 && hotkeyBox.Text == "已停用" && settings.ShowInTaskbar, "settings show the current mode and shortcut; the settings center keeps its taskbar button");
+        modeBox.SelectedIndex = 1; Pump(200);
+        Assert(app.Data.Settings.WidgetMode == "Standard" && !todo.DesktopMode, "the settings switch changes the window mode immediately");
+        Find<Button>(settings, "hotkey-default").PerformClick(); Pump(80);
+        Assert(app.Data.Settings.ShowHotkey == "Ctrl+Alt+Shift+D" && hotkeyBox.Text == "Ctrl+Alt+Shift+D", "restoring the default shortcut updates the setting and the field");
+        settings.Size = new Size(1180, 900); Pump(120); Capture(settings, Path.Combine(path, "settings-window-mode.png"));
+        modeBox.SelectedIndex = 0; Pump(200); settings.Close(); Pump(80);
+        Switch(app, "Clean"); app.ShowAll(); Pump(150);
+        Capture(todo, Path.Combine(path, "frame-todo-clean.png")); Capture(calendar, Path.Combine(path, "frame-calendar.png"));
+        Switch(app, "Card"); Pump(100); Capture(ddl, Path.Combine(path, "frame-ddl-card.png"));
+        app.Save(); Assert(app.Flush(), "window mode changes saved");
+    }
     [STAThread] public static int Main(string[] args)
     {
         Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
@@ -327,6 +412,7 @@ public static class NotebookLayoutTests
                 if (mode == "read") ReadChecks(app, path);
                 else if (mode == "render") RenderChecks(app, path);
                 else if (mode == "due") DueChecks(app, path);
+                else if (mode == "frame") FrameChecks(app, path);
                 else WriteChecks(app, path, mode == "card");
                 app.Shutdown();
             }

@@ -18,8 +18,15 @@ namespace DeskStudy
         public string LastBackupUtc { get; set; }
         public Dictionary<string, WindowState> SavedLayout { get; set; }
         public string SavedLayoutUtc { get; set; }
+        // "Desktop": borderless widgets, off the taskbar, sinking behind other windows when not in use. "Standard": ordinary windows.
+        public string WidgetMode { get; set; }
+        // Global shortcut that raises or lowers all widgets, e.g. "Ctrl+Alt+Shift+D". Empty disables it.
+        public string ShowHotkey { get; set; }
+        // Set when the file predates WidgetMode: its window bounds still include the system frame.
+        [System.Web.Script.Serialization.ScriptIgnore] public bool FramedWindowBounds { get; set; }
         public AppSettings()
         {
+            WidgetMode = "Desktop"; ShowHotkey = HotkeySpec.Default;
             NotebookLayout = "Card";
             GlobalAppearance = new AppearanceOptions();
             AppearanceOverrides = new Dictionary<string, AppearanceOptions>();
@@ -67,8 +74,54 @@ namespace DeskStudy
         public string DateOnlyReminderTime { get; set; }
         public ReminderOptions() { DefaultLeadMinutes = 30; QuietStart = "22:00"; QuietEnd = "08:00"; SoundEnabled = true; DateOnlyReminderTime = "09:00"; }
     }
+    // A global shortcut written as "Ctrl+Alt+Shift+D". Needs Ctrl, Alt or Win so it cannot shadow ordinary typing.
+    public sealed class HotkeySpec
+    {
+        public const string Default = "Ctrl+Alt+Shift+D";
+        public const int Alt = 1, Ctrl = 2, Shift = 4, Win = 8;
+        public int Modifiers { get; private set; }
+        public int VirtualKey { get; private set; }
+        public static bool TryParse(string text, out HotkeySpec spec)
+        {
+            spec = null;
+            if (String.IsNullOrWhiteSpace(text)) return false;
+            int modifiers = 0, key = 0;
+            foreach (string raw in text.Split('+'))
+            {
+                string part = raw.Trim().ToUpperInvariant();
+                if (part == "CTRL") modifiers |= Ctrl;
+                else if (part == "ALT") modifiers |= Alt;
+                else if (part == "SHIFT") modifiers |= Shift;
+                else if (part == "WIN") modifiers |= Win;
+                else if (key != 0) return false;
+                else if (part.Length == 1 && ((part[0] >= 'A' && part[0] <= 'Z') || (part[0] >= '0' && part[0] <= '9'))) key = part[0];
+                else if (part.Length >= 2 && part[0] == 'F' && Int32.TryParse(part.Substring(1), out key) && key >= 1 && key <= 12) key = 0x6F + key;
+                else if (part == "`") key = 0xC0;
+                else if (part == "SPACE") key = 0x20;
+                else return false;
+            }
+            if (key == 0 || (modifiers & (Ctrl | Alt | Win)) == 0) return false;
+            spec = new HotkeySpec { Modifiers = modifiers, VirtualKey = key };
+            return true;
+        }
+        public static string Format(int modifiers, int virtualKey)
+        {
+            string key = virtualKey >= 0x70 && virtualKey <= 0x7B ? "F" + (virtualKey - 0x6F) : virtualKey == 0xC0 ? "`" : virtualKey == 0x20 ? "Space"
+                : (virtualKey >= 'A' && virtualKey <= 'Z') || (virtualKey >= '0' && virtualKey <= '9') ? ((char)virtualKey).ToString() : "";
+            if (key == "") return "";
+            return ((modifiers & Ctrl) != 0 ? "Ctrl+" : "") + ((modifiers & Alt) != 0 ? "Alt+" : "") + ((modifiers & Shift) != 0 ? "Shift+" : "") + ((modifiers & Win) != 0 ? "Win+" : "") + key;
+        }
+    }
     public static class SettingsLogic
     {
+        public static readonly string[] WidgetModes = { "Desktop", "Standard" };
+        // Turns bounds saved with a system frame into the same content area without one, and back.
+        public static void ShiftFrame(WindowState window, int left, int top, int right, int bottom, bool removeFrame)
+        {
+            int sign = removeFrame ? 1 : -1;
+            window.X += sign * left; window.Y += sign * top;
+            window.Width -= sign * (left + right); window.Height -= sign * (top + bottom);
+        }
         public static AppearanceOptions EffectiveAppearance(AppData data, string key)
         {
             AppearanceOptions value;
@@ -142,6 +195,8 @@ namespace DeskStudy
         {
             Require(settings != null, "缺少设置数据。"); Appearance(settings.GlobalAppearance);
             Require(NotebookLayouts.Contains(settings.NotebookLayout), "便签布局无效。");
+            Require(WidgetModes.Contains(settings.WidgetMode), "窗口模式无效。");
+            HotkeySpec hotkey; Require(settings.ShowHotkey == "" || HotkeySpec.TryParse(settings.ShowHotkey, out hotkey), "快捷键无效。");
             Require(settings.AppearanceOverrides != null && settings.AppearanceOverrides.Count <= 3, "组件外观设置无效。");
             foreach (KeyValuePair<string, AppearanceOptions> pair in settings.AppearanceOverrides)
             { Require(new[] { "calendar", "todo", "ddl" }.Contains(pair.Key), "未知的组件外观设置。"); Appearance(pair.Value); }

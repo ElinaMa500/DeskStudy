@@ -51,6 +51,24 @@ public static class NotebookLayoutCoreTests
             Assert(reopened.Data.Settings.NotebookLayout == "Journal" && reopened.Data.Books[0].Pages[0].Text == "完整的历史中文备注" && reopened.LoadWarning == "", "version 3 data reopens in 1.3 with layout and content intact");
             reopened.Data.Settings.NotebookLayout = "Card"; reopened.Save();
             Assert(Convert.ToInt32(Map(Json().DeserializeObject(File.ReadAllText(oldFile)))["Version"]) == 2, "switching back to a 1.2 layout writes version 2 again");
+            Assert(!reopened.Data.Settings.FramedWindowBounds && reopened.Data.Settings.WidgetMode == "Desktop" && reopened.Data.Settings.ShowHotkey == "Ctrl+Alt+Shift+D", "data saved by this version carries the window mode and needs no bounds conversion");
+            var framed = Map(Json().DeserializeObject(File.ReadAllText(oldFile))); Map(framed["Settings"]).Remove("WidgetMode"); Map(framed["Settings"]).Remove("ShowHotkey"); File.WriteAllText(oldFile, Json().Serialize(framed));
+            var legacy = new AppStore(root);
+            Assert(legacy.LoadWarning == "" && legacy.Data.Settings.FramedWindowBounds && legacy.Data.Settings.WidgetMode == "Desktop", "data from before 1.5 opens in desktop mode and is marked for a one-time bounds conversion");
+            var window = new WindowState { X = 100, Y = 200, Width = 500, Height = 600 };
+            SettingsLogic.ShiftFrame(window, 9, 38, 9, 9, true);
+            Assert(window.X == 109 && window.Y == 238 && window.Width == 482 && window.Height == 553, "removing the frame keeps the content rectangle");
+            SettingsLogic.ShiftFrame(window, 9, 38, 9, 9, false);
+            Assert(window.X == 100 && window.Y == 200 && window.Width == 500 && window.Height == 600, "restoring the frame returns the original bounds");
+            HotkeySpec key;
+            Assert(HotkeySpec.TryParse("Ctrl+Alt+Shift+D", out key) && key.Modifiers == 7 && key.VirtualKey == 'D' && HotkeySpec.Format(key.Modifiers, key.VirtualKey) == "Ctrl+Alt+Shift+D", "the default shortcut parses and formats back");
+            Assert(HotkeySpec.TryParse("alt+f9", out key) && key.VirtualKey == 0x78 && HotkeySpec.TryParse("Ctrl+`", out key) && key.VirtualKey == 0xC0, "function keys and the backtick key are accepted");
+            Assert(!HotkeySpec.TryParse("D", out key) && !HotkeySpec.TryParse("Shift+D", out key) && !HotkeySpec.TryParse("Ctrl+Alt", out key) && !HotkeySpec.TryParse("Ctrl+A+B", out key) && !HotkeySpec.TryParse("Ctrl+F13", out key), "shortcuts without Ctrl, Alt or Win, without a key, or with two keys are rejected");
+            legacy.Data.Settings.WidgetMode = "Floating"; Reject(delegate { legacy.Save(); }, "an unknown window mode is rejected before saving");
+            legacy.Data.Settings.WidgetMode = "Standard"; legacy.Data.Settings.ShowHotkey = "D"; Reject(delegate { legacy.Save(); }, "an invalid shortcut is rejected before saving");
+            legacy.Data.Settings.ShowHotkey = ""; legacy.Save();
+            var standard = new AppStore(root);
+            Assert(standard.Data.Settings.WidgetMode == "Standard" && standard.Data.Settings.ShowHotkey == "" && !standard.Data.Settings.FramedWindowBounds, "standard mode and a disabled shortcut survive a restart");
             Console.WriteLine("ALL " + count + " NOTEBOOK LAYOUT CORE CHECKS PASSED"); return 0;
         }
         catch(Exception e) { Console.Error.WriteLine(e); return 1; }

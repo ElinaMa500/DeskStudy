@@ -1,0 +1,153 @@
+using System;
+using System.Drawing;
+using System.Runtime.InteropServices;
+using System.Windows.Forms;
+
+namespace DeskStudy
+{
+    // Desktop widget mode: no title bar, off the taskbar and Alt+Tab, resizable from the edges,
+    // and resting behind other windows until clicked.
+    public partial class WidgetForm
+    {
+        private bool desktopMode;
+        private Button closeButton;
+        private Timer hoverTimer;
+        private bool closeShown;
+        private Color closeRest, closeHot;
+        public bool DesktopMode { get { return desktopMode; } }
+
+        [StructLayout(LayoutKind.Sequential)] private struct RECT { public int Left, Top, Right, Bottom; }
+        [DllImport("user32.dll")] private static extern bool SetWindowPos(IntPtr hwnd, IntPtr after, int x, int y, int cx, int cy, uint flags);
+        [DllImport("user32.dll")] private static extern bool AdjustWindowRectEx(ref RECT rect, int style, bool menu, int exStyle);
+        [DllImport("dwmapi.dll")] private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
+        private const uint NoSize = 0x0001, NoMove = 0x0002, NoZOrder = 0x0004, NoActivate = 0x0010, FrameChanged = 0x0020;
+        private static readonly IntPtr HwndBottom = new IntPtr(1);
+
+        // How much a standard window's frame adds around its content, used to keep the content area when switching modes.
+        public static Padding FrameInsets()
+        {
+            var rect = new RECT();
+            AdjustWindowRectEx(ref rect, 0x00CF0000, false, 0);
+            return new Padding(-rect.Left, -rect.Top, rect.Right, rect.Bottom);
+        }
+
+        protected override CreateParams CreateParams
+        {
+            get
+            {
+                CreateParams cp = base.CreateParams;
+                if (desktopMode) { cp.ExStyle |= 0x00000080; cp.ExStyle &= ~0x00040000; }
+                return cp;
+            }
+        }
+        // Shown without taking focus, so a widget appearing at startup never interrupts typing elsewhere.
+        protected override bool ShowWithoutActivation { get { return desktopMode && !TopMost; } }
+
+        private void InitializeFrame()
+        {
+            closeButton = Ui.Button("✕", delegate { Hide(); });
+            closeButton.Name = "close-widget"; closeButton.AccessibleName = "隐藏这个组件"; closeButton.AutoSize = false; closeButton.Visible = false;
+            closeButton.FlatStyle = FlatStyle.Flat; closeButton.FlatAppearance.BorderSize = 0; closeButton.Margin = Padding.Empty; closeButton.TabStop = false;
+            headerActions.Controls.Add(closeButton);
+            hoverTimer = new Timer { Interval = 150 };
+            hoverTimer.Tick += delegate { UpdateCloseHover(); };
+        }
+        // The ✕ keeps its place in the header and only becomes visible while the pointer is over the widget.
+        private void UpdateCloseHover()
+        {
+            if (!closeShown || IsDisposed) return;
+            Color wanted = Visible && Bounds.Contains(Cursor.Position) ? closeHot : closeRest;
+            if (closeButton.ForeColor != wanted) closeButton.ForeColor = wanted;
+        }
+        private void StyleCloseButton(bool show, Color back, Color muted, Color soft, float dpi)
+        {
+            closeShown = show && desktopMode;
+            closeButton.Visible = closeShown; hoverTimer.Enabled = closeShown;
+            if (!closeShown) return;
+            closeRest = back; closeHot = muted;
+            closeButton.BackColor = back; closeButton.FlatAppearance.BorderSize = 0; closeButton.FlatAppearance.BorderColor = back; closeButton.FlatAppearance.MouseOverBackColor = soft;
+            closeButton.Size = new Size((int)Math.Round(28 * dpi), settingsButton.Height);
+            UpdateCloseHover();
+        }
+
+        // Applies the window mode chosen in settings. The window is rebuilt, so callers restore bounds afterwards.
+        public void ApplyWidgetMode()
+        {
+            bool wanted = App.Data.Settings.WidgetMode == "Desktop";
+            if (wanted == desktopMode) return;
+            bool remembered = ready; ready = false;
+            try
+            {
+                desktopMode = wanted;
+                ShowInTaskbar = !wanted; MaximizeBox = !wanted; MinimizeBox = !wanted;
+                if (IsHandleCreated) RecreateHandle();
+            }
+            finally { ready = remembered; }
+            RestoreWindow(); ApplyAppearance();
+        }
+
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            if (!desktopMode) return;
+            try { int round = 2; DwmSetWindowAttribute(Handle, 33, ref round, sizeof(int)); }
+            catch (DllNotFoundException) { }
+            catch (EntryPointNotFoundException) { }
+            // Re-evaluate the frame so the title bar is removed immediately.
+            SetWindowPos(Handle, IntPtr.Zero, 0, 0, 0, 0, NoSize | NoMove | NoZOrder | NoActivate | FrameChanged);
+        }
+
+        // Hit-test code for a screen point: a resize edge or corner, otherwise client.
+        public int EdgeHit(Point screen)
+        {
+            if (!desktopMode || IsDisposed || Disposing || !IsHandleCreated || PositionLocked || WindowState != FormWindowState.Normal) return 1;
+            float dpi; using (Graphics g = CreateGraphics()) dpi = g.DpiX / 96F;
+            int grip = (int)Math.Round(6 * dpi), corner = (int)Math.Round(14 * dpi);
+            Rectangle b = Bounds;
+            if (!b.Contains(screen)) return 1;
+            bool left = screen.X < b.Left + grip, right = screen.X >= b.Right - grip, top = screen.Y < b.Top + grip, bottom = screen.Y >= b.Bottom - grip;
+            bool nearLeft = screen.X < b.Left + corner, nearRight = screen.X >= b.Right - corner, nearTop = screen.Y < b.Top + corner, nearBottom = screen.Y >= b.Bottom - corner;
+            if ((top && nearLeft) || (left && nearTop)) return 13;
+            if ((top && nearRight) || (right && nearTop)) return 14;
+            if ((bottom && nearLeft) || (left && nearBottom)) return 16;
+            if ((bottom && nearRight) || (right && nearBottom)) return 17;
+            return left ? 10 : right ? 11 : top ? 12 : bottom ? 15 : 1;
+        }
+        internal static Point ScreenPoint(IntPtr lParam)
+        {
+            int value = unchecked((int)lParam.ToInt64());
+            return new Point((short)(value & 0xFFFF), (short)((value >> 16) & 0xFFFF));
+        }
+        private bool FrameWndProc(ref Message m)
+        {
+            if (!desktopMode) return false;
+            // The whole window is client area: no title bar. The thick frame style stays so Windows keeps the shadow and rounded corners.
+            if (m.Msg == 0x0083) { m.Result = IntPtr.Zero; return true; }
+            if (m.Msg == 0x0084) { m.Result = new IntPtr(EdgeHit(ScreenPoint(m.LParam))); return true; }
+            return false;
+        }
+        private void AfterFrameWndProc(ref Message m)
+        {
+            // Another application came to the front: go back behind everything.
+            if (desktopMode && m.Msg == 0x001C && m.WParam == IntPtr.Zero && IsHandleCreated && !IsDisposed)
+                BeginInvoke(new Action(SinkToBottom));
+        }
+        public void SinkToBottom()
+        {
+            if (!desktopMode || TopMost || IsDisposed || !IsHandleCreated || !Visible) return;
+            SetWindowPos(Handle, HwndBottom, 0, 0, 0, 0, NoSize | NoMove | NoActivate);
+        }
+    }
+
+    // A panel that lets the owning widget's resize edges show through where it touches the window border.
+    internal sealed class EdgePanel : Panel
+    {
+        protected override void WndProc(ref Message m)
+        {
+            base.WndProc(ref m);
+            if (m.Msg != 0x0084) return;
+            var form = FindForm() as WidgetForm;
+            if (form != null && form.DesktopMode && form.EdgeHit(WidgetForm.ScreenPoint(m.LParam)) != 1) m.Result = new IntPtr(-1);
+        }
+    }
+}

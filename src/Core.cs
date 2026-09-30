@@ -417,6 +417,8 @@ namespace DeskStudy
             CheckShape(root, version);
             AppData data = serializer.Deserialize<AppData>(json);
             data.Version = 2;
+            // Files written before 1.5 stored window bounds that include the system title bar and frame.
+            data.Settings.FramedWindowBounds = version < 2 || !((Dictionary<string, object>)root["Settings"]).ContainsKey("WidgetMode");
             if (version >= 2)
             {
                 var settings = (Dictionary<string, object>)root["Settings"];

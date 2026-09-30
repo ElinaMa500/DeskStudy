@@ -32,7 +32,7 @@ namespace DeskStudy
         }
     }
 
-    public class WidgetForm : Form
+    public partial class WidgetForm : Form
     {
         protected AppController App;
         protected Panel Body;
@@ -57,15 +57,16 @@ namespace DeskStudy
         {
             SuspendLayout();
             App = app; WidgetKey = key;
+            desktopMode = app.Data.Settings.WidgetMode == "Desktop";
             AutoScaleDimensions = new SizeF(96F, 96F);
             AutoScaleMode = AutoScaleMode.Dpi;
             Font = new Font("Microsoft YaHei UI", 9F);
             Text = title + " · 桌面课笺"; BackColor = Ui.Background;
             Icon = App.AppIcon; StartPosition = FormStartPosition.Manual;
             Size = defaultSize; MinimumSize = new Size(350, 430);
-            FormBorderStyle = FormBorderStyle.Sizable; MaximizeBox = true;
-            header = new Panel { Name = "widget-header", Dock = DockStyle.Top, Height = 48, BackColor = Color.White, Padding = new Padding(12, 6, 8, 6) };
-            stripe = new Panel { Name = "widget-accent", Dock = DockStyle.Top, Height = 3, BackColor = accent };
+            FormBorderStyle = FormBorderStyle.Sizable; MaximizeBox = !desktopMode; MinimizeBox = !desktopMode; ShowInTaskbar = !desktopMode;
+            header = new EdgePanel { Name = "widget-header", Dock = DockStyle.Top, Height = 48, BackColor = Color.White, Padding = new Padding(12, 6, 8, 6) };
+            stripe = new EdgePanel { Name = "widget-accent", Dock = DockStyle.Top, Height = 3, BackColor = accent };
             headingTitle = title;
             heading = Ui.Label(title, 12F, accent); heading.Name = "widget-heading"; heading.Dock = DockStyle.Fill; heading.TextAlign = ContentAlignment.MiddleLeft; heading.AutoSize = false;
             heading.Paint += delegate(object sender, PaintEventArgs e)
@@ -90,7 +91,8 @@ namespace DeskStudy
             settingsButton = menu; hideButton = hide;
             actions.Controls.Add(pin); actions.Controls.Add(menu); actions.Controls.Add(hide);
             header.Controls.Add(heading); header.Controls.Add(actions);
-            Body = new Panel { Dock = DockStyle.Fill, Padding = new Padding(12, 6, 12, 10), BackColor = Ui.Background };
+            InitializeFrame();
+            Body = new EdgePanel { Dock = DockStyle.Fill, Padding = new Padding(12, 6, 12, 10), BackColor = Ui.Background };
             Controls.Add(Body); Controls.Add(header); Controls.Add(stripe);
             MouseEventHandler drag = delegate(object sender, MouseEventArgs e) { if (!PositionLocked && e.Button == MouseButtons.Left) { ReleaseCapture(); SendMessage(Handle, 0xA1, new IntPtr(2), IntPtr.Zero); } };
             header.MouseDown += drag; heading.MouseDown += drag;
@@ -114,8 +116,10 @@ namespace DeskStudy
                 if (m.Msg == 0x112 && (command == 0xF010 || command == 0xF000 || command == 0xF030)) return;
                 if ((m.Msg == 0xA1 || m.Msg == 0xA3) && m.WParam.ToInt32() == 2) return;
             }
+            if (App != null && FrameWndProc(ref m)) return;
             base.WndProc(ref m);
             if (App != null && PositionLocked && m.Msg == 0x84 && m.Result.ToInt32() >= 10 && m.Result.ToInt32() <= 17) m.Result = new IntPtr(1);
+            if (App != null) AfterFrameWndProc(ref m);
         }
         public void ApplyAppearance()
         {
@@ -144,6 +148,7 @@ namespace DeskStudy
         {
             int width = (pin.AutoSize ? pin.PreferredSize.Width : pin.Width) + pin.Margin.Horizontal + settingsButton.Width + settingsButton.Margin.Horizontal + 4;
             if (hideButton.Visible || !referenceHeader) width += hideButton.Width + hideButton.Margin.Horizontal;
+            if (closeShown) width += closeButton.Width + closeButton.Margin.Horizontal;
             headerActions.Width = width;
         }
         // Reference-style header (清爽卡片 / 手账纸页): colored dot, book label, a 置顶 toggle and a small ⚙.
@@ -184,6 +189,8 @@ namespace DeskStudy
                 settingsButton.Width = (int)Math.Round(40 * dpi); settingsButton.Margin = hideButton.Margin;
                 settingsButton.FlatAppearance.MouseOverBackColor = Color.Empty;
             }
+            // Without a title bar there is no system ✕, so the reference header carries its own.
+            StyleCloseButton(on, back, muted, soft, dpi);
             UpdateHeaderActionsWidth();
             header.Invalidate(); heading.Invalidate();
         }
@@ -210,6 +217,7 @@ namespace DeskStudy
                 foreach (var baseline in appearanceBaselines.Values) if (baseline.AppliedFont != null) baseline.AppliedFont.Dispose();
                 appearanceBaselines.Clear();
                 if (notebookHeadingFont != null) { notebookHeadingFont.Dispose(); notebookHeadingFont = null; }
+                if (hoverTimer != null) { hoverTimer.Dispose(); hoverTimer = null; }
             }
         }
         protected void SetTitle(string title) { Text = title + " · 桌面课笺"; headingTitle = title; heading.Text = title + headingSuffix; }
@@ -268,7 +276,8 @@ namespace DeskStudy
         private readonly List<ReminderRecord> pendingDelivery = new List<ReminderRecord>();
         private PowerModeChangedEventHandler powerHandler;
         private SessionEndingEventHandler sessionHandler;
-        public AppController(string dataDirectory, EventWaitHandle signal, bool enableNotifications)
+        public AppController(string dataDirectory, EventWaitHandle signal, bool enableNotifications) : this(dataDirectory, signal, enableNotifications, false) { }
+        public AppController(string dataDirectory, EventWaitHandle signal, bool enableNotifications, bool quietStart)
         {
             Store = new AppStore(dataDirectory); showSignal = signal; notifications = enableNotifications;
             AppIcon = Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? SystemIcons.Application;
@@ -276,7 +285,10 @@ namespace DeskStudy
             saveTimer.Tick += delegate { saveTimer.Stop(); Flush(); };
             tray = new NotifyIcon { Icon = AppIcon, Text = "桌面课笺 · 课表 / Todo / DDL", Visible = enableNotifications };
             tray.ContextMenuStrip = CreateMenu(); tray.DoubleClick += delegate { ShowAll(); };
+            // Widgets have no taskbar button in desktop mode, so one click on the tray icon brings them forward.
+            tray.MouseClick += delegate(object sender, MouseEventArgs e) { if (e.Button == MouseButtons.Left) RaiseWidgets(); };
             tray.BalloonTipClicked += delegate { OpenReminders(); };
+            bool framesConverted = NormalizeWindowFrames();
             Widgets.Add(new CalendarForm(this)); Widgets.Add(new NotebookForm(this, "todo")); Widgets.Add(new NotebookForm(this, "ddl"));
             // Apply physical saved bounds after each derived form has completed DPI scaling,
             // including forms that stay hidden and therefore do not raise Load yet.
@@ -285,6 +297,8 @@ namespace DeskStudy
             var visible = Widgets.ToDictionary(w => w.WidgetKey, w => !Data.Windows.ContainsKey(w.WidgetKey) || Data.Windows[w.WidgetKey].Visible);
             foreach (var w in Widgets) if (visible[w.WidgetKey]) w.Show();
             foreach (var w in Widgets) w.ApplyAppearance();
+            FinishStartup(quietStart);
+            if (framesConverted) QueueSave();
             powerHandler = delegate(object sender, PowerModeChangedEventArgs e)
             {
                 if (e.Mode == PowerModes.Resume && !Exiting && Widgets.Count > 0 && Widgets[0].IsHandleCreated)
@@ -387,7 +401,7 @@ namespace DeskStudy
         }
         private void ShowHelp()
         {
-            MessageBox.Show("桌面课笺 1.2\n\n外观页可统一切换两本便签为「原始外观 / 轻量卡片 / 纸页本」。新布局点击页标题可编辑、底部翻页、任务末尾连续录入，⋯ 菜单修改截止时间。\n\n从托盘菜单或任一组件的齿轮按钮打开设置中心。关闭设置中心后，组件与提醒继续运行。\n\n显示与布局：管理置顶、位置锁定、保存布局；窗口移出屏幕后，可使用「找回当前屏幕」。外观支持全局设置和组件单独覆盖，修改立即预览并自动保存。\n\n日历：支持周/月视图和循环课表。临时停课或调课可选择「仅这一次」；设置中心可统一管理课程系列与学期。\n\n便签：文字和任务自动保存，设置中心可管理页面名称、顺序、归档和当前页。隐藏、翻页或归档不会取消未完成任务的提醒。\n\n提醒每 5 秒检查所有页面；免打扰结束、退出后重新运行或休眠恢复后汇总补发。完全退出后不能实时通知，请保留托盘运行。\n\n数据与应用：导入、导出、备份恢复和开机启动。恢复前会先保留当前数据。重置布局或外观不会删除内容。\n\n数据目录：\n" + Store.DirectoryPath, "使用说明", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show("桌面课笺 1.5\n\n桌面组件模式下，组件没有标题栏，也不出现在任务栏：拖动顶栏移动，拖动边缘调整大小；点击组件时它浮到前面，切到别的程序后自动回到其他窗口下面。单击托盘图标或按快捷键（默认 Ctrl+Alt+Shift+D）可把组件浮到前面。可在设置中心的「显示与布局」切回标准窗口。\n\n外观页可切换五种便签布局。点击页标题可编辑，在任务末尾连续录入；点任务下方的状态文字可设置或修改截止时间。\n\n从托盘菜单或任一组件的齿轮按钮打开设置中心。关闭设置中心后，组件与提醒继续运行。\n\n显示与布局：管理置顶、位置锁定、保存布局；窗口移出屏幕后，可使用「找回当前屏幕」。外观支持全局设置和组件单独覆盖，修改立即预览并自动保存。\n\n日历：支持周/月视图和循环课表。临时停课或调课可选择「仅这一次」；设置中心可统一管理课程系列与学期。\n\n便签：文字和任务自动保存，设置中心可管理页面名称、顺序、归档和当前页。隐藏、翻页或归档不会取消未完成任务的提醒。\n\n提醒每 5 秒检查所有页面；免打扰结束、退出后重新运行或休眠恢复后汇总补发。完全退出后不能实时通知，请保留托盘运行。\n\n数据与应用：导入、导出、备份恢复和开机启动。恢复前会先保留当前数据。重置布局或外观不会删除内容。\n\n数据目录：\n" + Store.DirectoryPath, "使用说明", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
         public void Shutdown()
         {
@@ -396,6 +410,7 @@ namespace DeskStudy
             Exiting = true; reminderTimer.Stop(); saveTimer.Stop(); reopenTimer.Stop();
             SystemEvents.PowerModeChanged -= powerHandler; SystemEvents.SessionEnding -= sessionHandler;
             tray.Visible = false;
+            ReleaseShowHotkey();
             foreach (var w in Widgets) w.Dispose();
             if (center != null) center.Dispose();
             if (settingsCenter != null) settingsCenter.Dispose();
@@ -452,7 +467,7 @@ namespace DeskStudy
             using (var mutex = new Mutex(true, "Local\\DeskStudy" + hash, out created))
             {
                 if (!created) { signal.Set(); return; }
-                try { using (var app = new AppController(directory, signal, true)) Application.Run(app); }
+                try { using (var app = new AppController(directory, signal, true, args.Contains("--startup"))) Application.Run(app); }
                 catch (Exception ex) { MessageBox.Show("应用无法继续运行。已保存的数据仍保留在本地。\n\n" + ex.Message + "\n\n数据目录：" + directory, "桌面课笺", MessageBoxButtons.OK, MessageBoxIcon.Error); }
                 finally { mutex.ReleaseMutex(); }
             }

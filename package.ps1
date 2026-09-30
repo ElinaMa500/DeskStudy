@@ -3,7 +3,7 @@
 param([switch]$SkipBuild)
 $ErrorActionPreference = 'Stop'
 $projectRoot = $PSScriptRoot
-$version = '1.4'
+$version = '1.5'
 if (-not $SkipBuild) { & (Join-Path $projectRoot 'build.ps1') }
 $releasePath = Join-Path $projectRoot "release-$version"
 foreach ($name in 'README.md', 'LAYOUTS.md', 'VERIFICATION.md', 'DEVELOPMENT.md', 'USER_GUIDE.md') {
