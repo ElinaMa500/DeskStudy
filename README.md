@@ -4,6 +4,7 @@
 
 ![日历、Todo 与 DDL 三个桌面组件](docs/images/overview.png)
 
+- **介绍页**：<https://elinama500.github.io/DeskStudy/>
 - **下载**：在 [Releases](https://github.com/ElinaMa500/DeskStudy/releases/latest) 页面下载 `DeskStudy-1.3-Windows.zip`，解压后双击 `DeskStudy.exe`。
 - **使用指南**：[USER_GUIDE.md](USER_GUIDE.md)（压缩包内为 `使用指南.html`）。
 - **五种便签外观**：[LAYOUTS.md](LAYOUTS.md)。
