@@ -218,12 +218,13 @@ namespace DeskStudy
             SetCompactNotebookHeader(IsModern);
             // 清爽卡片 / 手账纸页 sit closer to the bottom edge, so the notebook can be shorter (1.5.1).
             if (_contentReady && !_bodyPaddingCaptured) { _bodyPadding = Body.Padding; _bodyPaddingCaptured = true; }
-            if (_bodyPaddingCaptured) Body.Padding = IsReference ? new Padding(_bodyPadding.Left, _bodyPadding.Top, _bodyPadding.Right, Px(3)) : _bodyPadding;
+            if (_bodyPaddingCaptured) // Narrower side margins too, so two notebooks side by side can match the calendar's width.
+            Body.Padding = IsReference ? new Padding(Px(4), _bodyPadding.Top, Px(4), Px(3)) : _bodyPadding;
             if (_contentReady && _originalMinimum.IsEmpty) _originalMinimum = MinimumSize;
             if (!_originalMinimum.IsEmpty)
             {
-                // The slimmer footer lets these two layouts go about 30 px shorter.
-                Size minimum = IsReference ? new Size(_originalMinimum.Width, _originalMinimum.Height - Px(30)) : _originalMinimum;
+                // The slimmer footer and side margins let these two layouts go shorter and narrower.
+                Size minimum = IsReference ? new Size(_originalMinimum.Width - Px(24), _originalMinimum.Height - Px(30)) : _originalMinimum;
                 if (MinimumSize != minimum) MinimumSize = minimum;
             }
             Color bg = AppearancePainter.Background(appearance), fg = AppearancePainter.Foreground(appearance), surface = AppearancePainter.Surface(appearance);

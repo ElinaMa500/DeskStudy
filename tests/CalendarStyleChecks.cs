@@ -57,6 +57,7 @@ public static class CalendarStyleChecks
         Assert(Inside(gear) && Inside(pin) && gear.Bottom <= gear.Parent.ClientSize.Height, "清爽: 置顶 and ⚙ are fully visible");
         Assert(calendar.MinimumSize.Height < originalMinimum, "清爽: the calendar can be made shorter (" + calendar.MinimumSize.Height + " < " + originalMinimum + ")");
         Assert(todo.MinimumSize.Height < originalNotebookMinimum, "清爽: the notebook can be made shorter thanks to the slimmer footer (" + todo.MinimumSize.Height + " < " + originalNotebookMinimum + ")");
+        Assert(2 * todo.MinimumSize.Width + PlacementLogic.Gap <= calendar.MinimumSize.Width, "清爽: two notebooks side by side fit above the calendar at its narrowest (" + todo.MinimumSize.Width + " × 2 + gap ≤ " + calendar.MinimumSize.Width + ")");
         var notebookHeader = Find<Panel>(todo, "widget-header");
         Assert(notebookHeader.Height > header.Height, "清爽: the notebook header keeps its height (" + notebookHeader.Height + "), only the calendar's is slimmer");
         foreach (string name in new[] { "calendar-previous", "calendar-next", "calendar-today", "calendar-workweek", "calendar-week", "calendar-month", "calendar-add" })
