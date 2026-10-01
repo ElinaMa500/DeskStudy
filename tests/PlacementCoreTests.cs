@@ -78,6 +78,14 @@ public static class PlacementCoreTests
             var crowded = PlacementLogic.Resolve(R(100, 100, 800, 800), tight, L(R(0, 0, 600, 1000)), G);
             Assert(crowded == R(100, 100, 800, 800), "no free spot anywhere: left where dropped instead of jumping around");
 
+            // Folded bars rest on the bottom edge.
+            var bar = R(1000, 300, 440, 55);
+            Assert(PlacementLogic.Dock(bar, work, none, G) == R(1000, 1140 - 55, 440, 55), "a folded bar drops straight down onto the taskbar");
+            Assert(PlacementLogic.Dock(R(1530, 300, 440, 55), work, none, G) == R(1480, 1085, 440, 55), "a folded bar 50 px past the right edge snaps to it");
+            var bigBelow = R(1000, 540, 900, 600);
+            Assert(PlacementLogic.Dock(bar, work, L(bigBelow), G) == R(1000 - G - 440, 1085, 440, 55), "a widget already on the bottom edge: the bar slides beside it, never on top of it");
+            var otherBar = R(1000, 1085, 440, 55);
+            Assert(PlacementLogic.Dock(R(1100, 200, 440, 55), work, L(otherBar), G) == R(1440 + G, 1085, 440, 55), "two folded bars line up side by side, 5 px apart");
             // Resizing.
             var min = new Size(350, 430);
             Assert(PlacementLogic.AfterResize(R(1400, 100, 560, 500), PlacementLogic.EdgeRight, work, none, min, G) == R(1400, 100, 520, 500), "right edge 40 px past the screen: back to the edge, left edge stays");

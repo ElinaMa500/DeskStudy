@@ -240,7 +240,7 @@ namespace DeskStudy
             weekButton.BackColor = !monthView && !workWeek ? selected : surfaceColor;
             workWeekButton.BackColor = !monthView && workWeek ? selected : surfaceColor;
             monthButton.BackColor = monthView ? selected : surfaceColor;
-            if (MinimumSize.Height != Px(520)) MinimumSize = new Size(MinimumSize.Width, Px(520));
+            SetExpandedMinimumSize(new Size(ExpandedMinimumSize.Width, Px(520)));
             if (!contentReady) return;
             if (originalsCaptured)
             {
@@ -275,7 +275,7 @@ namespace DeskStudy
             ((CalendarBarButton)refPrev).TextOffset = ((CalendarBarButton)refNext).TextOffset = -Px(2);
             Button selected = monthView ? refMonth : workWeek ? refWorkWeek : refWeek;
             selected.BackColor = p.Soft; selected.ForeColor = p.Ink; selected.Font = RefFont(8F, FontStyle.Bold);
-            if (MinimumSize.Height != Px(420)) MinimumSize = new Size(MinimumSize.Width, Px(420));
+            SetExpandedMinimumSize(new Size(ExpandedMinimumSize.Width, Px(420)));
             if (!contentReady) return;
             Body.Padding = new Padding(0, 0, 0, Px(2));
             contentLayout.Padding = new Padding(Px(16), Px(2), Px(14), Px(8));

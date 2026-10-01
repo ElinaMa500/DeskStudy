@@ -89,12 +89,19 @@ namespace DeskStudy
             var menu = Ui.Button("⚙", delegate { App.OpenSettings(); }); menu.Name = "open-settings"; menu.AccessibleName = "打开设置中心"; menu.AutoSize = false; menu.Width = 40;
             var hide = Ui.Button("隐藏", delegate { Hide(); }); hide.Name = "hide-widget"; hide.AutoSize = false; hide.Width = 54;
             settingsButton = menu; hideButton = hide;
-            actions.Controls.Add(pin); actions.Controls.Add(menu); actions.Controls.Add(hide);
+            InitializeCollapse();
+            actions.Controls.Add(pin); actions.Controls.Add(menu); actions.Controls.Add(collapseButton); actions.Controls.Add(hide);
             header.Controls.Add(heading); header.Controls.Add(actions);
             InitializeFrame();
             Body = new EdgePanel { Dock = DockStyle.Fill, Padding = new Padding(12, 6, 12, 10), BackColor = Ui.Background };
             Controls.Add(Body); Controls.Add(header); Controls.Add(stripe);
-            MouseEventHandler drag = delegate(object sender, MouseEventArgs e) { if (!PositionLocked && e.Button == MouseButtons.Left) { ReleaseCapture(); SendMessage(Handle, 0xA1, new IntPtr(2), IntPtr.Zero); } };
+            MouseEventHandler drag = delegate(object sender, MouseEventArgs e)
+            {
+                if (e.Button != MouseButtons.Left) return;
+                // Double-clicking the header folds or unfolds the widget.
+                if (e.Clicks == 2) { ToggleCollapse(); return; }
+                if (!PositionLocked) { ReleaseCapture(); SendMessage(Handle, 0xA1, new IntPtr(2), IntPtr.Zero); }
+            };
             header.MouseDown += drag; heading.MouseDown += drag;
             RestoreWindow();
             Move += delegate { Remember(); }; ResizeEnd += delegate { Remember(); };
@@ -136,10 +143,12 @@ namespace DeskStudy
                 {
                     hideButton.Width = Math.Max(hideButton.Width, TextRenderer.MeasureText("隐藏", hideButton.Font).Width + hideButton.Padding.Horizontal + 10);
                     int height = Math.Max(hideButton.Height, hideButton.Font.Height + hideButton.Padding.Vertical + 8);
-                    hideButton.Height = height; settingsButton.Height = height;
+                    hideButton.Height = height; settingsButton.Height = height; collapseButton.Height = height;
                     UpdateHeaderActionsWidth();
                 }
                 OnAppearanceChanged(appearance);
+                StyleCollapseButton();
+                if (collapsed) FitCollapsed();
             }
             finally { applyingAppearance = false; }
         }
@@ -147,7 +156,7 @@ namespace DeskStudy
         protected virtual bool CanApplyAppearance() { return true; }
         private void UpdateHeaderActionsWidth()
         {
-            int width = (pin.AutoSize ? pin.PreferredSize.Width : pin.Width) + pin.Margin.Horizontal + settingsButton.Width + settingsButton.Margin.Horizontal + 4;
+            int width = (pin.AutoSize ? pin.PreferredSize.Width : pin.Width) + pin.Margin.Horizontal + settingsButton.Width + settingsButton.Margin.Horizontal + collapseButton.Width + collapseButton.Margin.Horizontal + 4;
             if (hideButton.Visible || !referenceHeader) width += hideButton.Width + hideButton.Margin.Horizontal;
             if (closeShown) width += closeButton.Width + closeButton.Margin.Horizontal;
             headerActions.Width = width;
@@ -252,6 +261,8 @@ namespace DeskStudy
         public void RestoreWindow()
         {
             bool old = ready; ready = false;
+            // Placing a widget from saved or typed coordinates always shows it unfolded.
+            UnfoldInPlace();
             WindowState ws;
             if (App.Data.Windows.TryGetValue(WidgetKey, out ws))
             {
@@ -274,6 +285,8 @@ namespace DeskStudy
             Rectangle b = WindowState == FormWindowState.Normal ? Bounds : RestoreBounds;
             WindowState old;
             bool existed = App.Data.Windows.TryGetValue(WidgetKey, out old);
+            // A folded widget is saved where it was before folding, so the next start shows it unfolded there.
+            if (collapsed) b = foldedFrom;
             var next = new WindowState { X = b.X, Y = b.Y, Width = b.Width, Height = b.Height, TopMost = TopMost, Visible = Visible, PositionLocked = existed && old.PositionLocked };
             if (existed && old.X == next.X && old.Y == next.Y && old.Width == next.Width && old.Height == next.Height && old.TopMost == next.TopMost && old.Visible == next.Visible) return;
             App.Data.Windows[WidgetKey] = next;

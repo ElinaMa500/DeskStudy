@@ -220,12 +220,12 @@ namespace DeskStudy
             if (_contentReady && !_bodyPaddingCaptured) { _bodyPadding = Body.Padding; _bodyPaddingCaptured = true; }
             if (_bodyPaddingCaptured) // Narrower side margins too, so two notebooks side by side can match the calendar's width.
             Body.Padding = IsReference ? new Padding(Px(4), _bodyPadding.Top, Px(4), Px(3)) : _bodyPadding;
-            if (_contentReady && _originalMinimum.IsEmpty) _originalMinimum = MinimumSize;
+            if (_contentReady && _originalMinimum.IsEmpty) _originalMinimum = ExpandedMinimumSize;
             if (!_originalMinimum.IsEmpty)
             {
                 // The slimmer footer and side margins let these two layouts go shorter and narrower.
                 Size minimum = IsReference ? new Size(_originalMinimum.Width - Px(24), _originalMinimum.Height - Px(30)) : _originalMinimum;
-                if (MinimumSize != minimum) MinimumSize = minimum;
+                SetExpandedMinimumSize(minimum);
             }
             Color bg = AppearancePainter.Background(appearance), fg = AppearancePainter.Foreground(appearance), surface = AppearancePainter.Surface(appearance);
             _modern.BackColor = bg; _tasks.BackColor = bg;

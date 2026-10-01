@@ -107,11 +107,14 @@ namespace DeskStudy
             if (!b.Contains(screen)) return 1;
             bool left = screen.X < b.Left + grip, right = screen.X >= b.Right - grip, top = screen.Y < b.Top + grip, bottom = screen.Y >= b.Bottom - grip;
             bool nearLeft = screen.X < b.Left + corner, nearRight = screen.X >= b.Right - corner, nearTop = screen.Y < b.Top + corner, nearBottom = screen.Y >= b.Bottom - corner;
-            if ((top && nearLeft) || (left && nearTop)) return 13;
-            if ((top && nearRight) || (right && nearTop)) return 14;
-            if ((bottom && nearLeft) || (left && nearBottom)) return 16;
-            if ((bottom && nearRight) || (right && nearBottom)) return 17;
-            return left ? 10 : right ? 11 : top ? 12 : bottom ? 15 : 1;
+            int hit = left ? 10 : right ? 11 : top ? 12 : bottom ? 15 : 1;
+            if ((top && nearLeft) || (left && nearTop)) hit = 13;
+            else if ((top && nearRight) || (right && nearTop)) hit = 14;
+            else if ((bottom && nearLeft) || (left && nearBottom)) hit = 16;
+            else if ((bottom && nearRight) || (right && nearBottom)) hit = 17;
+            // A folded widget is a fixed-size bar.
+            if (collapsed) return 1;
+            return hit;
         }
         internal static Point ScreenPoint(IntPtr lParam)
         {

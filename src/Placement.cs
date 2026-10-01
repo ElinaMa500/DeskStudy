@@ -119,6 +119,12 @@ namespace DeskStudy
             if (placementSuspended > 0 || Exiting || !w.Placeable) return;
             Settle(w, edge, PlacementObstacles(w), animate, false);
         }
+        // Where a widget would end up if put at the given place (used when unfolding).
+        internal Rectangle ResolveFor(WidgetForm w, Rectangle visual)
+        {
+            Rectangle work = Screen.FromRectangle(visual).WorkingArea;
+            return w.PositionLocked ? PlacementLogic.Contain(visual, work) : PlacementLogic.Resolve(visual, work, PlacementObstacles(w), PlacementLogic.Gap);
+        }
         // Released after a drag or resize: first snap to a screen edge or neighbour within reach, then settle.
         public void SettleAfterDrag(WidgetForm w, int edge)
         {
@@ -129,6 +135,14 @@ namespace DeskStudy
         {
             Rectangle visual = w.VisualBounds;
             Rectangle work = Screen.FromRectangle(visual).WorkingArea;
+            if (w.Collapsed)
+            {
+                // Folded: a bar on the bottom edge; dragging it only chooses where along the bottom it sits.
+                if (snap) visual = PlacementLogic.SnapMove(visual, work, others, PlacementLogic.SnapDistance, PlacementLogic.Gap);
+                Rectangle dock = PlacementLogic.Dock(visual, work, others, PlacementLogic.Gap);
+                w.SlideTo(dock, animate);
+                return dock;
+            }
             if (snap && !w.PositionLocked)
                 visual = edge == 0 ? PlacementLogic.SnapMove(visual, work, others, PlacementLogic.SnapDistance, PlacementLogic.Gap)
                     : PlacementLogic.SnapResize(visual, edge, work, others, w.VisualMinimum, PlacementLogic.SnapDistance, PlacementLogic.Gap);

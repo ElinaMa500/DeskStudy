@@ -110,6 +110,32 @@ namespace DeskStudy
             return bestDistance != long.MaxValue;
         }
 
+        // A folded widget rests on the bottom of the work area: the left and right edges follow the usual edge rule,
+        // and it slides sideways to the nearest free spot instead of covering another widget.
+        public static Rectangle Dock(Rectangle r, Rectangle work, IList<Rectangle> others, int gap)
+        {
+            Rectangle docked = Contain(new Rectangle(r.X, work.Bottom - Math.Min(r.Height, work.Height), r.Width, r.Height), work);
+            docked.Y = work.Bottom - docked.Height;
+            // A bar on the bottom edge never sits on another widget, even one much larger than itself.
+            if (!Overlaps(docked, others)) return docked;
+            for (int pass = 0; pass < 2; pass++)
+            {
+                int spacing = pass == 0 ? gap : 0;
+                var xs = new List<int> { docked.X, work.Left, work.Right - docked.Width };
+                foreach (var o in others) { xs.Add(o.Left - spacing - docked.Width); xs.Add(o.Right + spacing); }
+                int best = int.MinValue; long bestDistance = long.MaxValue;
+                foreach (int x in xs)
+                {
+                    var candidate = new Rectangle(x, docked.Y, docked.Width, docked.Height);
+                    if (Contain(candidate, work) != candidate || !Clear(candidate, others, spacing)) continue;
+                    long distance = Math.Abs((long)x - docked.X);
+                    if (distance < bestDistance) { bestDistance = distance; best = x; }
+                }
+                if (best != int.MinValue) { docked.X = best; return docked; }
+            }
+            return docked;
+        }
+
         // Resize edges as reported by WM_SIZING.
         public const int EdgeLeft = 1, EdgeRight = 2, EdgeTop = 3, EdgeTopLeft = 4, EdgeTopRight = 5, EdgeBottom = 6, EdgeBottomLeft = 7, EdgeBottomRight = 8;
         public static bool MovesLeft(int edge) { return edge == EdgeLeft || edge == EdgeTopLeft || edge == EdgeBottomLeft; }
