@@ -14,7 +14,7 @@ namespace DeskStudy
         private string lastDefaultView;
         private Label period;
         private Label hint;
-        private Button weekButton;
+        private Button weekButton, workWeekButton;
         private Button monthButton;
         private CalendarSurface surface;
         private Panel dayHeader;
@@ -25,6 +25,22 @@ namespace DeskStudy
         private List<Occurrence> occurrences = new List<Occurrence>();
         private readonly Color ink = Color.FromArgb(38, 49, 65);
         private readonly Color muted = Color.FromArgb(119, 128, 141);
+        // Reference styles follow the notebook layout: 清爽 for 轻量卡片 / 清爽卡片, 纸页 for 纸页本 / 手账纸页.
+        private TableLayoutPanel toolbar;
+        private Panel refBar;
+        private Button refPrev, refNext, refToday, refWorkWeek, refWeek, refMonth, refAdd;
+        // 工作周: the week view limited to Monday–Friday.
+        private bool workWeek;
+        private int ViewDays { get { return !monthView && workWeek ? 5 : 7; } }
+        private DateTime ViewStart() { return workWeek ? focusDate.Date.AddDays(-(((int)focusDate.DayOfWeek + 6) % 7)) : WeekStart(focusDate); }
+        private Label refRange, refMeta;
+        private string calendarStyle = "Original";
+        private Padding originalBodyPadding, originalLayoutPadding;
+        private float originalToolbarRow, originalHintRow;
+        private bool originalsCaptured;
+        private CalendarPalette palette;
+        private readonly Dictionary<string, Font> refFonts = new Dictionary<string, Font>();
+        public string AppliedCalendarStyle { get { return calendarStyle; } }
 
         public CalendarForm(AppController app) : base(app, "calendar", "日历 · 课表", Color.FromArgb(76, 118, 108), new Size(900, 710))
         {
@@ -57,6 +73,8 @@ namespace DeskStudy
             {
                 clockTimer.Dispose();
                 App.DataChanged -= RefreshData;
+                foreach (Font font in refFonts.Values) font.Dispose();
+                refFonts.Clear();
             }
             base.Dispose(disposing);
         }
@@ -84,12 +102,12 @@ namespace DeskStudy
             layout.Padding = new Padding(12, 4, 12, 10);
             Body.Controls.Add(layout);
 
-            TableLayoutPanel toolbar = new TableLayoutPanel();
+            toolbar = new TableLayoutPanel();
             toolbar.Dock = DockStyle.Fill; toolbar.ColumnCount = 3; toolbar.RowCount = 1;
             toolbar.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 146));
             toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 265));
+            toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 312));
             FlowLayoutPanel navigation = new FlowLayoutPanel(); navigation.Dock = DockStyle.Fill; navigation.WrapContents = false;
             navigation.Padding = new Padding(0, 5, 0, 0);
             navigation.Controls.Add(MakeButton("‹", 32, delegate { MovePeriod(-1); }));
@@ -97,24 +115,30 @@ namespace DeskStudy
             navigation.Controls.Add(MakeButton("›", 32, delegate { MovePeriod(1); }));
             toolbar.Controls.Add(navigation, 0, 0);
             period = new Label(); period.Dock = DockStyle.Fill; period.TextAlign = ContentAlignment.MiddleLeft;
-            period.Font = new Font("Microsoft YaHei UI", 12F, FontStyle.Bold); period.ForeColor = ink;
+            period.Font = new Font("Microsoft YaHei UI", 12F, FontStyle.Bold); period.ForeColor = ink; period.AutoEllipsis = true;
+            period.Resize += delegate { FitPeriod(); };
             toolbar.Controls.Add(period, 1, 0);
             FlowLayoutPanel actions = new FlowLayoutPanel(); actions.Dock = DockStyle.Fill; actions.WrapContents = false;
             actions.Padding = new Padding(0, 5, 0, 0);
-            weekButton = MakeButton("周", 42, delegate { monthView = false; RefreshData(); surface.ScrollToMorning(); });
-            monthButton = MakeButton("月", 42, delegate { monthView = true; RefreshData(); });
-            actions.Controls.Add(weekButton); actions.Controls.Add(monthButton);
-            Button add = MakeButton("＋ 添加日程", 145, delegate { AddEvent(focusDate, 9); });
+            workWeekButton = MakeButton("工作周", 72, delegate { SetView(false, true); });
+            weekButton = MakeButton("周", 42, delegate { SetView(false, false); });
+            monthButton = MakeButton("月", 42, delegate { SetView(true, false); });
+            workWeekButton.Name = "calendar-original-workweek"; weekButton.Name = "calendar-original-week"; monthButton.Name = "calendar-original-month";
+            actions.Controls.Add(workWeekButton); actions.Controls.Add(weekButton); actions.Controls.Add(monthButton);
+            Button add = MakeButton("＋ 添加日程", 125, delegate { AddEvent(focusDate, 9); });
             add.BackColor = Color.FromArgb(73, 111, 101); add.ForeColor = Color.White;
             actions.Controls.Add(add); toolbar.Controls.Add(actions, 2, 0);
-            layout.Controls.Add(toolbar, 0, 0);
+            Panel topRow = new Panel { Dock = DockStyle.Fill, Margin = Padding.Empty };
+            topRow.Controls.Add(toolbar);
+            BuildReferenceBar(); topRow.Controls.Add(refBar);
+            layout.Controls.Add(topRow, 0, 0);
 
             hint = new Label(); hint.Dock = DockStyle.Fill;
             hint.Text = "每一天，留一点从容   ·   点击课程编辑；双击空白处添加";
             hint.Font = new Font("Microsoft YaHei UI", 9F); hint.ForeColor = muted;
             hint.TextAlign = ContentAlignment.MiddleLeft; hint.Padding = new Padding(6, 0, 0, 0);
             layout.Controls.Add(hint, 0, 1);
-            dayHeader = new Panel(); dayHeader.Dock = DockStyle.Fill; dayHeader.Paint += PaintHeader;
+            dayHeader = new Panel(); dayHeader.Dock = DockStyle.Fill; dayHeader.Margin = Padding.Empty; dayHeader.Paint += PaintHeader;
             layout.Controls.Add(dayHeader, 0, 2);
             surface = new CalendarSurface(); surface.Dock = DockStyle.Fill;
             surface.OpenOccurrence += EditEvent;
@@ -124,10 +148,31 @@ namespace DeskStudy
             layout.Controls.Add(surface, 0, 3);
         }
 
+        private string periodFull = "", periodShort = "";
+        // Drops the year when the range would otherwise wrap onto a second line.
+        private void FitPeriod()
+        {
+            if (period == null) return;
+            string text = TextRenderer.MeasureText(periodFull, period.Font).Width <= period.ClientSize.Width ? periodFull : periodShort;
+            if (period.Text != text) period.Text = text;
+        }
+
         private DateTime WeekStart(DateTime date)
         {
             int start = App.Data.Settings.Calendar.WeekStartDay;
             return date.Date.AddDays(-(((int)date.DayOfWeek - start + 7) % 7));
+        }
+
+        // Switches between 工作周, 周 and 月 and remembers the choice for the next start.
+        private void SetView(bool month, bool work)
+        {
+            monthView = month; workWeek = !month && work;
+            CalendarOptions options = App.Data.Settings.Calendar;
+            options.DefaultView = month ? "Month" : "Week"; options.WorkWeek = workWeek;
+            lastDefaultView = options.DefaultView + (options.WorkWeek ? "|work" : "");
+            App.SettingsChanged();
+            RefreshData();
+            if (!month) surface.ScrollToMorning();
         }
 
         private void MovePeriod(int amount)
@@ -139,38 +184,163 @@ namespace DeskStudy
         public void RefreshData()
         {
             if (IsDisposed || surface == null) return;
-            string defaultView = App.Data.Settings.Calendar.DefaultView;
-            if (lastDefaultView != defaultView) { monthView = defaultView == "Month"; lastDefaultView = defaultView; }
-            DateTime start = monthView ? WeekStart(new DateTime(focusDate.Year, focusDate.Month, 1)) : WeekStart(focusDate);
-            DateTime end = start.AddDays(monthView ? 41 : 6);
+            string defaultView = App.Data.Settings.Calendar.DefaultView + (App.Data.Settings.Calendar.WorkWeek ? "|work" : "");
+            if (lastDefaultView != defaultView) { monthView = App.Data.Settings.Calendar.DefaultView == "Month"; workWeek = !monthView && App.Data.Settings.Calendar.WorkWeek; lastDefaultView = defaultView; }
+            DateTime start = monthView ? WeekStart(new DateTime(focusDate.Year, focusDate.Month, 1)) : ViewStart();
+            DateTime end = start.AddDays(monthView ? 41 : ViewDays - 1);
             occurrences = CalendarEngine.GetOccurrences(App.Data, start, end).ToList();
-            period.Text = monthView ? focusDate.ToString("yyyy 年 M 月") : start.ToString("M.d") + " – " + end.ToString("M.d") + "  ·  " + focusDate.Year;
+            periodFull = monthView ? focusDate.ToString("yyyy 年 M 月") : start.ToString("M.d") + " – " + end.ToString("M.d") + "  ·  " + focusDate.Year;
+            periodShort = monthView ? periodFull : start.ToString("M.d") + " – " + end.ToString("M.d");
+            FitPeriod();
             int teachingWeek = SettingsLogic.TeachingWeek(App.Data.Settings, focusDate);
             hint.Text = (teachingWeek > 0 ? "教学第 " + teachingWeek + " 周   ·   " : "") + "点击课程编辑；双击空白处添加";
-            surface.SetData(start, focusDate, monthView, occurrences);
+            refRange.Text = monthView ? focusDate.ToString("yyyy 年 M 月") : start.ToString("M.d") + " – " + end.ToString("M.d");
+            refMeta.Text = monthView ? (teachingWeek > 0 ? "教学第 " + teachingWeek + " 周" : "") : focusDate.Year + (teachingWeek > 0 ? " · 教学第 " + teachingWeek + " 周" : "");
+            ArrangeReferenceBar();
+            surface.SetData(start, focusDate, monthView, occurrences, ViewDays);
             ApplyAppearance();
             dayHeader.Invalidate();
         }
 
+        private static string StyleFor(string notebookLayout)
+        {
+            return notebookLayout == "Card" || notebookLayout == "Clean" ? "Clean" : notebookLayout == "Paper" || notebookLayout == "Journal" ? "Journal" : "Original";
+        }
+        private bool IsReference { get { return calendarStyle != "Original"; } }
+        protected override bool SlimReferenceHeader { get { return true; } }
+        private int Px(float value) { using (Graphics g = CreateGraphics()) return (int)Math.Round(value * g.DpiY / 96F); }
+
         protected override void OnAppearanceChanged(AppearanceOptions appearance)
         {
             if (surface == null) return;
+            calendarStyle = StyleFor(App.Data.Settings.NotebookLayout);
             surface.SetAppearance(appearance);
-            Color selected = AppearancePainter.Dark(AppearancePainter.Background(appearance)) ? Color.FromArgb(64, 90, 86) : Color.FromArgb(219, 233, 227);
-            weekButton.BackColor = monthView ? AppearancePainter.Surface(appearance) : selected;
-            monthButton.BackColor = monthView ? selected : AppearancePainter.Surface(appearance);
-            if (contentReady)
+            // Sizes are measured in screen pixels, so styling waits until the form has been scaled for this display.
+            if (!contentReady) return;
+            NormalizeHeaderButtons();
+            if (!originalsCaptured)
             {
-                float dpi;
-                using (Graphics graphics = CreateGraphics()) dpi = graphics.DpiY / 96F;
-                using (Font headerFont = new Font("Microsoft YaHei UI", appearance.FontSize, FontStyle.Bold))
-                    contentLayout.RowStyles[2].Height = Math.Max(45 * dpi, TextRenderer.MeasureText(monthView ? "周一" : "周一\n9/28", headerFont).Height + 10 * dpi);
+                originalBodyPadding = Body.Padding; originalLayoutPadding = contentLayout.Padding;
+                originalToolbarRow = contentLayout.RowStyles[0].Height; originalHintRow = contentLayout.RowStyles[1].Height;
+                originalsCaptured = true;
             }
+            if (IsReference) StyleReference(appearance);
+            else StyleOriginal(appearance);
             dayHeader.Invalidate();
+        }
+
+        private void StyleOriginal(AppearanceOptions appearance)
+        {
+            Color bg = AppearancePainter.Background(appearance), surfaceColor = AppearancePainter.Surface(appearance);
+            SetCompactNotebookHeader(false);
+            SetReferenceHeader(false, "", bg, AppearancePainter.Foreground(appearance), Ui.Muted, Color.FromArgb(76, 118, 108), Color.FromArgb(76, 118, 108), surfaceColor, Ui.Border, false);
+            surface.SetReference(false, palette);
+            toolbar.Visible = true; refBar.Visible = false; hint.Visible = true;
+            Color selected = AppearancePainter.Dark(bg) ? Color.FromArgb(64, 90, 86) : Color.FromArgb(219, 233, 227);
+            weekButton.BackColor = !monthView && !workWeek ? selected : surfaceColor;
+            workWeekButton.BackColor = !monthView && workWeek ? selected : surfaceColor;
+            monthButton.BackColor = monthView ? selected : surfaceColor;
+            if (MinimumSize.Height != Px(520)) MinimumSize = new Size(MinimumSize.Width, Px(520));
+            if (!contentReady) return;
+            if (originalsCaptured)
+            {
+                Body.Padding = originalBodyPadding; contentLayout.Padding = originalLayoutPadding;
+                contentLayout.RowStyles[0].Height = originalToolbarRow; contentLayout.RowStyles[1].Height = originalHintRow;
+            }
+            using (Font headerFont = new Font("Microsoft YaHei UI", appearance.FontSize, FontStyle.Bold))
+                contentLayout.RowStyles[2].Height = Math.Max(Px(45), TextRenderer.MeasureText(monthView ? "周一" : "周一\n9/28", headerFont).Height + Px(10));
+        }
+
+        // 清爽 / 纸页: the same header as the reference notebooks, one navigation row, a one-line day header.
+        private void StyleReference(AppearanceOptions appearance)
+        {
+            bool journal = calendarStyle == "Journal";
+            palette = CalendarPalette.For(AppearancePainter.Background(appearance), App.Data.Settings.NotebookLayout);
+            CalendarPalette p = palette;
+            SetCompactNotebookHeader(true, 8F);
+            SetReferenceHeader(true, "", p.Back, p.Ink, journal ? p.Ink : p.Sub, p.Accent, p.Accent, p.Soft, p.Rule, journal);
+            surface.SetReference(true, p);
+            toolbar.Visible = false; refBar.Visible = true; hint.Visible = false;
+            refBar.BackColor = p.Back; refBar.Parent.BackColor = p.Back; dayHeader.BackColor = p.Back; contentLayout.BackColor = p.Back; Body.BackColor = p.Back;
+            refRange.Font = RefFont(10.5F, FontStyle.Regular); refRange.ForeColor = p.Ink; refRange.BackColor = p.Back;
+            refMeta.Font = RefFont(8F, FontStyle.Regular); refMeta.ForeColor = p.Sub; refMeta.BackColor = p.Back;
+            foreach (Button b in new[] { refPrev, refNext, refToday, refWorkWeek, refWeek, refMonth, refAdd })
+            {
+                b.BackColor = p.Back; b.ForeColor = p.Sub; b.Font = RefFont(8F, FontStyle.Regular);
+                ((CalendarBarButton)b).HoverColor = p.Soft;
+            }
+            refPrev.Font = refNext.Font = RefFont(11F, FontStyle.Regular);
+            refAdd.Font = RefFont(10F, FontStyle.Regular); refAdd.ForeColor = p.Accent;
+            // The ‹ › glyphs sit low in their line box.
+            ((CalendarBarButton)refPrev).TextOffset = ((CalendarBarButton)refNext).TextOffset = -Px(2);
+            Button selected = monthView ? refMonth : workWeek ? refWorkWeek : refWeek;
+            selected.BackColor = p.Soft; selected.ForeColor = p.Ink; selected.Font = RefFont(8F, FontStyle.Bold);
+            if (MinimumSize.Height != Px(420)) MinimumSize = new Size(MinimumSize.Width, Px(420));
+            if (!contentReady) return;
+            Body.Padding = new Padding(0, 0, 0, Px(2));
+            contentLayout.Padding = new Padding(Px(16), Px(2), Px(14), Px(8));
+            contentLayout.RowStyles[0].Height = Math.Max(Px(34), refRange.Font.Height + Px(12));
+            contentLayout.RowStyles[1].Height = 0;
+            contentLayout.RowStyles[2].Height = Math.Max(Px(32), RefFont(9F, FontStyle.Bold).Height + Px(14));
+            ArrangeReferenceBar();
+        }
+
+        private Font RefFont(float size, FontStyle style)
+        {
+            float scaled = (float)Math.Round(size * SettingsLogic.EffectiveAppearance(App.Data, "calendar").FontSize / 9F, 2);
+            string key = scaled.ToString(CultureInfo.InvariantCulture) + "|" + style;
+            Font font;
+            if (!refFonts.TryGetValue(key, out font)) { font = new Font("Microsoft YaHei UI", scaled, style); refFonts[key] = font; }
+            return font;
+        }
+
+        private Button RefButton(string text, string name, string accessible, EventHandler action)
+        {
+            Button b = new CalendarBarButton { Text = text, Name = name, AccessibleName = accessible, AutoSize = false, Margin = Padding.Empty, Cursor = Cursors.Hand, Tag = "appearance-custom-font", UseMnemonic = false, TabStop = false };
+            b.Click += action; return b;
+        }
+
+        private void BuildReferenceBar()
+        {
+            refBar = new Panel { Name = "calendar-reference-bar", Dock = DockStyle.Fill, Visible = false };
+            refPrev = RefButton("‹", "calendar-previous", "上一周或上一月", delegate { MovePeriod(-1); });
+            refNext = RefButton("›", "calendar-next", "下一周或下一月", delegate { MovePeriod(1); });
+            refToday = RefButton("今天", "calendar-today", "回到今天", delegate { focusDate = DateTime.Today; RefreshData(); });
+            refWorkWeek = RefButton("工作周", "calendar-workweek", "工作周视图：只看周一至周五", delegate { SetView(false, true); });
+            refWeek = RefButton("周", "calendar-week", "周视图", delegate { SetView(false, false); });
+            refMonth = RefButton("月", "calendar-month", "月视图", delegate { SetView(true, false); });
+            refAdd = RefButton("＋", "calendar-add", "添加日程", delegate { AddEvent(focusDate, 9); });
+            refRange = new Label { Name = "calendar-range", AutoSize = false, TextAlign = ContentAlignment.MiddleLeft, Tag = "appearance-custom-font", UseMnemonic = false };
+            refMeta = new Label { Name = "calendar-meta", AutoSize = false, TextAlign = ContentAlignment.MiddleLeft, Tag = "appearance-custom-font", UseMnemonic = false, AutoEllipsis = true };
+            refBar.Controls.AddRange(new Control[] { refPrev, refRange, refNext, refMeta, refToday, refWorkWeek, refWeek, refMonth, refAdd });
+            refBar.Resize += delegate { ArrangeReferenceBar(); };
+            var tips = new ToolTip(); tips.SetToolTip(refWorkWeek, "只看周一至周五"); Disposed += delegate { tips.Dispose(); };
+        }
+
+        private void ArrangeReferenceBar()
+        {
+            if (refBar == null || !refBar.Visible || refRange.Font == null) return;
+            int w = refBar.ClientSize.Width, h = refBar.ClientSize.Height;
+            int bh = Math.Min(h - Px(4), Math.Max(Px(24), refToday.Font.Height + Px(8))), y = (h - bh) / 2, arrow = Px(22);
+            refPrev.SetBounds(-Px(6), y, arrow, bh);
+            int rangeWidth = TextRenderer.MeasureText(refRange.Text, refRange.Font).Width + Px(2);
+            refRange.SetBounds(refPrev.Right, 0, rangeWidth, h);
+            refNext.SetBounds(refRange.Right, y, arrow, bh);
+            int add = Px(26); refAdd.SetBounds(w - add, y, add, bh);
+            int segment = Math.Max(Px(28), TextRenderer.MeasureText("月", refMonth.Font).Width + Px(14));
+            refMonth.SetBounds(refAdd.Left - Px(8) - segment, y, segment, bh);
+            refWeek.SetBounds(refMonth.Left - segment, y, segment, bh);
+            int workSegment = TextRenderer.MeasureText("工作周", refWorkWeek.Font).Width + Px(14);
+            refWorkWeek.SetBounds(refWeek.Left - workSegment, y, workSegment, bh);
+            int today = TextRenderer.MeasureText("今天", refToday.Font).Width + Px(14);
+            refToday.SetBounds(refWorkWeek.Left - Px(8) - today, y, today, bh);
+            int metaLeft = refNext.Right + Px(8);
+            refMeta.SetBounds(metaLeft, 0, Math.Max(0, refToday.Left - Px(8) - metaLeft), h);
         }
 
         private void PaintHeader(object sender, PaintEventArgs e)
         {
+            if (IsReference) { PaintReferenceHeader(e.Graphics); return; }
             AppearanceOptions appearance = SettingsLogic.EffectiveAppearance(App.Data, "calendar");
             Color foreground = AppearancePainter.Foreground(appearance);
             bool dark = AppearancePainter.Dark(AppearancePainter.Background(appearance));
@@ -178,9 +348,10 @@ namespace DeskStudy
             string[] weekdays = { "周日", "周一", "周二", "周三", "周四", "周五", "周六" };
             int left = monthView ? 0 : surface.TimeGutter;
             int available = surface == null ? dayHeader.Width : surface.GridWidth;
-            float width = (available - left) / 7F;
-            DateTime start = WeekStart(focusDate);
-            for (int i = 0; i < 7; i++)
+            int count = monthView ? 7 : ViewDays;
+            float width = (available - left) / (float)count;
+            DateTime start = monthView ? WeekStart(focusDate) : ViewStart();
+            for (int i = 0; i < count; i++)
             {
                 DateTime date = start.AddDays(i);
                 Rectangle rect = new Rectangle(left + (int)(i * width), 1, (int)width, Math.Max(1, dayHeader.ClientSize.Height - 2));
@@ -190,6 +361,43 @@ namespace DeskStudy
                 using (Font font = new Font("Microsoft YaHei UI", appearance.FontSize, today ? FontStyle.Bold : FontStyle.Regular))
                     TextRenderer.DrawText(e.Graphics, text, font, rect, foreground, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
             }
+        }
+
+        // One line per day, "一 28"; today sits in a soft accent pill.
+        private void PaintReferenceHeader(Graphics graphics)
+        {
+            CalendarPalette p = palette;
+            graphics.Clear(p.Back);
+            graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            string[] weekdays = { "日", "一", "二", "三", "四", "五", "六" };
+            int left = monthView ? 0 : surface.TimeGutter;
+            int count = monthView ? 7 : ViewDays;
+            float width = (surface.GridWidth - left) / (float)count;
+            int height = dayHeader.ClientSize.Height;
+            DateTime start = monthView ? WeekStart(focusDate) : ViewStart();
+            Font regular = RefFont(9F, FontStyle.Regular), bold = RefFont(9F, FontStyle.Bold);
+            const TextFormatFlags flags = TextFormatFlags.NoPadding | TextFormatFlags.SingleLine;
+            for (int i = 0; i < 7; i++)
+            {
+                DateTime date = start.AddDays(i);
+                bool today = !monthView && date.Date == DateTime.Today;
+                string day = weekdays[(int)date.DayOfWeek], number = monthView ? "" : " " + date.Day;
+                Font font = today ? bold : regular;
+                Size daySize = TextRenderer.MeasureText(graphics, day, font, Size.Empty, flags), numberSize = TextRenderer.MeasureText(graphics, number, font, Size.Empty, flags);
+                int total = daySize.Width + numberSize.Width;
+                // Keep the pill a few pixels clear of the rule underneath.
+                int pillHeight = daySize.Height + Px(4), pillTop = Math.Max(0, (height - 1 - Px(5) - pillHeight) / 2 + Px(1));
+                int x = left + (int)(i * width + (width - total) / 2), y = pillTop + (pillHeight - daySize.Height) / 2;
+                if (today)
+                {
+                    Rectangle pill = new Rectangle(x - Px(9), pillTop, total + Px(18), pillHeight);
+                    using (var path = CalendarSurface.Rounded(pill, pill.Height / 2))
+                    using (Brush fill = new SolidBrush(p.Today)) graphics.FillPath(fill, path);
+                }
+                TextRenderer.DrawText(graphics, day, font, new Point(x, y), today ? p.Accent : p.Sub, flags);
+                if (number != "") TextRenderer.DrawText(graphics, number, font, new Point(x + daySize.Width, y), today ? p.Accent : p.Ink, flags);
+            }
+            using (Pen rule = new Pen(p.Rule)) graphics.DrawLine(rule, 0, height - 1, dayHeader.Width, height - 1);
         }
 
         private void AddEvent(DateTime date, int hour)
@@ -262,8 +470,88 @@ namespace DeskStudy
         }
     }
 
+    // Text button for the calendar's navigation row: drawn by hand so the text sits exactly in the middle.
+    internal sealed class CalendarBarButton : Button
+    {
+        public Color HoverColor = Color.Empty;
+        public int TextOffset;
+        private bool hot;
+        public CalendarBarButton()
+        {
+            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+            FlatStyle = FlatStyle.Flat; FlatAppearance.BorderSize = 0;
+        }
+        protected override void OnMouseEnter(EventArgs e) { hot = true; Invalidate(); base.OnMouseEnter(e); }
+        protected override void OnMouseLeave(EventArgs e) { hot = false; Invalidate(); base.OnMouseLeave(e); }
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            Color behind = Parent != null ? Parent.BackColor : BackColor;
+            e.Graphics.Clear(behind);
+            Color fill = hot && !HoverColor.IsEmpty ? HoverColor : BackColor;
+            if (fill.ToArgb() != behind.ToArgb())
+            {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                using (var path = CalendarSurface.Rounded(new Rectangle(0, 0, Width - 1, Height - 1), Math.Max(2, Height / 5)))
+                using (Brush brush = new SolidBrush(fill)) e.Graphics.FillPath(brush, path);
+            }
+            TextRenderer.DrawText(e.Graphics, Text, Font, new Rectangle(0, TextOffset, Width, Height), ForeColor, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.NoPadding);
+        }
+    }
+
+    // Colors for the 清爽 and 纸页 calendar, matching the reference notebooks.
+    internal struct CalendarPalette
+    {
+        public Color Back, Ink, Sub, Faint, Rule, HalfRule, Soft, Accent, Today, Outside;
+        private static Color Hex(string value) { return ColorTranslator.FromHtml(value); }
+        private static Color Mix(Color from, Color to, double amount)
+        {
+            return Color.FromArgb((int)Math.Round(from.R + (to.R - from.R) * amount), (int)Math.Round(from.G + (to.G - from.G) * amount), (int)Math.Round(from.B + (to.B - from.B) * amount));
+        }
+        public static CalendarPalette For(Color back, string notebookLayout)
+        {
+            bool dark = AppearancePainter.Dark(back), paper = notebookLayout == "Paper" || notebookLayout == "Journal";
+            var p = new CalendarPalette { Back = back };
+            p.Ink = dark ? Hex("#E3E9E5") : Hex("#283732");
+            p.Sub = dark ? Hex("#AFB9B2") : Hex("#68736E");
+            p.Accent = dark ? Hex("#A5C5AC") : Hex("#527562");
+            if (!dark && back.ToArgb() == Hex(SettingsLogic.LayoutBackground(notebookLayout)).ToArgb())
+            {
+                p.Rule = paper ? Hex("#E9E4D6") : Hex("#E8ECE8");
+                p.Soft = paper ? Hex("#EFECDF") : Hex("#F3F6F2");
+            }
+            else { p.Rule = Mix(back, p.Ink, dark ? .16 : .09); p.Soft = Mix(back, p.Ink, dark ? .08 : .045); }
+            p.HalfRule = Mix(back, p.Rule, .45);
+            p.Faint = Mix(p.Sub, back, .35);
+            p.Today = Mix(back, p.Accent, dark ? .22 : .12);
+            p.Outside = Mix(back, p.Ink, dark ? .05 : .025);
+            return p;
+        }
+    }
+
     internal sealed class CalendarSurface : ScrollableControl
     {
+        private bool reference;
+        private Color accent = Color.FromArgb(82, 117, 98);
+        // 清爽 / 纸页: the notebook palette, softer rules, rounded course blocks.
+        public void SetReference(bool on, CalendarPalette p)
+        {
+            reference = on;
+            if (on)
+            {
+                canvas = p.Back; foreground = p.Ink; secondary = p.Sub; ruleColor = p.Rule; halfRuleColor = p.HalfRule;
+                todayColor = Blend(p.Back, p.Accent, AppearancePainter.Dark(p.Back) ? .1F : .045F); outsideColor = p.Outside; accent = p.Accent;
+                BackColor = canvas;
+            }
+            Invalidate();
+        }
+        internal static System.Drawing.Drawing2D.GraphicsPath Rounded(Rectangle r, int radius)
+        {
+            var path = new System.Drawing.Drawing2D.GraphicsPath();
+            int d = Math.Max(1, Math.Min(radius * 2, Math.Min(r.Width, r.Height)));
+            path.AddArc(r.X, r.Y, d, d, 180, 90); path.AddArc(r.Right - d, r.Y, d, d, 270, 90);
+            path.AddArc(r.Right - d, r.Bottom - d, d, d, 0, 90); path.AddArc(r.X, r.Bottom - d, d, d, 90, 90);
+            path.CloseFigure(); return path;
+        }
         public event Action<Occurrence> OpenOccurrence;
         public event Action<DateTime, int> CreateEvent;
         public event Action<DateTime> SelectDate;
@@ -337,8 +625,11 @@ namespace DeskStudy
             AutoScrollMinSize = new Size(0, monthView ? T(600) : 24 * HourHeight + S(15));
         }
 
-        public void SetData(DateTime start, DateTime focus, bool month, List<Occurrence> values)
+        private int days = 7;
+        public void SetData(DateTime start, DateTime focus, bool month, List<Occurrence> values) { SetData(start, focus, month, values, 7); }
+        public void SetData(DateTime start, DateTime focus, bool month, List<Occurrence> values, int dayCount)
         {
+            days = Math.Max(1, Math.Min(7, dayCount));
             bool changedMode = monthView != month;
             startDate = start; focusDate = focus; monthView = month; items = values;
             UpdateScrollExtent();
@@ -376,12 +667,12 @@ namespace DeskStudy
 
         private void DrawWeek(Graphics graphics)
         {
-            int width = Math.Max(S(100), GridWidth); float col = (width - TimeGutter) / 7F;
+            int width = Math.Max(S(100), GridWidth); float col = (width - TimeGutter) / (float)days;
             using (Pen rule = new Pen(ruleColor))
             using (Pen halfRule = new Pen(halfRuleColor))
-            using (Font timeFont = new Font("Microsoft YaHei UI", 8F * fontScale))
+            using (Font timeFont = new Font("Microsoft YaHei UI", (reference ? 7.5F : 8F) * fontScale))
             {
-                for (int day = 0; day < 7; day++)
+                for (int day = 0; day < days; day++)
                 {
                     DateTime date = startDate.AddDays(day);
                     if (date.Date == DateTime.Today)
@@ -396,7 +687,7 @@ namespace DeskStudy
                     if (hour < 24) TextRenderer.DrawText(graphics, hour.ToString("00") + ":00", timeFont, new Rectangle(0, y + S(2), T(45), T(20)), secondary, TextFormatFlags.Right | ScrolledText);
                 }
             }
-            for (int day = 0; day < 7; day++)
+            for (int day = 0; day < days; day++)
             {
                 string date = startDate.AddDays(day).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
                 List<Occurrence> dayItems = items.Where(o => o.Date == date).OrderBy(o => o.StartTime).ThenBy(o => o.EndTime).ToList();
@@ -428,7 +719,7 @@ namespace DeskStudy
                     }
                 }
             }
-            if (DateTime.Today >= startDate && DateTime.Today < startDate.AddDays(7))
+            if (DateTime.Today >= startDate && DateTime.Today < startDate.AddDays(days))
             {
                 int day = (DateTime.Today - startDate).Days; int y = (int)(DateTime.Now.TimeOfDay.TotalMinutes * HourHeight / 60);
                 using (Pen now = new Pen(Color.FromArgb(193, 103, 94), S(2))) graphics.DrawLine(now, TimeGutter + day * col, y, TimeGutter + (day + 1) * col, y);
@@ -454,7 +745,17 @@ namespace DeskStudy
                     if (date == DateTime.Today) bg = todayColor;
                     using (Brush fill = new SolidBrush(bg)) graphics.FillRectangle(fill, cell);
                     graphics.DrawRectangle(rule, cell);
-                    TextRenderer.DrawText(graphics, date.Day.ToString() + (date == DateTime.Today ? " 今天" : ""), dateFont, new Rectangle(x + S(6), y + S(5), (int)col - S(10), T(24)), date.Month == focusDate.Month ? foreground : secondary, TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine | ScrolledText);
+                    if (reference && date == DateTime.Today)
+                    {
+                        // Today: the date number in an accent circle.
+                        int size = T(24); Rectangle dot = new Rectangle(x + S(4), y + S(4), size, size);
+                        var smoothing = graphics.SmoothingMode; graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                        using (Brush b = new SolidBrush(accent)) graphics.FillEllipse(b, dot);
+                        graphics.SmoothingMode = smoothing;
+                        TextRenderer.DrawText(graphics, date.Day.ToString(), dateFont, dot, canvas, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | ScrolledText);
+                    }
+                    else
+                        TextRenderer.DrawText(graphics, date.Day.ToString() + (!reference && date == DateTime.Today ? " 今天" : ""), dateFont, new Rectangle(x + S(6), y + S(5), (int)col - S(10), T(24)), date.Month == focusDate.Month ? foreground : secondary, TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine | ScrolledText);
                     List<Occurrence> dayItems = items.Where(o => o.Date == date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)).OrderBy(o => o.StartTime).ToList();
                     int capacity = Math.Max(1, ((int)row - T(37)) / T(25));
                     int shown = dayItems.Count > capacity ? Math.Max(0, capacity - 1) : dayItems.Count;
@@ -476,8 +777,24 @@ namespace DeskStudy
         private void DrawEvent(Graphics graphics, Occurrence item, Rectangle rect, bool compact)
         {
             Color color = EventColor(item.Color);
-            using (Brush fill = new SolidBrush(Tint(color))) graphics.FillRectangle(fill, rect);
-            using (Brush stripe = new SolidBrush(color)) graphics.FillRectangle(stripe, rect.X, rect.Y, Math.Min(S(3), rect.Width), rect.Height);
+            if (reference)
+            {
+                // Rounded block with the color bar along its left edge.
+                var smoothing = graphics.SmoothingMode; graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                using (var path = Rounded(rect, S(5)))
+                {
+                    using (Brush fill = new SolidBrush(Tint(color))) graphics.FillPath(fill, path);
+                    var clip = graphics.Clip; graphics.SetClip(path, System.Drawing.Drawing2D.CombineMode.Intersect);
+                    using (Brush stripe = new SolidBrush(color)) graphics.FillRectangle(stripe, rect.X, rect.Y, Math.Min(S(3), rect.Width), rect.Height);
+                    graphics.Clip = clip;
+                }
+                graphics.SmoothingMode = smoothing;
+            }
+            else
+            {
+                using (Brush fill = new SolidBrush(Tint(color))) graphics.FillRectangle(fill, rect);
+                using (Brush stripe = new SolidBrush(color)) graphics.FillRectangle(stripe, rect.X, rect.Y, Math.Min(S(3), rect.Width), rect.Height);
+            }
             Rectangle inner = new Rectangle(rect.X + S(5), rect.Y + S(3), Math.Max(1, rect.Width - S(9)), Math.Max(1, rect.Height - S(6)));
             using (Font titleFont = new Font("Microsoft YaHei UI", (compact ? 8F : 9F) * fontScale, FontStyle.Bold))
             using (Font detailFont = new Font("Microsoft YaHei UI", 8F * fontScale))
@@ -501,7 +818,7 @@ namespace DeskStudy
                 int row = Math.Min(5, Math.Max(0, (int)(point.Y / (MonthHeight / 6F))));
                 return startDate.AddDays(row * 7 + column);
             }
-            int day = Math.Min(6, Math.Max(0, (int)((point.X - TimeGutter) / ((Math.Max(S(100), GridWidth) - TimeGutter) / 7F))));
+            int day = Math.Min(days - 1, Math.Max(0, (int)((point.X - TimeGutter) / ((Math.Max(S(100), GridWidth) - TimeGutter) / (float)days))));
             return startDate.AddDays(day);
         }
 

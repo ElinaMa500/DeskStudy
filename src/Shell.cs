@@ -170,30 +170,55 @@ namespace DeskStudy
                 header.BackColor = back; heading.BackColor = back; headerActions.BackColor = back;
                 heading.ForeColor = muted;
                 heading.Padding = new Padding((int)Math.Round(15 * dpi), 0, 0, 0);
-                header.Padding = new Padding((int)Math.Round(18 * dpi), (int)Math.Round(6 * dpi), (int)Math.Round(10 * dpi), (int)Math.Round(4 * dpi));
+                bool slim = SlimReferenceHeader;
+                header.Padding = slim ? new Padding((int)Math.Round(18 * dpi), (int)Math.Round(6 * dpi), (int)Math.Round(10 * dpi), (int)Math.Round(4 * dpi))
+                    : new Padding((int)Math.Round(18 * dpi), (int)Math.Round(6 * dpi), (int)Math.Round(10 * dpi), (int)Math.Round(4 * dpi));
+                if (slim)
+                {
+                    // Slim header (calendar, 1.5.1): smaller 置顶 / ⚙ / ✕ so more of the timetable shows below.
+                    float size = (float)Math.Round(8F * SettingsLogic.EffectiveAppearance(App.Data, WidgetKey).FontSize / 9F, 2);
+                    if (slimFont == null || Math.Abs(slimFont.SizeInPoints - size) > .01F) { Font old = slimFont; slimFont = new Font("Microsoft YaHei UI", size); if (old != null) old.Dispose(); }
+                    pin.Font = slimFont; settingsButton.Font = slimFont; settingsButton.Padding = Padding.Empty;
+                    settingsButton.MinimumSize = Size.Empty;
+                    settingsButton.Height = Math.Max((int)Math.Round(22 * dpi), slimFont.Height + (int)Math.Round(6 * dpi));
+                }
                 pin.BackColor = back; pin.ForeColor = pin.Checked ? accent : ink;
                 pin.FlatAppearance.CheckedBackColor = soft; pin.FlatAppearance.MouseOverBackColor = soft; pin.FlatAppearance.MouseDownBackColor = soft;
                 pin.Padding = Padding.Empty;
                 pin.Margin = new Padding(0, 0, (int)Math.Round(2 * dpi), 0);
                 settingsButton.BackColor = back; settingsButton.ForeColor = muted;
                 settingsButton.FlatAppearance.BorderSize = 0; settingsButton.FlatAppearance.MouseOverBackColor = soft; settingsButton.FlatAppearance.BorderColor = back;
-                settingsButton.Width = (int)Math.Round(30 * dpi);
+                settingsButton.Width = (int)Math.Round((slim ? 26 : 30) * dpi);
                 settingsButton.Margin = Padding.Empty;
                 pin.AutoSize = false;
-                pin.Size = new Size(TextRenderer.MeasureText("置顶", pin.Font).Width + (int)Math.Round(16 * dpi), settingsButton.Height);
-                header.Height = (int)Math.Max(42 * dpi, settingsButton.Height + 12 * dpi);
+                pin.Size = new Size(TextRenderer.MeasureText("置顶", pin.Font).Width + (int)Math.Round((slim ? 12 : 16) * dpi), settingsButton.Height);
+                header.Height = slim ? settingsButton.Height + header.Padding.Vertical : (int)Math.Max(42 * dpi, settingsButton.Height + 12 * dpi);
             }
             else
             {
                 heading.Padding = Padding.Empty; header.Padding = new Padding(12, 6, 8, 6);
                 pin.Padding = Padding.Empty; pin.Margin = new Padding(4, 7, 7, 2); pin.AutoSize = true;
-                settingsButton.Width = (int)Math.Round(40 * dpi); settingsButton.Margin = hideButton.Margin;
+                settingsButton.Width = (int)Math.Round(40 * dpi); settingsButton.Margin = hideButton.Margin; settingsButton.Height = hideButton.Height;
                 settingsButton.FlatAppearance.MouseOverBackColor = Color.Empty;
             }
             // Without a title bar there is no system ✕, so the reference header carries its own.
             StyleCloseButton(on, back, muted, soft, dpi);
             UpdateHeaderActionsWidth();
             header.Invalidate(); heading.Invalidate();
+        }
+        private Font slimFont;
+        // The calendar uses a lower reference header than the notebooks.
+        protected virtual bool SlimReferenceHeader { get { return false; } }
+        // Header buttons at their designed size for this screen: 32 px tall with 3 px margins, scaled once.
+        protected void NormalizeHeaderButtons()
+        {
+            float dpi; using (var g = CreateGraphics()) dpi = g.DpiY / 96F;
+            int height = Math.Max((int)Math.Round(32 * dpi), hideButton.Font.Height + hideButton.Padding.Vertical + 8);
+            var margin = new Padding((int)Math.Round(3 * dpi));
+            // Their own minimum size was scaled with the form (twice on the calendar) and would keep them oversized.
+            hideButton.MinimumSize = settingsButton.MinimumSize = Size.Empty;
+            hideButton.Height = settingsButton.Height = height;
+            hideButton.Margin = margin; settingsButton.Margin = margin;
         }
         protected void SetCompactNotebookHeader(bool compact) { SetCompactNotebookHeader(compact, 9.5F); }
         protected void SetCompactNotebookHeader(bool compact, float compactSize)
@@ -220,6 +245,7 @@ namespace DeskStudy
                 if (notebookHeadingFont != null) { notebookHeadingFont.Dispose(); notebookHeadingFont = null; }
                 if (hoverTimer != null) { hoverTimer.Dispose(); hoverTimer = null; }
                 if (slideTimer != null) { slideTimer.Dispose(); slideTimer = null; }
+                if (slimFont != null) { slimFont.Dispose(); slimFont = null; }
             }
         }
         protected void SetTitle(string title) { Text = title + " · 桌面课笺"; headingTitle = title; heading.Text = title + headingSuffix; }

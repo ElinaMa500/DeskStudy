@@ -41,6 +41,9 @@ namespace DeskStudy
         private ContextMenuStrip _taskMenu;
         private Label _quickPlus;
         private readonly Dictionary<string, Font> _referenceFonts = new Dictionary<string, Font>();
+        private Padding _bodyPadding;
+        private bool _bodyPaddingCaptured;
+        private Size _originalMinimum;
         public string AppliedNotebookLayout { get { return _appliedLayout; } }
         private bool IsModern { get { return _appliedLayout != "Original"; } }
         // 清爽卡片 (Clean) and 手账纸页 (Journal) follow desktop-notebook-preview.html.
@@ -213,6 +216,16 @@ namespace DeskStudy
         private void StyleNotebookLayout(AppearanceOptions appearance)
         {
             SetCompactNotebookHeader(IsModern);
+            // 清爽卡片 / 手账纸页 sit closer to the bottom edge, so the notebook can be shorter (1.5.1).
+            if (_contentReady && !_bodyPaddingCaptured) { _bodyPadding = Body.Padding; _bodyPaddingCaptured = true; }
+            if (_bodyPaddingCaptured) Body.Padding = IsReference ? new Padding(_bodyPadding.Left, _bodyPadding.Top, _bodyPadding.Right, Px(3)) : _bodyPadding;
+            if (_contentReady && _originalMinimum.IsEmpty) _originalMinimum = MinimumSize;
+            if (!_originalMinimum.IsEmpty)
+            {
+                // The slimmer footer lets these two layouts go about 30 px shorter.
+                Size minimum = IsReference ? new Size(_originalMinimum.Width, _originalMinimum.Height - Px(30)) : _originalMinimum;
+                if (MinimumSize != minimum) MinimumSize = minimum;
+            }
             Color bg = AppearancePainter.Background(appearance), fg = AppearancePainter.Foreground(appearance), surface = AppearancePainter.Surface(appearance);
             _modern.BackColor = bg; _tasks.BackColor = bg;
             _pageTitle.BackColor = IsModern ? bg : surface;
@@ -231,7 +244,7 @@ namespace DeskStudy
                 if (IsModern) { row.Card.BackColor = bg; row.Title.BackColor = Color.Transparent; row.Status.BackColor = Color.Transparent; row.Toggle.BackColor = _appliedLayout == "Card" ? surface : bg; }
                 card.Invalidate();
             }
-            foreach (Button b in new[] { _previous, _next, _newPageButton, _directory, _details, _quickAdd }) { b.FlatAppearance.BorderSize = IsModern ? 0 : 1; b.BackColor = IsModern ? bg : surface; }
+            foreach (Button b in new[] { _previous, _next, _newPageButton, _directory, _details, _quickAdd }) { b.FlatAppearance.BorderSize = IsModern ? 0 : 1; b.BackColor = IsModern ? bg : surface; b.Padding = Padding.Empty; }
             _newPageButton.Text = "＋ 新页";
             _quickAdd.Text = "＋ 添加"; _quickText.Cue = "记下一件事，回车添加"; _quickPlus.Visible = false; _quickEntry.Margin = Padding.Empty;
             if (IsReference) StyleReferenceLayout();
@@ -313,7 +326,8 @@ namespace DeskStudy
         {
             bool journal = _appliedLayout == "Journal";
             int clientWidth = _modern.ClientSize.Width, clientHeight = _modern.ClientSize.Height;
-            int footer = Math.Max(Px(42), _newPageButton.Font.Height + Px(18));
+            // Slim footer (1.5.1).
+            int footer = Math.Max(Px(32), _newPageButton.Font.Height + Px(10));
             int footerY = Math.Max(Px(200), clientHeight - footer);
             _modernFooter.SetBounds(0, footerY, clientWidth, footer);
             int rail = RailWidth(), side = journal ? Px(16) : Px(20);
@@ -344,14 +358,16 @@ namespace DeskStudy
             _notesToggle.SetBounds(left - Px(2), notesY, Math.Min(width, TextRenderer.MeasureText(_notesToggle.Text, _notesToggle.Font).Width + Px(30)), toggle);
             _notes.Visible = _notesExpanded;
             _notes.SetBounds(left, _notesToggle.Bottom + Px(4), width, Math.Max(1, notesHeight));
-            int arrow = Px(30), pad = Px(13);
+            int arrow = Px(24), pad = Px(13);
             int directoryWidth = TextRenderer.MeasureText(_directory.Text, _directory.Font).Width + Px(14);
             int newWidth = TextRenderer.MeasureText(_newPageButton.Text, _newPageButton.Font).Width + Px(16);
-            int buttonHeight = footer - Px(12);
-            _previous.SetBounds(pad, Px(6), arrow, buttonHeight);
-            _directory.SetBounds(_previous.Right, Px(6), Math.Max(Px(60), Math.Min(directoryWidth, clientWidth - pad * 2 - arrow * 2 - newWidth)), buttonHeight);
-            _next.SetBounds(_directory.Right, Px(6), arrow, buttonHeight);
-            _newPageButton.SetBounds(clientWidth - pad - newWidth, Px(6), newWidth, buttonHeight);
+            int buttonHeight = footer - Px(6);
+            // The ‹ › glyphs sit low in their line; raise the two buttons so the arrows line up with the page number.
+            int lift = Px(6);
+            _previous.SetBounds(pad, Px(3) - lift, arrow, buttonHeight);
+            _directory.SetBounds(_previous.Right, Px(3), Math.Max(Px(60), Math.Min(directoryWidth, clientWidth - pad * 2 - arrow * 2 - newWidth)), buttonHeight);
+            _next.SetBounds(_directory.Right, Px(3) - lift, arrow, buttonHeight);
+            _newPageButton.SetBounds(clientWidth - pad - newWidth, Px(3), newWidth, buttonHeight);
             UpdateSaveStatus(); _modern.Invalidate();
         }
         private void ArrangeModernLayout()

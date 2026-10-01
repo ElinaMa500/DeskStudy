@@ -47,6 +47,8 @@ namespace DeskStudy
     public sealed class CalendarOptions
     {
         public string DefaultView { get; set; }
+        // 工作周 (Monday–Friday) is a week view, so DefaultView stays "Week" and older versions still read the file.
+        public bool WorkWeek { get; set; }
         public int WeekStartDay { get; set; }
         public string SemesterStart { get; set; }
         public string SemesterEnd { get; set; }
@@ -126,7 +128,8 @@ namespace DeskStudy
         {
             AppearanceOptions value;
             bool overridden = data.Settings.AppearanceOverrides.TryGetValue(key, out value);
-            if (key != "todo" && key != "ddl") return overridden ? value : data.Settings.GlobalAppearance;
+            // The calendar follows the notebook layout's default background too, so the three widgets match (1.5.1).
+            if (key != "todo" && key != "ddl" && key != "calendar") return overridden ? value : data.Settings.GlobalAppearance;
             var result = new AppearanceOptions { BackgroundColor = LayoutBackground(data.Settings.NotebookLayout) };
             MergeAppearance(result, data.Settings.GlobalAppearance);
             if (overridden) MergeAppearance(result, value);

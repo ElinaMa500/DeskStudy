@@ -306,7 +306,7 @@ namespace DeskStudy
                 string key = keyValue; var card = Card(page, key == "calendar" ? "日历" : key == "todo" ? "Todo 便签" : "DDL 便签");
                 var editor = new LayoutEditors(); layoutEditors[key] = editor;
                 editor.X = Number("layout-" + key + "-x", -100000, 100000, 10); editor.Y = Number("layout-" + key + "-y", -100000, 100000, 10);
-                editor.Width = Number("layout-" + key + "-width", key == "calendar" ? 680 : 350, 20000, 10); editor.Height = Number("layout-" + key + "-height", key == "calendar" ? 520 : 430, 20000, 10);
+                editor.Width = Number("layout-" + key + "-width", key == "calendar" ? 680 : 350, 20000, 10); editor.Height = Number("layout-" + key + "-height", key == "calendar" ? 420 : 430, 20000, 10);
                 var position = Buttons(Ui.Label("X", 9F, Ui.Muted), editor.X, Ui.Label("Y", 9F, Ui.Muted), editor.Y);
                 var size = Buttons(Ui.Label("宽", 9F, Ui.Muted), editor.Width, Ui.Label("高", 9F, Ui.Muted), editor.Height);
                 Field(card, "窗口位置", position); Field(card, "窗口尺寸", size);
@@ -390,12 +390,13 @@ namespace DeskStudy
         {
             var page = NewPage("日历与课表", "设定学期节奏与桌面日历显示。下方统一管理整个课程系列，临时停课或调课可在日历中选择“仅这一次”。");
             var card = Card(page, "日历与学期默认值");
-            defaultView = Combo("calendar-default-view", new Choice("Week", "周视图"), new Choice("Month", "月视图")); Field(card, "默认视图", defaultView);
+            defaultView = Combo("calendar-default-view", new Choice("WorkWeek", "工作周（周一至周五）"), new Choice("Week", "周视图"), new Choice("Month", "月视图")); Field(card, "日历视图", defaultView);
             weekStart = Combo("calendar-week-start", new Choice("1", "星期一"), new Choice("0", "星期日"), new Choice("2", "星期二"), new Choice("3", "星期三"), new Choice("4", "星期四"), new Choice("5", "星期五"), new Choice("6", "星期六")); Field(card, "一周起始日", weekStart);
             semesterStart = DatePicker("semester-start"); semesterEnd = DatePicker("semester-end"); teachingWeekOne = DatePicker("teaching-week-one");
             Field(card, "学期开始", semesterStart); Field(card, "学期结束", semesterEnd); Field(card, "教学第 1 周起点", teachingWeekOne);
+            Add(card, Ui.Label("日历会记住你上次在组件上选的视图，下次打开仍是它。", 8.5F, Ui.Muted));
             Add(card, Ui.Label("学期与教学周用于新增课程的默认循环范围；有效日期会自动保存。", 8.5F, Ui.Muted));
-            defaultView.SelectedIndexChanged += delegate { ChangeSetting(delegate { app.Data.Settings.Calendar.DefaultView = SelectedId(defaultView); }); };
+            defaultView.SelectedIndexChanged += delegate { ChangeSetting(delegate { string view = SelectedId(defaultView); app.Data.Settings.Calendar.DefaultView = view == "Month" ? "Month" : "Week"; app.Data.Settings.Calendar.WorkWeek = view == "WorkWeek"; }); };
             weekStart.SelectedIndexChanged += delegate { ChangeSetting(delegate { app.Data.Settings.Calendar.WeekStartDay = Int32.Parse(SelectedId(weekStart), CultureInfo.InvariantCulture); }); };
             semesterStart.ValueChanged += delegate { SaveCalendarDates(); }; semesterEnd.ValueChanged += delegate { SaveCalendarDates(); }; teachingWeekOne.ValueChanged += delegate { SaveCalendarDates(); };
             var series = Card(page, "课程与循环系列"); courses = List("calendar-series", 195, "课程名称", "日期 / 周期", "时间"); Add(series, courses);
@@ -520,7 +521,7 @@ namespace DeskStudy
                 Color color; try { color = ColorTranslator.FromHtml(appearance.BackgroundColor); } catch { color = Ui.Background; }
                 backgroundColor.BackColor = color; backgroundColor.ForeColor = color.GetBrightness() < 0.5F ? Color.White : Ui.Text; backgroundColor.Text = appearance.BackgroundColor.ToUpperInvariant() + " · 选择颜色";
                 appearanceHint.Text = target == "global" ? "正在调整全局外观，所有跟随全局的组件会同步变化。" : follows ? "此组件正在跟随全局。取消勾选后可以单独调整。" : "此组件使用独立外观。勾选“跟随全局外观”即可恢复同步。";
-                SelectId(defaultView, app.Data.Settings.Calendar.DefaultView); SelectId(weekStart, app.Data.Settings.Calendar.WeekStartDay.ToString(CultureInfo.InvariantCulture));
+                SelectId(defaultView, app.Data.Settings.Calendar.WorkWeek && app.Data.Settings.Calendar.DefaultView == "Week" ? "WorkWeek" : app.Data.Settings.Calendar.DefaultView); SelectId(weekStart, app.Data.Settings.Calendar.WeekStartDay.ToString(CultureInfo.InvariantCulture));
                 if (!calendarDatesPending) { SetDate(semesterStart, app.Data.Settings.Calendar.SemesterStart); SetDate(semesterEnd, app.Data.Settings.Calendar.SemesterEnd); SetDate(teachingWeekOne, app.Data.Settings.Calendar.TeachingWeekOne); }
                 RefreshCourses(); RefreshBooks();
                 SetNumber(leadMinutes, app.Data.Settings.Reminders.DefaultLeadMinutes); quietEnabled.Checked = app.Data.Settings.Reminders.QuietHoursEnabled;

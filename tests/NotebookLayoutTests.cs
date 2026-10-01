@@ -415,6 +415,7 @@ public static class NotebookLayoutTests
                 else if (mode == "render") RenderChecks(app, path);
                 else if (mode == "due") DueChecks(app, path);
                 else if (mode == "frame") FrameChecks(app, path);
+                else if (mode == "calstyle" || mode == "calstyleread") CalendarStyleChecks.Run(app, path, mode == "calstyleread");
                 else if (mode == "place" || mode == "placeread") PlacementChecks.Run(app, path, mode == "placeread");
                 else WriteChecks(app, path, mode == "card");
                 app.Shutdown();

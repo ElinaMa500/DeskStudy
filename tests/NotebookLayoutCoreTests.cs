@@ -19,9 +19,9 @@ public static class NotebookLayoutCoreTests
             var store = new AppStore(root); var d = store.Data;
             Assert(d.Settings.NotebookLayout == "Card" && SettingsLogic.EffectiveAppearance(d, "todo").BackgroundColor == "#F4F6F3", "fresh settings use Card and its defaults");
             d.Settings.NotebookLayout = "Paper";
-            Assert(SettingsLogic.EffectiveAppearance(d, "ddl").BackgroundColor == "#FBF5E8" && SettingsLogic.EffectiveAppearance(d, "calendar").BackgroundColor == "#F7F8FB", "paper defaults apply only to notebooks");
+            Assert(SettingsLogic.EffectiveAppearance(d, "ddl").BackgroundColor == "#FBF5E8" && SettingsLogic.EffectiveAppearance(d, "calendar").BackgroundColor == "#FBF5E8", "paper defaults apply to the notebooks and, since 1.5.1, the calendar");
             d.Settings.NotebookLayout = "Clean"; Assert(SettingsLogic.EffectiveAppearance(d, "todo").BackgroundColor == "#FFFFFF", "clean card defaults to the reference white background");
-            d.Settings.NotebookLayout = "Journal"; Assert(SettingsLogic.EffectiveAppearance(d, "ddl").BackgroundColor == "#FAF8F1" && SettingsLogic.EffectiveAppearance(d, "calendar").BackgroundColor == "#F7F8FB", "journal defaults to the reference paper color for notebooks only");
+            d.Settings.NotebookLayout = "Journal"; Assert(SettingsLogic.EffectiveAppearance(d, "ddl").BackgroundColor == "#FAF8F1" && SettingsLogic.EffectiveAppearance(d, "calendar").BackgroundColor == "#FAF8F1", "journal defaults to the reference paper color for the notebooks and the calendar");
             d.Settings.NotebookLayout = "Paper";
             SettingsLogic.MarkAppearanceCustomized(d.Settings.GlobalAppearance, "FontSize"); d.Settings.GlobalAppearance.FontSize = 12;
             d.Settings.AppearanceOverrides["todo"] = new AppearanceOptions { FontSize = 14 };
