@@ -10,12 +10,16 @@ using DeskStudy;
 // The calendar following the notebook layout (原始 / 清爽 / 纸页), the 工作周 view and the slimmer reference widgets.
 public static class CalendarStyleChecks
 {
+    [System.Runtime.InteropServices.DllImport("user32.dll")] static extern int GetWindowRgnBox(IntPtr hwnd, out RECT box);
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)] struct RECT { public int Left, Top, Right, Bottom; }
+    static bool Clipped(Form f) { RECT box; return GetWindowRgnBox(f.Handle, out box) > 1; }
     static void Assert(bool condition, string message) { if (!condition) throw new Exception(message); Console.WriteLine("PASS " + message); }
     static void Pump(int ms) { var clock = Stopwatch.StartNew(); while (clock.ElapsedMilliseconds < ms) { Application.DoEvents(); Thread.Sleep(10); } }
     static IEnumerable<Control> All(Control root) { foreach (Control c in root.Controls) { yield return c; foreach (Control d in All(c)) yield return d; } }
     static T Find<T>(Control root, string name) where T : Control { return (T)All(root).First(c => c.Name == name); }
     static void Switch(AppController app, string layout) { app.Data.Settings.NotebookLayout = layout; app.SettingsChanged(); Pump(200); }
     // The whole control lies inside its parent's client area (nothing cut off).
+    [System.Runtime.InteropServices.DllImport("user32.dll")] static extern IntPtr SendMessage(IntPtr hwnd, int msg, IntPtr wparam, IntPtr lparam);
     static bool Inside(Control c) { return c.Parent != null && new Rectangle(Point.Empty, c.Parent.ClientSize).Contains(c.Bounds); }
 
     public static void Run(AppController app, string path, bool afterRestart)
@@ -83,6 +87,19 @@ public static class CalendarStyleChecks
             Assert(close.Width < fold.Width && visual.Right - closeOnScreen.Right <= 14 && closeOnScreen.Top - visual.Top <= 14 && closeOnScreen.Left - foldOnScreen.Right >= 8, w.WidgetKey + ": the ✕ is small and alone in the top-right corner (" + closeOnScreen + ", fold " + foldOnScreen + ")");
         }
 
+        // Corners: rounded by clipping at rest (no shadow), lifted while dragging; 直角 turns it off.
+        Assert(app.Data.Settings.WidgetCorners == "Round" && app.Widgets.All(w => Clipped(w)), "default 圆角: each widget is clipped to rounded corners at rest");
+        SendMessage(todo.Handle, 0x0231, IntPtr.Zero, IntPtr.Zero); Pump(60);
+        Assert(!Clipped(todo), "while dragging the clip is lifted so the system corners and shadow show");
+        SendMessage(todo.Handle, 0x0232, IntPtr.Zero, IntPtr.Zero); Pump(400);
+        Assert(Clipped(todo), "after the drag the rounded clip is back");
+        app.SetWidgetCorners("Square"); Pump(100);
+        Assert(app.Widgets.All(w => !Clipped(w)), "直角: no clipping");
+        bool rejected = false; try { app.SetWidgetCorners("Oval"); } catch (InvalidOperationException) { rejected = true; }
+        Assert(rejected && app.Data.Settings.WidgetCorners == "Square", "an unknown corner style is rejected");
+        app.SetWidgetCorners("Round"); Pump(100);
+        Assert(app.Widgets.All(w => Clipped(w)), "back to 圆角");
+
         // 工作周: five columns from Monday, remembered; 周 and 月 switch back.
         var range = Find<Label>(calendar, "calendar-range");
         ((Button)Find<Control>(calendar, "calendar-workweek")).PerformClick(); Pump(150);
@@ -107,6 +124,11 @@ public static class CalendarStyleChecks
         Assert(view.Items.Count == 3, "the settings center offers 工作周, 周 and 月");
         view.SelectedIndex = 0; Pump(150);
         Assert(app.Data.Settings.Calendar.WorkWeek && range.Text == monday.ToString("M.d") + " – " + monday.AddDays(4).ToString("M.d"), "choosing 工作周 in the settings center switches the calendar");
+        var corners = Find<ComboBox>(settings, "widget-corners");
+        Assert(corners.Items.Count == 2 && corners.SelectedIndex == 0, "the settings center offers 圆角 / 直角, 圆角 selected by default");
+        corners.SelectedIndex = 1; Pump(150);
+        Assert(app.Data.Settings.WidgetCorners == "Square" && app.Widgets.All(w => !Clipped(w)), "choosing 直角 in the settings center applies at once");
+        corners.SelectedIndex = 0; Pump(150);
         settings.Close(); Pump(80);
         app.Save(); Assert(app.Flush(), "calendar style changes saved");
     }

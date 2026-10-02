@@ -24,7 +24,7 @@ namespace DeskStudy
         private bool syncing;
         private bool calendarDatesPending;
         private bool cleanupComplete;
-        private ComboBox appearanceTarget, theme, defaultView, weekStart, bookChoice, desktopPage, saveDelay, widgetMode;
+        private ComboBox appearanceTarget, theme, defaultView, weekStart, bookChoice, desktopPage, saveDelay, widgetMode, widgetCorners;
         private TextBox hotkeyBox;
         private Label hotkeyStatus;
         private NumericUpDown opacity, fontSize, leadMinutes;
@@ -284,6 +284,9 @@ namespace DeskStudy
             var mode = Card(page, "窗口模式");
             widgetMode = Combo("widget-mode", new Choice("Desktop", "桌面组件模式"), new Choice("Standard", "标准窗口")); Field(mode, "组件窗口", widgetMode);
             widgetMode.SelectedIndexChanged += delegate { if (!syncing) Run(delegate { app.SetWidgetMode(SelectedId(widgetMode)); }); };
+            widgetCorners = Combo("widget-corners", new Choice("Round", "圆角"), new Choice("Square", "直角")); Field(mode, "组件四角", widgetCorners);
+            widgetCorners.SelectedIndexChanged += delegate { if (!syncing) Run(delegate { app.SetWidgetCorners(SelectedId(widgetCorners)); }); };
+            Add(mode, Ui.Label("桌面组件模式下生效。平时没有阴影；拖动或调整大小时显示系统阴影（Windows 11 上此时为系统圆角）。", 8.5F, Ui.Muted));
             Add(mode, Ui.Label("桌面组件模式：没有标题栏，不出现在任务栏和 Alt+Tab 里。拖动顶栏移动，拖动边缘调整大小。", 8.5F, Ui.Muted));
             Add(mode, Ui.Label("点击组件时它浮到前面；切到别的程序后，它自动回到其他窗口下面。勾选「始终置顶」的组件不受影响。", 8.5F, Ui.Muted));
             hotkeyBox = new TextBox { Name = "show-hotkey", Width = 220, ReadOnly = true, BackColor = Color.White, Margin = new Padding(0, 4, 8, 5), ShortcutsEnabled = false, AccessibleName = "显示或收起全部组件的快捷键，点击后按下新的组合键" };
@@ -507,7 +510,7 @@ namespace DeskStudy
                     overviewDetails[key].Text = (w.Visible ? "已显示" : "已隐藏") + " · " + w.Width + " × " + w.Height + (w.TopMost ? " · 始终置顶" : "") + (w.PositionLocked ? " · 位置已锁定" : "");
                     var editor = layoutEditors[key]; SetNumber(editor.X, w.X); SetNumber(editor.Y, w.Y); SetNumber(editor.Width, w.Width); SetNumber(editor.Height, w.Height); editor.Pin.Checked = w.TopMost; editor.Locked.Checked = w.PositionLocked;
                 }
-                SelectId(widgetMode, app.Data.Settings.WidgetMode);
+                SelectId(widgetMode, app.Data.Settings.WidgetMode); SelectId(widgetCorners, app.Data.Settings.WidgetCorners);
                 hotkeyBox.Text = app.Data.Settings.ShowHotkey == "" ? "已停用" : app.Data.Settings.ShowHotkey;
                 hotkeyStatus.Text = app.HotkeyStatus ?? "";
                 layoutSaved.Text = String.IsNullOrEmpty(app.Data.Settings.SavedLayoutUtc) ? "尚未保存自定义布局。重置与找回不会影响内容。" : "已保存布局：" + LocalStamp(app.Data.Settings.SavedLayoutUtc) + "。重置与找回不会影响内容。";

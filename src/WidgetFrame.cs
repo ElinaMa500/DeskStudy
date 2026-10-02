@@ -67,11 +67,34 @@ namespace DeskStudy
         {
             if (!desktopMode || !IsHandleCreated || IsDisposed) return;
             shadowOn = on;
-            // Windows 11 draws the shadow together with the rounded corners, so the corners are only rounded while dragging.
+            // Windows 11 draws the shadow together with its rounded corners, so the system rounds only while dragging.
             try { int corner = on ? 2 : 1; DwmSetWindowAttribute(Handle, 33, ref corner, sizeof(int)); }
             catch (DllNotFoundException) { }
             catch (EntryPointNotFoundException) { }
+            ApplyCorners();
         }
+        // At rest, "圆角" is drawn by clipping the window to a rounded shape, which casts no shadow.
+        // While dragging the clip is lifted so the system's own rounded corners and shadow show.
+        public void ApplyCorners()
+        {
+            if (!IsHandleCreated || IsDisposed) return;
+            bool clip = desktopMode && !shadowOn && WindowState == FormWindowState.Normal && App != null && App.Data.Settings.WidgetCorners != "Square";
+            if (!clip) { if (cornerClipped) { SetWindowRgn(Handle, IntPtr.Zero, true); cornerClipped = false; } return; }
+            float dpi; using (Graphics g = CreateGraphics()) dpi = g.DpiX / 96F;
+            int diameter = (int)Math.Round(16 * dpi);
+            IntPtr region = CreateRoundRectRgn(0, 0, Width + 1, Height + 1, diameter, diameter);
+            // The window owns the region after this call.
+            if (SetWindowRgn(Handle, region, true) == 0) DeleteObject(region); else cornerClipped = true;
+        }
+        private bool cornerClipped;
+        protected override void OnSizeChanged(EventArgs e)
+        {
+            base.OnSizeChanged(e);
+            if (cornerClipped || (desktopMode && !shadowOn)) ApplyCorners();
+        }
+        [DllImport("gdi32.dll")] private static extern IntPtr CreateRoundRectRgn(int left, int top, int right, int bottom, int widthEllipse, int heightEllipse);
+        [DllImport("gdi32.dll")] private static extern bool DeleteObject(IntPtr handle);
+        [DllImport("user32.dll")] private static extern int SetWindowRgn(IntPtr hwnd, IntPtr region, bool redraw);
         private Font closeFont;
         // Just inside the top-right corner, outside the band used for resizing from the edges.
         private void PlaceCloseButton()
@@ -119,6 +142,7 @@ namespace DeskStudy
         protected override void OnHandleCreated(EventArgs e)
         {
             base.OnHandleCreated(e);
+            cornerClipped = false; shadowOn = false;
             if (!desktopMode) return;
             SetShadow(false);
             // Re-evaluate the frame so the title bar is removed immediately.

@@ -65,6 +65,15 @@ namespace DeskStudy
             SettingsChanged();
         }
 
+        public void SetWidgetCorners(string style)
+        {
+            if (!SettingsLogic.WidgetCornerStyles.Contains(style)) throw new InvalidOperationException("组件四角样式无效。");
+            if (Data.Settings.WidgetCorners == style) return;
+            Data.Settings.WidgetCorners = style;
+            foreach (var w in Widgets) w.ApplyCorners();
+            SettingsChanged();
+        }
+
         // Only the real instance claims a system-wide shortcut; isolated test and preview runs never do.
         public void RegisterShowHotkey()
         {
