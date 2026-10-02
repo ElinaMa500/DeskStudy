@@ -24,6 +24,9 @@ namespace DeskStudy
         private bool syncing;
         private bool calendarDatesPending;
         private bool cleanupComplete;
+        private ComboBox uiLanguage;
+        private Label languageNote;
+        private Button restartButton;
         private ComboBox appearanceTarget, theme, defaultView, weekStart, bookChoice, desktopPage, saveDelay, widgetMode, widgetCorners;
         private TextBox hotkeyBox;
         private Label hotkeyStatus;
@@ -333,6 +336,11 @@ namespace DeskStudy
         private void BuildAppearance()
         {
             var page = NewPage("外观", "颜色、透明度与字号会实时应用到桌面组件。单个组件可以覆盖全局设置，也可以重新跟随全局。");
+            var language = Card(page, Lang.T("界面语言 · Language"));
+            uiLanguage = Combo("ui-language", new Choice("zh-CN", "中文"), new Choice("en", "English")); Field(language, Lang.T("界面语言"), uiLanguage);
+            uiLanguage.SelectedIndexChanged += delegate { if (!syncing) { ChangeSetting(delegate { app.Data.Settings.Language = SelectedId(uiLanguage); }); UpdateLanguageNote(); } };
+            languageNote = Ui.Label(Lang.T("切换语言后需要重启程序 · Restart DeskStudy to apply"), 8.5F, Ui.Muted); Add(language, languageNote);
+            restartButton = ActionButton("restart-for-language", Lang.T("立即重启 · Restart now"), app.Restart); Add(language, Buttons(restartButton));
             var layouts = Card(page, "便签布局 · Todo 与 DDL 同步切换");
             var choices = Buttons();
             string[] ids = SettingsLogic.NotebookLayouts, titles = { "原始外观", "轻量卡片", "纸页本", "清爽卡片", "手账纸页" }, descriptions = { "顶部翻页，保留文字区与完整操作按钮。", "任务优先，折叠备注，固定底部翻页。", "暖纸色与页边线，侧边目录可滚动。", "白底大标题，细线任务列表，界面最简洁。", "米色纸页与窄侧页签，更有手账感。" };
@@ -412,6 +420,14 @@ namespace DeskStudy
             calendarDatesPending = semesterEnd.Value.Date < semesterStart.Value.Date;
             if (calendarDatesPending) { status.Text = "学期结束日期应晚于或等于开始日期；请调整日期后自动保存。"; return; }
             ChangeSetting(delegate { app.Data.Settings.Calendar.SemesterStart = DateValue(semesterStart); app.Data.Settings.Calendar.SemesterEnd = DateValue(semesterEnd); app.Data.Settings.Calendar.TeachingWeekOne = DateValue(teachingWeekOne); });
+        }
+        // The restart button only shows while the chosen language differs from the one in use.
+        private void UpdateLanguageNote()
+        {
+            if (restartButton == null) return;
+            bool pending = app.Data.Settings.Language != Lang.Current;
+            restartButton.Visible = pending;
+            languageNote.Text = Lang.T(pending ? "重启后切换为所选语言 · The new language applies after a restart" : "切换语言后需要重启程序 · Restart DeskStudy to apply");
         }
         private void ChangeSetting(Action action) { if (!syncing) Run(delegate { action(); app.SettingsChanged(); }); }
         private void DeleteSeries()
@@ -510,6 +526,7 @@ namespace DeskStudy
                     overviewDetails[key].Text = (w.Visible ? "已显示" : "已隐藏") + " · " + w.Width + " × " + w.Height + (w.TopMost ? " · 始终置顶" : "") + (w.PositionLocked ? " · 位置已锁定" : "");
                     var editor = layoutEditors[key]; SetNumber(editor.X, w.X); SetNumber(editor.Y, w.Y); SetNumber(editor.Width, w.Width); SetNumber(editor.Height, w.Height); editor.Pin.Checked = w.TopMost; editor.Locked.Checked = w.PositionLocked;
                 }
+                SelectId(uiLanguage, app.Data.Settings.Language); UpdateLanguageNote();
                 SelectId(widgetMode, app.Data.Settings.WidgetMode); SelectId(widgetCorners, app.Data.Settings.WidgetCorners);
                 hotkeyBox.Text = app.Data.Settings.ShowHotkey == "" ? "已停用" : app.Data.Settings.ShowHotkey;
                 hotkeyStatus.Text = app.HotkeyStatus ?? "";

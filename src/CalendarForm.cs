@@ -203,12 +203,12 @@ namespace DeskStudy
             DateTime start = monthView ? WeekStart(new DateTime(focusDate.Year, focusDate.Month, 1)) : ViewStart();
             DateTime end = start.AddDays(monthView ? 41 : ViewDays - 1);
             occurrences = CalendarEngine.GetOccurrences(App.Data, start, end).ToList();
-            periodFull = monthView ? focusDate.ToString("yyyy 年 M 月") : start.ToString("M.d") + " – " + end.ToString("M.d") + "  ·  " + focusDate.Year;
+            periodFull = monthView ? Lang.MonthTitle(focusDate) : start.ToString("M.d") + " – " + end.ToString("M.d") + "  ·  " + focusDate.Year;
             periodShort = monthView ? periodFull : start.ToString("M.d") + " – " + end.ToString("M.d");
             FitPeriod();
             int teachingWeek = SettingsLogic.TeachingWeek(App.Data.Settings, focusDate);
             hint.Text = (teachingWeek > 0 ? "教学第 " + teachingWeek + " 周   ·   " : "") + "点击课程编辑；双击空白处添加";
-            refRange.Text = monthView ? focusDate.ToString("yyyy 年 M 月") : start.ToString("M.d") + " – " + end.ToString("M.d");
+            refRange.Text = monthView ? Lang.MonthTitle(focusDate) : start.ToString("M.d") + " – " + end.ToString("M.d");
             refMeta.Text = monthView ? (teachingWeek > 0 ? "教学第 " + teachingWeek + " 周" : "") : focusDate.Year + (teachingWeek > 0 ? " · 教学第 " + teachingWeek + " 周" : "");
             ArrangeReferenceBar();
             surface.SetData(start, focusDate, monthView, occurrences, ViewDays);
@@ -360,7 +360,6 @@ namespace DeskStudy
             Color foreground = AppearancePainter.Foreground(appearance);
             bool dark = AppearancePainter.Dark(AppearancePainter.Background(appearance));
             e.Graphics.Clear(AppearancePainter.Background(appearance));
-            string[] weekdays = { "周日", "周一", "周二", "周三", "周四", "周五", "周六" };
             int left = monthView ? 0 : surface.TimeGutter;
             int available = surface == null ? dayHeader.Width : surface.GridWidth;
             int count = monthView ? 7 : ViewDays;
@@ -372,7 +371,7 @@ namespace DeskStudy
                 Rectangle rect = new Rectangle(left + (int)(i * width), 1, (int)width, Math.Max(1, dayHeader.ClientSize.Height - 2));
                 bool today = !monthView && date.Date == DateTime.Today;
                 if (today) using (Brush b = new SolidBrush(dark ? Color.FromArgb(58, 83, 77) : Color.FromArgb(226, 237, 231))) e.Graphics.FillRectangle(b, rect);
-                string text = weekdays[(int)date.DayOfWeek] + (monthView ? "" : "\n" + date.ToString("M/d"));
+                string text = Lang.Weekday(date.DayOfWeek) + (monthView ? "" : "\n" + date.ToString("M/d"));
                 using (Font font = new Font("Microsoft YaHei UI", appearance.FontSize, today ? FontStyle.Bold : FontStyle.Regular))
                     TextRenderer.DrawText(e.Graphics, text, font, rect, foreground, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
             }
@@ -384,7 +383,6 @@ namespace DeskStudy
             CalendarPalette p = palette;
             graphics.Clear(p.Back);
             graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-            string[] weekdays = { "日", "一", "二", "三", "四", "五", "六" };
             int left = monthView ? 0 : surface.TimeGutter;
             int count = monthView ? 7 : ViewDays;
             float width = (surface.GridWidth - left) / (float)count;
@@ -396,7 +394,7 @@ namespace DeskStudy
             {
                 DateTime date = start.AddDays(i);
                 bool today = !monthView && date.Date == DateTime.Today;
-                string day = weekdays[(int)date.DayOfWeek], number = monthView ? "" : " " + date.Day;
+                string day = Lang.WeekdayShort(date.DayOfWeek), number = monthView ? "" : " " + date.Day;
                 Font font = today ? bold : regular;
                 Size daySize = TextRenderer.MeasureText(graphics, day, font, Size.Empty, flags), numberSize = TextRenderer.MeasureText(graphics, number, font, Size.Empty, flags);
                 int total = daySize.Width + numberSize.Width;
@@ -870,7 +868,7 @@ namespace DeskStudy
             using (Form dialog = new Form())
             {
                 dialog.SuspendLayout(); dialog.AutoScaleDimensions = new SizeF(96F, 96F); dialog.AutoScaleMode = AutoScaleMode.Dpi;
-                dialog.Text = date.ToString("M 月 d 日") + " · 全部日程"; dialog.Size = new Size(410, 420);
+                dialog.Text = Lang.MonthDay(date) + " · " + Lang.T("全部日程"); dialog.Size = new Size(410, 420);
                 dialog.StartPosition = FormStartPosition.CenterParent; dialog.MinimizeBox = false; dialog.MaximizeBox = false;
                 dialog.Font = new Font("Microsoft YaHei UI", 10F); dialog.BackColor = Color.FromArgb(250, 250, 247);
                 FlowLayoutPanel list = new FlowLayoutPanel(); list.Dock = DockStyle.Fill; list.FlowDirection = FlowDirection.TopDown; list.WrapContents = false; list.AutoScroll = true; list.Padding = new Padding(12);

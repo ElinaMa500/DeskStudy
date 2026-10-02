@@ -328,6 +328,14 @@ namespace DeskStudy
             // Widgets have no taskbar button in desktop mode, so one click on the tray icon brings them forward.
             tray.MouseClick += delegate(object sender, MouseEventArgs e) { if (e.Button == MouseButtons.Left) RaiseWidgets(); };
             tray.BalloonTipClicked += delegate { OpenReminders(); };
+            if (Store.IsNew)
+            {
+                // First start: the Windows display language, and notebook names to match.
+                Data.Settings.Language = Lang.SystemDefault();
+                if (Data.Settings.Language == Lang.English)
+                    foreach (var book in Data.Books) book.Name = book.Id == "ddl" ? "Deadlines" : "To-do";
+            }
+            Lang.Use(Data.Settings.Language);
             bool framesConverted = NormalizeWindowFrames();            Widgets.Add(new CalendarForm(this)); Widgets.Add(new NotebookForm(this, "todo")); Widgets.Add(new NotebookForm(this, "ddl"));
             // Apply physical saved bounds after each derived form has completed DPI scaling,
             // including forms that stay hidden and therefore do not raise Load yet.
@@ -504,6 +512,14 @@ namespace DeskStudy
             SetProcessDPIAware(); Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
             string directory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DeskStudy");
             for (int i = 0; i + 1 < args.Length; i++) if (args[i] == "--data-dir") directory = Path.GetFullPath(args[++i]);
+            // After "Restart now": wait until the previous instance has saved and gone before taking its place.
+            for (int i = 0; i + 1 < args.Length; i++)
+                if (args[i] == "--restart-after")
+                {
+                    int previous;
+                    if (Int32.TryParse(args[i + 1], out previous))
+                        try { using (var old = System.Diagnostics.Process.GetProcessById(previous)) old.WaitForExit(20000); } catch (ArgumentException) { }
+                }
             string hash; using (var sha = SHA256.Create()) hash = BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(directory.ToLowerInvariant()))).Replace("-", "").Substring(0, 20);
             bool created;
             using (var signal = new EventWaitHandle(false, EventResetMode.AutoReset, "Local\\DeskStudyShow" + hash))

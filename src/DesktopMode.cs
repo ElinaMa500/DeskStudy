@@ -74,6 +74,18 @@ namespace DeskStudy
             SettingsChanged();
         }
 
+        // Saves everything, starts a new copy of the program on the same data folder, and exits.
+        public void Restart() { RestartWith(Application.ExecutablePath); }
+        internal void RestartWith(string executable)
+        {
+            foreach (var w in Widgets) w.Remember();
+            if (!Flush()) return;
+            string arguments = "--data-dir \"" + Store.DirectoryPath.TrimEnd(System.IO.Path.DirectorySeparatorChar) + "\" --restart-after " + Process.GetCurrentProcess().Id.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            // Through the shell, so the new instance inherits nothing from this one.
+            Process.Start(new ProcessStartInfo(executable, arguments) { UseShellExecute = true });
+            Shutdown();
+        }
+
         // Only the real instance claims a system-wide shortcut; isolated test and preview runs never do.
         public void RegisterShowHotkey()
         {

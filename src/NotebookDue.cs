@@ -125,8 +125,7 @@ namespace DeskStudy
         }
         private static string DueLabel(DueChoice choice)
         {
-            string[] days = { "周日", "周一", "周二", "周三", "周四", "周五", "周六" };
-            return choice.Date.Month + "/" + choice.Date.Day + " " + days[(int)choice.Date.DayOfWeek] + (choice.DateOnly ? "" : " " + choice.Time.ToString(@"hh\:mm", CultureInfo.InvariantCulture));
+            return choice.Date.Month + "/" + choice.Date.Day + " " + Lang.Weekday(choice.Date.DayOfWeek) + (choice.DateOnly ? "" : " " + choice.Time.ToString(@"hh\:mm", CultureInfo.InvariantCulture));
         }
 
         // In the DDL book, Enter without a chosen deadline opens the picker; a second Enter adds the task without one.

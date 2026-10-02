@@ -137,9 +137,8 @@ namespace DeskStudy
                 TextRenderer.DrawText(g, Month.Year + " 年 " + Month.Month + " 月", bold, new Rectangle(0, 0, Width, header), Palette.Ink, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
             TextRenderer.DrawText(g, "‹", Font, new Rectangle(0, 0, header * 2, header), Palette.Sub, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
             TextRenderer.DrawText(g, "›", Font, new Rectangle(Width - header * 2, 0, header * 2, header), Palette.Sub, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
-            string[] names = { "日", "一", "二", "三", "四", "五", "六" };
             for (int i = 0; i < 7; i++)
-                TextRenderer.DrawText(g, names[(WeekStartDay + i) % 7], Font, new Rectangle(i * column, header, column, week), Palette.Faint, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+                TextRenderer.DrawText(g, Lang.WeekdayLetter((DayOfWeek)((WeekStartDay + i) % 7)), Font, new Rectangle(i * column, header, column, week), Palette.Faint, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
             DateTime first = First();
             for (int i = 0; i < 42; i++)
             {
@@ -355,8 +354,7 @@ namespace DeskStudy
             if (!choice.HasDue) { summary.Text = options.AllowClear ? "未选择日期" : "不设置截止时间"; summary.ForeColor = options.Palette.Sub; return; }
             DateTime moment = choice.DateOnly ? choice.Date.AddDays(1) : choice.Date.Add(choice.Time);
             bool passed = moment <= DateTime.Now;
-            string[] days = { "周日", "周一", "周二", "周三", "周四", "周五", "周六" };
-            string text = choice.Date.Month + "/" + choice.Date.Day + " " + days[(int)choice.Date.DayOfWeek] + (choice.DateOnly ? "" : " " + choice.Time.ToString(@"hh\:mm"));
+            string text = choice.Date.Month + "/" + choice.Date.Day + " " + Lang.Weekday(choice.Date.DayOfWeek) + (choice.DateOnly ? "" : " " + choice.Time.ToString(@"hh\:mm"));
             summary.Text = passed ? text + " · 这个时间已经过了" : text;
             summary.ForeColor = passed ? options.Palette.Warm : options.Palette.Ink;
         }

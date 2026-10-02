@@ -22,13 +22,15 @@ namespace DeskStudy
         public string WidgetMode { get; set; }
         // Desktop widgets: "Round" (default) or "Square" corners (1.5.1).
         public string WidgetCorners { get; set; }
+        // Interface language: "zh-CN" or "en" (1.5.1). Takes effect after a restart.
+        public string Language { get; set; }
         // Global shortcut that raises or lowers all widgets, e.g. "Ctrl+Alt+Shift+D". Empty disables it.
         public string ShowHotkey { get; set; }
         // Set when the file predates WidgetMode: its window bounds still include the system frame.
         [System.Web.Script.Serialization.ScriptIgnore] public bool FramedWindowBounds { get; set; }
         public AppSettings()
         {
-            WidgetMode = "Desktop"; ShowHotkey = HotkeySpec.Default; WidgetCorners = "Round";
+            WidgetMode = "Desktop"; ShowHotkey = HotkeySpec.Default; WidgetCorners = "Round"; Language = "zh-CN";
             NotebookLayout = "Card";
             GlobalAppearance = new AppearanceOptions();
             AppearanceOverrides = new Dictionary<string, AppearanceOptions>();
@@ -120,6 +122,7 @@ namespace DeskStudy
     {
         public static readonly string[] WidgetModes = { "Desktop", "Standard" };
         public static readonly string[] WidgetCornerStyles = { "Round", "Square" };
+        public static readonly string[] Languages = { "zh-CN", "en" };
         // Turns bounds saved with a system frame into the same content area without one, and back.
         public static void ShiftFrame(WindowState window, int left, int top, int right, int bottom, bool removeFrame)
         {
@@ -203,6 +206,7 @@ namespace DeskStudy
             Require(NotebookLayouts.Contains(settings.NotebookLayout), "便签布局无效。");
             Require(WidgetModes.Contains(settings.WidgetMode), "窗口模式无效。");
             Require(WidgetCornerStyles.Contains(settings.WidgetCorners), "组件四角样式无效。");
+            Require(Languages.Contains(settings.Language), "界面语言无效。");
             HotkeySpec hotkey; Require(settings.ShowHotkey == "" || HotkeySpec.TryParse(settings.ShowHotkey, out hotkey), "快捷键无效。");
             Require(settings.AppearanceOverrides != null && settings.AppearanceOverrides.Count <= 3, "组件外观设置无效。");
             foreach (KeyValuePair<string, AppearanceOptions> pair in settings.AppearanceOverrides)
