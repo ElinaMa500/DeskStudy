@@ -51,13 +51,13 @@ namespace DeskStudy
         // While the mouse is held the widget follows it freely; snapping and bouncing happen only on release.
         private void PlacementWndProc(ref Message m)
         {
-            if (m.Msg == 0x0231) { StopSlide(); sizingEdge = 0; }
+            if (m.Msg == 0x0231) { StopSlide(); sizingEdge = 0; SetShadow(true); }
             else if (m.Msg == 0x0214) sizingEdge = m.WParam.ToInt32();
         }
         private void AfterPlacementWndProc(ref Message m)
         {
             // The drag or resize is over: snap, settle on screen and off other widgets.
-            if (m.Msg == 0x0232 && !IsDisposed) { int edge = sizingEdge; sizingEdge = 0; App.SettleAfterDrag(this, edge); }
+            if (m.Msg == 0x0232 && !IsDisposed) { SetShadow(false); int edge = sizingEdge; sizingEdge = 0; App.SettleAfterDrag(this, edge); }
         }
 
         // Moves the widget so its visible area becomes the target, gliding there unless animations are off.

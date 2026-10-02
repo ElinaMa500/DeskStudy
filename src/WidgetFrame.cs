@@ -48,7 +48,9 @@ namespace DeskStudy
             closeButton = Ui.Button("✕", delegate { Hide(); });
             closeButton.Name = "close-widget"; closeButton.AccessibleName = "隐藏这个组件"; closeButton.AutoSize = false; closeButton.Visible = false;
             closeButton.FlatStyle = FlatStyle.Flat; closeButton.FlatAppearance.BorderSize = 0; closeButton.Margin = Padding.Empty; closeButton.TabStop = false;
-            headerActions.Controls.Add(closeButton);
+            // A small ✕ tucked into the top-right corner, apart from the other buttons so it is not hit by mistake.
+            header.Controls.Add(closeButton);
+            header.Resize += delegate { PlaceCloseButton(); };
             hoverTimer = new Timer { Interval = 150 };
             hoverTimer.Tick += delegate { UpdateCloseHover(); };
         }
@@ -59,6 +61,27 @@ namespace DeskStudy
             Color wanted = Visible && Bounds.Contains(Cursor.Position) ? closeHot : closeRest;
             if (closeButton.ForeColor != wanted) closeButton.ForeColor = wanted;
         }
+        // The system drop shadow only shows while the widget is being dragged or resized (1.5.1).
+        private bool shadowOn;
+        private void SetShadow(bool on)
+        {
+            if (!desktopMode || !IsHandleCreated || IsDisposed) return;
+            shadowOn = on;
+            // Windows 11 draws the shadow together with the rounded corners, so the corners are only rounded while dragging.
+            try { int corner = on ? 2 : 1; DwmSetWindowAttribute(Handle, 33, ref corner, sizeof(int)); }
+            catch (DllNotFoundException) { }
+            catch (EntryPointNotFoundException) { }
+        }
+        private Font closeFont;
+        // Just inside the top-right corner, outside the band used for resizing from the edges.
+        private void PlaceCloseButton()
+        {
+            if (closeButton == null || !closeShown) return;
+            float dpi; using (Graphics g = CreateGraphics()) dpi = g.DpiX / 96F;
+            int inset = (int)Math.Round(7 * dpi);
+            closeButton.Location = new Point(header.ClientSize.Width - closeButton.Width - inset, inset);
+            closeButton.BringToFront();
+        }
         private void StyleCloseButton(bool show, Color back, Color muted, Color soft, float dpi)
         {
             closeShown = show && desktopMode;
@@ -66,7 +89,14 @@ namespace DeskStudy
             if (!closeShown) return;
             closeRest = back; closeHot = muted;
             closeButton.BackColor = back; closeButton.FlatAppearance.BorderSize = 0; closeButton.FlatAppearance.BorderColor = back; closeButton.FlatAppearance.MouseOverBackColor = soft;
-            closeButton.Size = new Size((int)Math.Round(28 * dpi), settingsButton.Height);
+            float size = (float)Math.Round(7.5F * SettingsLogic.EffectiveAppearance(App.Data, WidgetKey).FontSize / 9F, 2);
+            if (closeFont == null || Math.Abs(closeFont.SizeInPoints - size) > .01F) { Font old = closeFont; closeFont = new Font("Microsoft YaHei UI", size); if (old != null) old.Dispose(); }
+            closeButton.Font = closeFont; closeButton.Padding = Padding.Empty; closeButton.MinimumSize = Size.Empty;
+            int side = (int)Math.Round(18 * dpi);
+            closeButton.Size = new Size(side, side);
+            // Keep the header's own buttons clear of the corner.
+            header.Padding = new Padding(header.Padding.Left, header.Padding.Top, header.Padding.Right + side + (int)Math.Round(6 * dpi), header.Padding.Bottom);
+            PlaceCloseButton();
             UpdateCloseHover();
         }
 
@@ -90,9 +120,7 @@ namespace DeskStudy
         {
             base.OnHandleCreated(e);
             if (!desktopMode) return;
-            try { int round = 2; DwmSetWindowAttribute(Handle, 33, ref round, sizeof(int)); }
-            catch (DllNotFoundException) { }
-            catch (EntryPointNotFoundException) { }
+            SetShadow(false);
             // Re-evaluate the frame so the title bar is removed immediately.
             SetWindowPos(Handle, IntPtr.Zero, 0, 0, 0, 0, NoSize | NoMove | NoZOrder | NoActivate | FrameChanged);
         }
@@ -127,6 +155,7 @@ namespace DeskStudy
             // The whole window is client area: no title bar. The thick frame style stays so Windows keeps the shadow and rounded corners.
             if (m.Msg == 0x0083) { m.Result = IntPtr.Zero; return true; }
             if (m.Msg == 0x0084) { m.Result = new IntPtr(EdgeHit(ScreenPoint(m.LParam))); return true; }
+
             return false;
         }
         private void AfterFrameWndProc(ref Message m)

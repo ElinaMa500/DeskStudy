@@ -158,7 +158,6 @@ namespace DeskStudy
         {
             int width = (pin.AutoSize ? pin.PreferredSize.Width : pin.Width) + pin.Margin.Horizontal + settingsButton.Width + settingsButton.Margin.Horizontal + collapseButton.Width + collapseButton.Margin.Horizontal + 4;
             if (hideButton.Visible || !referenceHeader) width += hideButton.Width + hideButton.Margin.Horizontal;
-            if (closeShown) width += closeButton.Width + closeButton.Margin.Horizontal;
             headerActions.Width = width;
         }
         // Reference-style header (清爽卡片 / 手账纸页): colored dot, book label, a 置顶 toggle and a small ⚙.
@@ -254,6 +253,7 @@ namespace DeskStudy
                 appearanceBaselines.Clear();
                 if (notebookHeadingFont != null) { notebookHeadingFont.Dispose(); notebookHeadingFont = null; }
                 if (hoverTimer != null) { hoverTimer.Dispose(); hoverTimer = null; }
+                if (closeFont != null) { closeFont.Dispose(); closeFont = null; }
                 if (slideTimer != null) { slideTimer.Dispose(); slideTimer = null; }
                 if (slimFont != null) { slimFont.Dispose(); slimFont = null; }
             }

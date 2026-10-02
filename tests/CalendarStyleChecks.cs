@@ -74,6 +74,15 @@ public static class CalendarStyleChecks
             Assert(c.Top >= 0 && c.Bottom <= c.Parent.ClientSize.Height && (name == "calendar-previous" || Inside(c)), "清爽: " + name + " is not cut off (" + c.Bounds + " in " + c.Parent.ClientSize + ")");
         }
 
+        foreach (var w in app.Widgets)
+        {
+            // The ✕ is small, in the top-right corner and set apart from the other header buttons.
+            var close = Find<Button>(w, "close-widget"); var fold = Find<Button>(w, "collapse-widget");
+            Rectangle closeOnScreen = close.RectangleToScreen(close.ClientRectangle), foldOnScreen = fold.RectangleToScreen(fold.ClientRectangle);
+            Rectangle visual = w.VisualBounds;
+            Assert(close.Width < fold.Width && visual.Right - closeOnScreen.Right <= 14 && closeOnScreen.Top - visual.Top <= 14 && closeOnScreen.Left - foldOnScreen.Right >= 8, w.WidgetKey + ": the ✕ is small and alone in the top-right corner (" + closeOnScreen + ", fold " + foldOnScreen + ")");
+        }
+
         // 工作周: five columns from Monday, remembered; 周 and 月 switch back.
         var range = Find<Label>(calendar, "calendar-range");
         ((Button)Find<Control>(calendar, "calendar-workweek")).PerformClick(); Pump(150);
