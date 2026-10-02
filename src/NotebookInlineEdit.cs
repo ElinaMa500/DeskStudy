@@ -29,7 +29,7 @@ namespace DeskStudy
             var box = new CompositionTextBox
             {
                 Name = "task-inline-editor", Multiline = true, WordWrap = true, AcceptsReturn = true, ScrollBars = ScrollBars.None,
-                BorderStyle = BorderStyle.None, MaxLength = 2000, Tag = "appearance-custom-font", AccessibleName = "编辑任务内容，回车保存，Shift+回车换行，Esc 取消"
+                BorderStyle = BorderStyle.None, MaxLength = 2000, Tag = "appearance-custom-font", AccessibleName = Lang.T("编辑任务内容，回车保存，Shift+回车换行，Esc 取消")
             };
             box.Font = _taskFont;
             box.ForeColor = AppearancePainter.Foreground(SettingsLogic.EffectiveAppearance(App.Data, _bookId));

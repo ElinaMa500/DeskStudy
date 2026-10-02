@@ -17,8 +17,8 @@ namespace DeskStudy
 
         private void InitializeDue()
         {
-            _quickDue = SmallButton("+ 截止时间", null);
-            _quickDue.Name = "quick-due"; _quickDue.AccessibleName = "为新任务设置截止时间"; _quickDue.Dock = DockStyle.None; _quickDue.Visible = false;
+            _quickDue = SmallButton(Lang.T("+ 截止时间"), null);
+            _quickDue.Name = "quick-due"; _quickDue.AccessibleName = Lang.T("为新任务设置截止时间"); _quickDue.Dock = DockStyle.None; _quickDue.Visible = false;
             _quickDue.FlatStyle = FlatStyle.Flat; _quickDue.FlatAppearance.BorderSize = 0;
             _quickDue.Click += delegate
             {
@@ -100,7 +100,7 @@ namespace DeskStudy
         private void UpdateQuickDue()
         {
             if (_quickDue == null) return;
-            _quickDue.Text = _pendingDue == null ? "+ 截止时间" : DueLabel(_pendingDue) + "  ×";
+            _quickDue.Text = _pendingDue == null ? Lang.T("+ 截止时间") : DueLabel(_pendingDue) + "  ×";
             StyleQuickDue();
             if (IsModern && _contentReady) LayoutTaskCards();
         }
@@ -145,7 +145,7 @@ namespace DeskStudy
             var task = new TaskItem { Text = _quickText.Text.Trim(), ReminderMinutes = App.Data.Settings.Reminders.DefaultLeadMinutes };
             if (choice != null && choice.HasDue) SetDue(task, choice);
             page.Tasks.Add(task);
-            _pendingDue = null; _quickDue.Text = "+ 截止时间";
+            _pendingDue = null; _quickDue.Text = Lang.T("+ 截止时间");
             _quickText.Clear(); Persist(); RefreshFromData(); _quickText.Focus(); _tasks.ScrollControlIntoView(_quickEntry);
         }
 
@@ -166,7 +166,7 @@ namespace DeskStudy
         private void WireDueRow(TaskRow row)
         {
             bool hot = false;
-            row.Status.Cursor = Cursors.Hand; row.Status.AccessibleName = "设置截止时间";
+            row.Status.Cursor = Cursors.Hand; row.Status.AccessibleName = Lang.T("设置截止时间");
             row.Status.Click += delegate { OpenTaskDue(row, row.Status); };
             row.Status.MouseEnter += delegate { hot = true; if (!row.Status.IsDisposed) row.Status.Invalidate(); };
             row.Status.MouseLeave += delegate { hot = false; if (!row.Status.IsDisposed) row.Status.Invalidate(); };
@@ -177,7 +177,7 @@ namespace DeskStudy
                 int width = Math.Min(row.Status.Width - 1, TextRenderer.MeasureText(first, row.Status.Font, Size.Empty, TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix).Width);
                 using (var pen = new Pen(row.Status.ForeColor)) e.Graphics.DrawLine(pen, 3, row.Status.Font.Height, width, row.Status.Font.Height);
             };
-            row.AddDue = new Label { Text = "+ 截止时间", AutoSize = false, Visible = false, Cursor = Cursors.Hand, TextAlign = ContentAlignment.MiddleRight, UseMnemonic = false, AccessibleName = "为这项任务设置截止时间" };
+            row.AddDue = new Label { Text = Lang.T("+ 截止时间"), AutoSize = false, Visible = false, Cursor = Cursors.Hand, TextAlign = ContentAlignment.MiddleRight, UseMnemonic = false, AccessibleName = Lang.T("为这项任务设置截止时间") };
             row.AddDue.Name = "add-due-" + row.Task.Id;
             row.AddDue.Click += delegate { OpenTaskDue(row, row.AddDue); };
             row.Card.Controls.Add(row.AddDue);
@@ -192,6 +192,6 @@ namespace DeskStudy
             return IsModern && String.IsNullOrEmpty(row.Task.DueLocal) && !row.Status.Visible;
         }
 
-        private string DayReminderText { get { return "当天 " + App.Data.Settings.Reminders.DateOnlyReminderTime + " 提醒"; } }
+        private string DayReminderText { get { return Lang.T("当天 {0} 提醒", App.Data.Settings.Reminders.DateOnlyReminderTime); } }
     }
 }

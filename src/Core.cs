@@ -56,7 +56,7 @@ namespace DeskStudy
         public Notebook()
         {
             LastDueDate = ""; LastDueTime = "";
-            Id = Guid.NewGuid().ToString("N"); Name = "便签";
+            Id = Guid.NewGuid().ToString("N"); Name = Lang.T("便签");
             Pages = new List<NotePage> { new NotePage() };
             CurrentPageId = Pages[0].Id;
         }
@@ -71,7 +71,7 @@ namespace DeskStudy
         public bool Archived { get; set; }
         public NotePage()
         {
-            Id = Guid.NewGuid().ToString("N"); Title = "新的一页";
+            Id = Guid.NewGuid().ToString("N"); Title = Lang.T("新的一页");
             CreatedUtc = DateTime.UtcNow.ToString("o"); Text = ""; Tasks = new List<TaskItem>();
         }
     }
@@ -114,7 +114,7 @@ namespace DeskStudy
         public List<EventOverride> Overrides { get; set; }
         public CalendarEvent()
         {
-            Id = Guid.NewGuid().ToString("N"); Title = "新日程";
+            Id = Guid.NewGuid().ToString("N"); Title = Lang.T("新日程");
             Date = DateTime.Today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture); StartTime = "09:00"; EndTime = "10:00";
             Location = ""; Notes = ""; Color = "#6A85B6"; TimeZoneId = TimeZoneInfo.Local.Id;
             RepeatEndDate = ""; RecurrenceAnchorDate = ""; WeekDays = new List<int>(); ExcludedDates = new List<string>();
@@ -184,7 +184,7 @@ namespace DeskStudy
             // the first valid minute; a repeated autumn time chooses the later UTC instant.
             int attempts = 0;
             while (tz.IsInvalidTime(wall) && attempts++ < 180) wall = wall.AddMinutes(1);
-            if (tz.IsInvalidTime(wall)) throw new ArgumentException("此时区的时间无法转换。");
+            if (tz.IsInvalidTime(wall)) throw new ArgumentException(Lang.T("此时区的时间无法转换。"));
             if (tz.IsAmbiguousTime(wall))
             {
                 TimeSpan offset = tz.GetAmbiguousTimeOffsets(wall).Min();
@@ -200,7 +200,7 @@ namespace DeskStudy
         {
             from = from.Date; to = to.Date;
             if (to < from) return new List<Occurrence>();
-            if ((to - from).TotalDays > 36600) throw new ArgumentException("查询日期范围过大。");
+            if ((to - from).TotalDays > 36600) throw new ArgumentException(Lang.T("查询日期范围过大。"));
             List<Occurrence> result = new List<Occurrence>();
             foreach (CalendarEvent e in data.Events)
             {
@@ -240,13 +240,13 @@ namespace DeskStudy
         }
         public static void CancelOccurrence(CalendarEvent e, string originalDate)
         {
-            if (!IsScheduled(e, TimeUtil.ParseDate(originalDate))) throw new ArgumentException("所选日期不属于此日程系列。");
+            if (!IsScheduled(e, TimeUtil.ParseDate(originalDate))) throw new ArgumentException(Lang.T("所选日期不属于此日程系列。"));
             if (!e.ExcludedDates.Contains(originalDate)) e.ExcludedDates.Add(originalDate);
             e.Overrides.RemoveAll(o => o.OriginalDate == originalDate);
         }
         public static void UpdateOccurrence(CalendarEvent e, EventOverride value)
         {
-            if (value == null || !IsScheduled(e, TimeUtil.ParseDate(value.OriginalDate))) throw new ArgumentException("所选日期不属于此日程系列。");
+            if (value == null || !IsScheduled(e, TimeUtil.ParseDate(value.OriginalDate))) throw new ArgumentException(Lang.T("所选日期不属于此日程系列。"));
             Validation.CheckOverride(value);
             e.ExcludedDates.Remove(value.OriginalDate);
             e.Overrides.RemoveAll(o => o.OriginalDate == value.OriginalDate);
@@ -376,12 +376,12 @@ namespace DeskStudy
                 try
                 {
                     Data = Read(BackupPath);
-                    LoadWarning = "主数据文件无法读取，已从上一份备份恢复。原文件已保留：" + recovery + "。原因：" + ex.Message;
+                    LoadWarning = Lang.T("主数据文件无法读取，已从上一份备份恢复。原文件已保留：{0}。原因：{1}", recovery, ex.Message);
                 }
                 catch
                 {
                     Data = new AppData();
-                    LoadWarning = "无法读取原数据，已保留损坏文件：" + recovery + "。当前显示空白数据。原因：" + ex.Message;
+                    LoadWarning = Lang.T("无法读取原数据，已保留损坏文件：{0}。当前显示空白数据。原因：{1}", recovery, ex.Message);
                 }
                 // Repair the primary without rotating the damaged file into the good backup.
                 WriteAtomic(DataPath, SerializeData(Data), null);
@@ -390,7 +390,7 @@ namespace DeskStudy
             {
                 string migration = UniqueBackupPath(migrationPrefix);
                 File.Copy(DataPath, migration, false);
-                LoadWarning = "数据已兼容新版设置。更新前的原始数据已保留：" + migration;
+                LoadWarning = Lang.T("数据已兼容新版设置。更新前的原始数据已保留：{0}", migration);
             }
         }
         private static JavaScriptSerializer Serializer()
@@ -406,16 +406,16 @@ namespace DeskStudy
         {
             legacy = "";
             FileInfo info = new FileInfo(path);
-            if (!info.Exists) throw new FileNotFoundException("找不到数据文件。", path);
-            if (info.Length > MaxBytes) throw new InvalidDataException("数据文件超过 32 MB 限制。");
+            if (!info.Exists) throw new FileNotFoundException(Lang.T("找不到数据文件。"), path);
+            if (info.Length > MaxBytes) throw new InvalidDataException(Lang.T("数据文件超过 32 MB 限制。"));
             string json = File.ReadAllText(path, Encoding.UTF8);
             JavaScriptSerializer serializer = Serializer();
             Dictionary<string, object> root = serializer.DeserializeObject(json) as Dictionary<string, object>;
             if (root == null || !(root.ContainsKey("Version") && root["Version"] is int) ||
                 !new[] { "Events", "Books", "Windows", "ReminderHistory", "LastCheckUtc" }.All(root.ContainsKey))
-                throw new InvalidDataException("这不是完整的 DeskStudy 备份文件（缺少版本或必要数据字段）。");
+                throw new InvalidDataException(Lang.T("这不是完整的 DeskStudy 备份文件（缺少版本或必要数据字段）。"));
             int version = (int)root["Version"];
-            if (version < 1 || version > 3) throw new NotSupportedException("不支持此数据版本，请使用兼容的应用版本。原数据保持不变。");
+            if (version < 1 || version > 3) throw new NotSupportedException(Lang.T("不支持此数据版本，请使用兼容的应用版本。原数据保持不变。"));
             CheckShape(root, version);
             AppData data = serializer.Deserialize<AppData>(json);
             data.Version = 2;
@@ -441,13 +441,13 @@ namespace DeskStudy
         private static Dictionary<string, object> ShapeObject(object value, string keys)
         {
             Dictionary<string, object> map = value as Dictionary<string, object>;
-            if (map == null || !keys.Split(',').All(map.ContainsKey)) throw new InvalidDataException("备份中的记录缺少必要字段，未导入。");
+            if (map == null || !keys.Split(',').All(map.ContainsKey)) throw new InvalidDataException(Lang.T("备份中的记录缺少必要字段，未导入。"));
             return map;
         }
         private static System.Collections.IList ShapeList(object value)
         {
             System.Collections.IList list = value as System.Collections.IList;
-            if (list == null) throw new InvalidDataException("备份中的列表格式无效，未导入。");
+            if (list == null) throw new InvalidDataException(Lang.T("备份中的列表格式无效，未导入。"));
             return list;
         }
         private static void CheckShape(Dictionary<string, object> root, int version)
@@ -473,16 +473,16 @@ namespace DeskStudy
             foreach (object record in ShapeList(root["ReminderHistory"])) ShapeObject(record, "Id,TaskId,Title,BookName,PageTitle,DueLocal,FiredUtc,Kind,CatchUp");
             if (version >= 2)
             {
-                if (!root.ContainsKey("Settings")) throw new InvalidDataException("版本 " + version + " 备份缺少设置，未导入。");
+                if (!root.ContainsKey("Settings")) throw new InvalidDataException(Lang.T("版本 {0} 备份缺少设置，未导入。", version));
                 Dictionary<string, object> settings = ShapeObject(root["Settings"], "GlobalAppearance,AppearanceOverrides,Calendar,Reminders,AutoSaveDelayMs,LaunchAtStartup,LastBackupUtc,SavedLayout,SavedLayoutUtc");
                 ShapeObject(settings["GlobalAppearance"], "Theme,BackgroundColor,Opacity,FontSize");
                 Dictionary<string, object> appearances = settings["AppearanceOverrides"] as Dictionary<string, object>;
-                if (appearances == null) throw new InvalidDataException("组件外观数据无效。");
+                if (appearances == null) throw new InvalidDataException(Lang.T("组件外观数据无效。"));
                 foreach (object appearance in appearances.Values) ShapeObject(appearance, "Theme,BackgroundColor,Opacity,FontSize");
                 ShapeObject(settings["Calendar"], "DefaultView,WeekStartDay,SemesterStart,SemesterEnd,TeachingWeekOne");
                 ShapeObject(settings["Reminders"], "DefaultLeadMinutes,QuietHoursEnabled,QuietStart,QuietEnd,SoundEnabled");
                 Dictionary<string, object> layout = settings["SavedLayout"] as Dictionary<string, object>;
-                if (layout == null) throw new InvalidDataException("保存的布局数据无效。");
+                if (layout == null) throw new InvalidDataException(Lang.T("保存的布局数据无效。"));
                 foreach (object window in layout.Values) ShapeObject(window, "X,Y,Width,Height,TopMost,Visible,PositionLocked");
             }
         }
@@ -527,7 +527,7 @@ namespace DeskStudy
             Validation.Check(Data);
             string full = Path.GetFullPath(path);
             if (String.Equals(full, DataPath, StringComparison.OrdinalIgnoreCase) || String.Equals(full, BackupPath, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException("请选择数据目录以外的备份文件名。");
+                throw new InvalidOperationException(Lang.T("请选择数据目录以外的备份文件名。"));
             WriteAtomic(full, SerializeData(Data), null);
             Data.Settings.LastBackupUtc = DateTime.UtcNow.ToString("o");
             // Export can be a rescue when normal saving is unavailable. The external
@@ -539,7 +539,7 @@ namespace DeskStudy
         private static void WriteAtomic(string path, string json, string backup)
         {
             byte[] bytes = new UTF8Encoding(false).GetBytes(json);
-            if (bytes.Length > MaxBytes) throw new InvalidDataException("数据超过 32 MB 限制。");
+            if (bytes.Length > MaxBytes) throw new InvalidDataException(Lang.T("数据超过 32 MB 限制。"));
             string temp = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
             try
             {
@@ -557,95 +557,95 @@ namespace DeskStudy
         private static void Require(bool condition, string message) { if (!condition) throw new InvalidDataException(message); }
         private static void Text(string value, int max, string label, bool nonempty)
         {
-            Require(value != null && value.Length <= max && (!nonempty || !String.IsNullOrWhiteSpace(value)), label + "为空或过长。");
+            Require(value != null && value.Length <= max && (!nonempty || !String.IsNullOrWhiteSpace(value)), Lang.T("{0}为空或过长。", Lang.T(label)));
         }
         private static void Date(string value) { TimeUtil.ParseDate(value); }
         private static void Zone(string value)
         {
-            Text(value, 200, "时区", true); TimeZoneInfo.FindSystemTimeZoneById(value);
+            Text(value, 200, Lang.T("时区"), true); TimeZoneInfo.FindSystemTimeZoneById(value);
         }
         private static void Times(string start, string end)
         {
             DateTime a = DateTime.ParseExact(start, "HH:mm", CultureInfo.InvariantCulture);
             DateTime b = DateTime.ParseExact(end, "HH:mm", CultureInfo.InvariantCulture);
-            Require(b > a, "结束时间必须晚于开始时间（单次日程不跨午夜）。");
+            Require(b > a, Lang.T("结束时间必须晚于开始时间（单次日程不跨午夜）。"));
         }
         private static void Color(string value)
         {
-            Require(value != null && value.Length == 7 && value[0] == '#' && value.Skip(1).All(c => Uri.IsHexDigit(c)), "颜色应为 #RRGGBB。");
+            Require(value != null && value.Length == 7 && value[0] == '#' && value.Skip(1).All(c => Uri.IsHexDigit(c)), Lang.T("颜色应为 #RRGGBB。"));
         }
         public static void CheckOverride(EventOverride o)
         {
-            Require(o != null, "日程例外不能为空。"); Date(o.OriginalDate); Date(o.Date); Times(o.StartTime, o.EndTime);
-            Text(o.Title, 1000, "日程名称", true); Text(o.Location, 4000, "地点", false); Text(o.Notes, 100000, "备注", false); Color(o.Color);
+            Require(o != null, Lang.T("日程例外不能为空。")); Date(o.OriginalDate); Date(o.Date); Times(o.StartTime, o.EndTime);
+            Text(o.Title, 1000, Lang.T("日程名称"), true); Text(o.Location, 4000, Lang.T("地点"), false); Text(o.Notes, 100000, Lang.T("备注"), false); Color(o.Color);
         }
         public static void Check(AppData data)
         {
-            Require(data != null, "无效的数据文件。"); Require(data.Version == 2, "不支持此数据版本，请使用兼容的应用版本。");
+            Require(data != null, Lang.T("无效的数据文件。")); Require(data.Version == 2, Lang.T("不支持此数据版本，请使用兼容的应用版本。"));
             SettingsLogic.Check(data.Settings);
-            Require(data.Events != null && data.Events.Count <= 20000, "日程列表无效或数量过多。");
-            Require(data.Books != null && data.Books.Count == 2 && data.Books.All(b => b != null) && data.Books.Any(b => b.Id == "todo") && data.Books.Any(b => b.Id == "ddl"), "数据必须包含 Todo 和 DDL 两本便签。");
-            Require(data.Windows != null && data.Windows.Count <= 20, "窗口信息无效。");
-            foreach (string key in new[] { "calendar", "todo", "ddl" }) Require(data.Windows.ContainsKey(key), "缺少窗口信息：" + key);
+            Require(data.Events != null && data.Events.Count <= 20000, Lang.T("日程列表无效或数量过多。"));
+            Require(data.Books != null && data.Books.Count == 2 && data.Books.All(b => b != null) && data.Books.Any(b => b.Id == "todo") && data.Books.Any(b => b.Id == "ddl"), Lang.T("数据必须包含 Todo 和 DDL 两本便签。"));
+            Require(data.Windows != null && data.Windows.Count <= 20, Lang.T("窗口信息无效。"));
+            foreach (string key in new[] { "calendar", "todo", "ddl" }) Require(data.Windows.ContainsKey(key), Lang.T("缺少窗口信息：{0}", key));
             foreach (WindowState window in data.Windows.Values)
-                Require(window != null && window.Width >= 120 && window.Width <= 16000 && window.Height >= 100 && window.Height <= 16000 && Math.Abs((long)window.X) <= 100000 && Math.Abs((long)window.Y) <= 100000, "窗口尺寸或位置无效。");
+                Require(window != null && window.Width >= 120 && window.Width <= 16000 && window.Height >= 100 && window.Height <= 16000 && Math.Abs((long)window.X) <= 100000 && Math.Abs((long)window.Y) <= 100000, Lang.T("窗口尺寸或位置无效。"));
             HashSet<string> ids = new HashSet<string>(StringComparer.Ordinal);
             foreach (CalendarEvent e in data.Events)
             {
-                Require(e != null, "日程不能为空。"); Id(e.Id, ids); Text(e.Title, 1000, "日程名称", true); Date(e.Date); Times(e.StartTime, e.EndTime);
-                Text(e.Location, 4000, "地点", false); Text(e.Notes, 100000, "备注", false); Color(e.Color); Zone(e.TimeZoneId);
-                Require(e.RepeatWeeks == 0 || e.RepeatWeeks == 1 || e.RepeatWeeks == 2, "循环周期无效。");
-                Text(e.RecurrenceAnchorDate, 10, "循环教学周起点", false);
+                Require(e != null, Lang.T("日程不能为空。")); Id(e.Id, ids); Text(e.Title, 1000, Lang.T("日程名称"), true); Date(e.Date); Times(e.StartTime, e.EndTime);
+                Text(e.Location, 4000, Lang.T("地点"), false); Text(e.Notes, 100000, Lang.T("备注"), false); Color(e.Color); Zone(e.TimeZoneId);
+                Require(e.RepeatWeeks == 0 || e.RepeatWeeks == 1 || e.RepeatWeeks == 2, Lang.T("循环周期无效。"));
+                Text(e.RecurrenceAnchorDate, 10, Lang.T("循环教学周起点"), false);
                 if (e.RecurrenceAnchorDate.Length > 0) Date(e.RecurrenceAnchorDate);
-                Require(e.WeekDays != null && e.WeekDays.Count <= 7 && e.WeekDays.All(d => d >= 0 && d <= 6) && e.WeekDays.Distinct().Count() == e.WeekDays.Count, "循环星期设置无效。");
+                Require(e.WeekDays != null && e.WeekDays.Count <= 7 && e.WeekDays.All(d => d >= 0 && d <= 6) && e.WeekDays.Distinct().Count() == e.WeekDays.Count, Lang.T("循环星期设置无效。"));
                 if (e.RepeatWeeks > 0)
                 {
                     Date(e.RepeatEndDate);
-                    Require(TimeUtil.ParseDate(e.RepeatEndDate) >= TimeUtil.ParseDate(e.Date), "循环结束日期早于开始日期。");
-                    Require((TimeUtil.ParseDate(e.RepeatEndDate) - TimeUtil.ParseDate(e.Date)).TotalDays <= 36600, "循环跨度不能超过 100 年。");
+                    Require(TimeUtil.ParseDate(e.RepeatEndDate) >= TimeUtil.ParseDate(e.Date), Lang.T("循环结束日期早于开始日期。"));
+                    Require((TimeUtil.ParseDate(e.RepeatEndDate) - TimeUtil.ParseDate(e.Date)).TotalDays <= 36600, Lang.T("循环跨度不能超过 100 年。"));
                 }
-                Require(e.ExcludedDates != null && e.ExcludedDates.Count <= 40000 && e.ExcludedDates.Distinct().Count() == e.ExcludedDates.Count, "取消记录无效。");
+                Require(e.ExcludedDates != null && e.ExcludedDates.Count <= 40000 && e.ExcludedDates.Distinct().Count() == e.ExcludedDates.Count, Lang.T("取消记录无效。"));
                 foreach (string value in e.ExcludedDates) Date(value);
-                Require(e.Overrides != null && e.Overrides.Count <= 40000, "日程例外列表无效。");
+                Require(e.Overrides != null && e.Overrides.Count <= 40000, Lang.T("日程例外列表无效。"));
                 HashSet<string> overrides = new HashSet<string>();
-                foreach (EventOverride o in e.Overrides) { CheckOverride(o); Require(overrides.Add(o.OriginalDate), "同一次日程有重复例外。"); }
+                foreach (EventOverride o in e.Overrides) { CheckOverride(o); Require(overrides.Add(o.OriginalDate), Lang.T("同一次日程有重复例外。")); }
             }
             int totalTasks = 0;
             foreach (Notebook book in data.Books)
             {
-                Text(book.Name, 200, "便签名称", true); Require(book.Pages != null && book.Pages.Count > 0 && book.Pages.Count <= 20000, "便签页面列表无效。");
-                Require(book.Pages.Any(p => p != null && p.Id == book.CurrentPageId), "当前便签页不存在。");
+                Text(book.Name, 200, Lang.T("便签名称"), true); Require(book.Pages != null && book.Pages.Count > 0 && book.Pages.Count <= 20000, Lang.T("便签页面列表无效。"));
+                Require(book.Pages.Any(p => p != null && p.Id == book.CurrentPageId), Lang.T("当前便签页不存在。"));
                 if (!String.IsNullOrEmpty(book.LastDueDate)) Date(book.LastDueDate);
                 if (!String.IsNullOrEmpty(book.LastDueTime)) DateTime.ParseExact(book.LastDueTime, "HH:mm", CultureInfo.InvariantCulture);
                 foreach (NotePage page in book.Pages)
                 {
-                    Require(page != null, "页面不能为空。"); Id(page.Id, ids); Text(page.Title, 1000, "页面标题", false); Text(page.Text, 1000000, "页面内容", false); Utc(page.CreatedUtc, false);
-                    Require(page.Tasks != null && page.Tasks.Count <= 20000, "任务列表无效。"); totalTasks += page.Tasks.Count;
-                    Require(totalTasks <= 100000, "任务数量超过 100000 条限制。");
+                    Require(page != null, Lang.T("页面不能为空。")); Id(page.Id, ids); Text(page.Title, 1000, Lang.T("页面标题"), false); Text(page.Text, 1000000, Lang.T("页面内容"), false); Utc(page.CreatedUtc, false);
+                    Require(page.Tasks != null && page.Tasks.Count <= 20000, Lang.T("任务列表无效。")); totalTasks += page.Tasks.Count;
+                    Require(totalTasks <= 100000, Lang.T("任务数量超过 100000 条限制。"));
                     foreach (TaskItem task in page.Tasks)
                     {
-                        Require(task != null, "任务不能为空。"); Id(task.Id, ids); Text(task.Text, 10000, "任务内容", false); Zone(task.TimeZoneId);
-                        Require(task.ReminderMinutes >= 0 && task.ReminderMinutes <= 5256000, "提前提醒时间无效。");
-                        Text(task.DueLocal, 40, "截止时间", false); if (task.DueLocal.Length > 0) TimeUtil.ParseLocal(task.DueLocal);
-                        Require(!task.DueDateOnly || task.DueLocal.Length > 0, "仅日期的截止时间缺少日期。");
-                        Text(task.AdvanceNotifiedKey, 500, "提醒状态", false); Text(task.DueNotifiedKey, 500, "提醒状态", false);
+                        Require(task != null, Lang.T("任务不能为空。")); Id(task.Id, ids); Text(task.Text, 10000, Lang.T("任务内容"), false); Zone(task.TimeZoneId);
+                        Require(task.ReminderMinutes >= 0 && task.ReminderMinutes <= 5256000, Lang.T("提前提醒时间无效。"));
+                        Text(task.DueLocal, 40, Lang.T("截止时间"), false); if (task.DueLocal.Length > 0) TimeUtil.ParseLocal(task.DueLocal);
+                        Require(!task.DueDateOnly || task.DueLocal.Length > 0, Lang.T("仅日期的截止时间缺少日期。"));
+                        Text(task.AdvanceNotifiedKey, 500, Lang.T("提醒状态"), false); Text(task.DueNotifiedKey, 500, Lang.T("提醒状态"), false);
                     }
                 }
             }
-            Require(data.ReminderHistory != null && data.ReminderHistory.Count <= 2000, "提醒历史无效。");
+            Require(data.ReminderHistory != null && data.ReminderHistory.Count <= 2000, Lang.T("提醒历史无效。"));
             foreach (ReminderRecord r in data.ReminderHistory)
             {
-                Require(r != null, "提醒记录不能为空。"); Text(r.Id, 100, "提醒 ID", true); Text(r.TaskId, 100, "任务 ID", true);
-                Text(r.Title, 10000, "提醒内容", false); Text(r.BookName, 200, "便签名称", false); Text(r.PageTitle, 1000, "页面标题", false);
-                TimeUtil.ParseLocal(r.DueLocal); Utc(r.FiredUtc, false); Require(r.Kind == "due" || r.Kind == "advance", "提醒类型无效。");
+                Require(r != null, Lang.T("提醒记录不能为空。")); Text(r.Id, 100, Lang.T("提醒 ID"), true); Text(r.TaskId, 100, Lang.T("任务 ID"), true);
+                Text(r.Title, 10000, Lang.T("提醒内容"), false); Text(r.BookName, 200, Lang.T("便签名称"), false); Text(r.PageTitle, 1000, Lang.T("页面标题"), false);
+                TimeUtil.ParseLocal(r.DueLocal); Utc(r.FiredUtc, false); Require(r.Kind == "due" || r.Kind == "advance", Lang.T("提醒类型无效。"));
             }
             Utc(data.LastCheckUtc, true);
         }
-        private static void Id(string value, HashSet<string> ids) { Text(value, 100, "ID", true); Require(ids.Add(value), "数据包含重复 ID。"); }
+        private static void Id(string value, HashSet<string> ids) { Text(value, 100, "ID", true); Require(ids.Add(value), Lang.T("数据包含重复 ID。")); }
         private static void Utc(string value, bool emptyAllowed)
         {
             if (emptyAllowed && value == "") return;
-            DateTime parsed; Require(!String.IsNullOrWhiteSpace(value) && DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out parsed), "时间格式无效。");
+            DateTime parsed; Require(!String.IsNullOrWhiteSpace(value) && DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out parsed), Lang.T("时间格式无效。"));
         }
     }
 }

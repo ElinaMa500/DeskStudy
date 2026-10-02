@@ -410,7 +410,7 @@ public static class NotebookLayoutTests
         try
         {
             // "langfresh": a brand-new user whose Windows display language is English.
-            if (mode == "langfresh") Thread.CurrentThread.CurrentUICulture = System.Globalization.CultureInfo.GetCultureInfo("en-US");
+            if (mode == "langfresh" || mode == "english") Thread.CurrentThread.CurrentUICulture = System.Globalization.CultureInfo.GetCultureInfo("en-US");
             using (var app = new AppController(path, null, false))
             {
                 Pump(150);
@@ -426,6 +426,7 @@ public static class NotebookLayoutTests
                     Console.WriteLine("RESTART REQUESTED: " + path); return 0;
                 }
                 else if (mode == "lang") LangChecks.Run(app);
+                else if (mode == "english") EnglishChecks.Run(app, path);
                 else if (mode == "langfresh") LangChecks.FreshEnglish(app);
                 else if (mode == "inline" || mode == "inlineread") InlineEditChecks.Run(app, path, mode == "inlineread");
                 else if (mode == "fold" || mode == "foldread") FoldChecks.Run(app, path, mode == "foldread");

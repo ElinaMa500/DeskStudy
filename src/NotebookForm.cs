@@ -83,7 +83,7 @@ namespace DeskStudy
             _pages.Dock = DockStyle.Fill;
             _pages.Margin = new Padding(4, 3, 4, 0);
             _pages.Font = new Font("Microsoft YaHei UI", 9f);
-            _pages.AccessibleName = "页面列表";
+            _pages.AccessibleName = Lang.T("页面列表");
             _pages.SelectedIndexChanged += delegate
             {
                 if (_rendering || _pages.SelectedItem == null) return;
@@ -97,7 +97,7 @@ namespace DeskStudy
             navigation.Controls.Add(_previous, 0, 0);
             navigation.Controls.Add(_pages, 1, 0);
             navigation.Controls.Add(_next, 2, 0);
-            var newPageButton = SmallButton("＋ 新页", delegate { AddPage(); });
+            var newPageButton = SmallButton(Lang.T("＋ 新页"), delegate { AddPage(); });
             _newPageButton = newPageButton;
             newPageButton.Name = "new-page";
             navigation.Controls.Add(newPageButton, 3, 0);
@@ -111,7 +111,7 @@ namespace DeskStudy
             _pageTitle.ForeColor = Ui.Text;
             _pageTitle.BorderStyle = BorderStyle.FixedSingle;
             _pageTitle.MaxLength = 140;
-            _pageTitle.AccessibleName = "页面标题";
+            _pageTitle.AccessibleName = Lang.T("页面标题");
             _pageTitle.TextChanged += delegate
             {
                 if (_rendering) return;
@@ -137,13 +137,13 @@ namespace DeskStudy
             _pageMeta.TextAlign = ContentAlignment.MiddleLeft;
             _pageMeta.Margin = Padding.Empty;
             metadata.Controls.Add(_pageMeta, 0, 0);
-            Button rename = SmallButton("重命名便签", delegate { RenameNotebook(); });
+            Button rename = SmallButton(Lang.T("重命名便签"), delegate { RenameNotebook(); });
             _renameButton = rename;
             rename.Font = new Font("Microsoft YaHei UI", 8f);
             metadata.Controls.Add(rename, 1, 0);
             _layout.Controls.Add(metadata, 0, 2);
 
-            _notesToggle = Ui.Button("文字记录  ▾", delegate { ToggleNotes(); });
+            _notesToggle = Ui.Button(Lang.T("文字记录  ▾"), delegate { ToggleNotes(); });
             _notesToggle.AutoSize = false;
             _notesToggle.MinimumSize = Size.Empty;
             _notesToggle.Dock = DockStyle.Fill;
@@ -167,7 +167,7 @@ namespace DeskStudy
             _notes.BorderStyle = BorderStyle.FixedSingle;
             _notes.BackColor = Color.White;
             _notes.ForeColor = Ui.Text;
-            _notes.AccessibleName = "本页文字记录";
+            _notes.AccessibleName = Lang.T("本页文字记录");
             _notes.TextChanged += delegate
             {
                 if (_rendering) return;
@@ -187,12 +187,12 @@ namespace DeskStudy
             taskHeader.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             taskHeader.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             taskHeader.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 92));
-            _taskCount = Ui.Label("任务", 9.5f, Ui.Text);
+            _taskCount = Ui.Label(Lang.T("任务"), 9.5f, Ui.Text);
             _taskCount.Dock = DockStyle.Fill;
             _taskCount.TextAlign = ContentAlignment.MiddleLeft;
             _taskCount.Margin = Padding.Empty;
             taskHeader.Controls.Add(_taskCount, 0, 0);
-            _addTaskButton = SmallButton("＋ 添加任务", delegate { EditTask(null); });
+            _addTaskButton = SmallButton(Lang.T("＋ 添加任务"), delegate { EditTask(null); });
             taskHeader.Controls.Add(_addTaskButton, 1, 0);
             _layout.Controls.Add(taskHeader, 0, 5);
 
@@ -206,7 +206,7 @@ namespace DeskStudy
             _tasks.BackColor = Ui.Background;
             _tasks.ClientSizeChanged += delegate { LayoutTaskCards(); };
             _layout.Controls.Add(_tasks, 0, 6);
-            Label footer = Ui.Label("隐藏、翻页、归档后仍会提醒", 8f, Ui.Muted);
+            Label footer = Ui.Label(Lang.T("隐藏、翻页、归档后仍会提醒"), 8f, Ui.Muted);
             footer.AutoEllipsis = true;
             footer.Dock = DockStyle.Fill;
             footer.TextAlign = ContentAlignment.BottomLeft;
@@ -340,7 +340,7 @@ namespace DeskStudy
         {
             NotePage page = new NotePage();
             page.Id = Guid.NewGuid().ToString("N");
-            page.Title = "未命名页";
+            page.Title = Lang.T("未命名页");
             page.CreatedUtc = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture);
             page.Text = "";
             page.Tasks = new List<TaskItem>();
@@ -389,7 +389,7 @@ namespace DeskStudy
                 DateTime created;
                 string date = DateTime.TryParse(page.CreatedUtc, CultureInfo.InvariantCulture,
                     DateTimeStyles.RoundtripKind, out created) ? created.ToLocalTime().ToString("yyyy.MM.dd") : "—";
-                _pageMeta.Text = "创建于 " + date;
+                _pageMeta.Text = Lang.T("创建于 {0}", date);
                 List<NotePage> visible = VisiblePages(book);
                 _previous.Enabled = visible.IndexOf(page) > 0;
                 _next.Enabled = visible.IndexOf(page) < visible.Count - 1;
@@ -423,7 +423,7 @@ namespace DeskStudy
                 for (int i = 0; i < visible.Count; i++)
                 {
                     NotePage page = visible[i];
-                    string title = String.IsNullOrWhiteSpace(page.Title) ? "未命名页" : page.Title;
+                    string title = String.IsNullOrWhiteSpace(page.Title) ? Lang.T("未命名页") : page.Title;
                     _pages.Items.Add(new PageChoice(page.Id, (i + 1).ToString("D2") + "  " + title));
                     if (page.Id == book.CurrentPageId) _pages.SelectedIndex = i;
                 }
@@ -487,7 +487,7 @@ namespace DeskStudy
             _notesExpanded = !_notesExpanded;
             _notes.Visible = _notesExpanded;
             using (var graphics = CreateGraphics()) _layout.RowStyles[4].Height = _notesExpanded ? (float)Math.Round(82 * graphics.DpiY / 96F) : 0;
-            _notesToggle.Text = _notesExpanded ? "文字记录  ▾" : "文字记录  ▸  （点击展开）";
+            _notesToggle.Text = _notesExpanded ? Lang.T("文字记录  ▾") : Lang.T("文字记录  ▸  （点击展开）");
             if (IsModern) { UpdateNotesCaption(); ArrangeModernLayout(); }
             else ArrangeOriginalNotes();
         }
@@ -515,10 +515,10 @@ namespace DeskStudy
                     _rows.Add(row);
                     _tasks.Controls.Add(row.Card);
                 }
-                _taskCount.Text = "任务  " + completed + " / " + page.Tasks.Count + " 已完成";
+                _taskCount.Text = Lang.T("任务  {0} / {1} 已完成", completed, page.Tasks.Count);
                 if (page.Tasks.Count == 0)
                 {
-                    Label empty = Ui.Label(IsModern ? "从下面记下一件要做的事。" : "这一页还没有任务\r\n\r\n记下一件小事，完成后也会留在这里。", 9f, Ui.Muted);
+                    Label empty = Ui.Label(IsModern ? Lang.T("从下面记下一件要做的事。") : Lang.T("这一页还没有任务\r\n\r\n记下一件小事，完成后也会留在这里。"), 9f, Ui.Muted);
                     empty.AutoSize = false;
                     empty.Padding = new Padding(12, 17, 8, 8);
                     empty.Height = 110;
@@ -545,7 +545,7 @@ namespace DeskStudy
             row.Toggle.Location = new Point(10, 11);
             row.Toggle.Size = new Size(20, 22);
             row.Toggle.Checked = task.Completed;
-            row.Toggle.AccessibleName = "完成任务：" + task.Text;
+            row.Toggle.AccessibleName = Lang.T("完成任务：{0}", task.Text);
             row.Toggle.CheckedChanged += delegate
             {
                 if (_rendering) return;
@@ -571,21 +571,21 @@ namespace DeskStudy
             row.Actions.WrapContents = false;
             row.Actions.Height = 27;
             row.Actions.Margin = Padding.Empty;
-            Button edit = ActionButton("编辑", 45, delegate { EditTask(task.Id); });
+            Button edit = ActionButton(Lang.T("编辑"), 45, delegate { EditTask(task.Id); });
             Button up = ActionButton("↑", 29, delegate { MoveTask(pageId, task.Id, -1); });
             Button down = ActionButton("↓", 29, delegate { MoveTask(pageId, task.Id, 1); });
-            Button delete = ActionButton("删除", 45, delegate { DeleteTask(pageId, task.Id); });
+            Button delete = ActionButton(Lang.T("删除"), 45, delegate { DeleteTask(pageId, task.Id); });
             up.Enabled = index > 0;
             down.Enabled = index < total - 1;
-            up.AccessibleName = "上移任务";
-            down.AccessibleName = "下移任务";
+            up.AccessibleName = Lang.T("上移任务");
+            down.AccessibleName = Lang.T("下移任务");
             delete.ForeColor = Color.FromArgb(155, 95, 82);
             row.Actions.Controls.Add(edit);
             row.Actions.Controls.Add(up);
             row.Actions.Controls.Add(down);
             row.Actions.Controls.Add(delete);
             row.More = ActionButton("⋯", 26, delegate { OpenTaskActions(row); });
-            row.More.AccessibleName = "任务操作";
+            row.More.AccessibleName = Lang.T("任务操作");
             row.Card.Controls.Add(row.Toggle);
             row.Card.Controls.Add(row.Title);
             row.Card.Controls.Add(row.Status);
@@ -635,7 +635,7 @@ namespace DeskStudy
                     int actionRows = 1, usedWidth = 0;
                     foreach (Control action in row.Actions.Controls)
                     {
-                        action.Size = new Size((int)((action.Text == "↑" || action.Text == "↓" ? 29 : 45) * scale * fontScale), (int)(27 * scale * fontScale));
+                        action.Size = new Size((int)((action.Text == "↑" || action.Text == "↓" ? 29 : Lang.IsEnglish ? 56 : 45) * scale * fontScale), (int)(27 * scale * fontScale));
                         action.Margin = new Padding(0, 0, (int)(5 * scale), 0);
                         int needed = action.Width + action.Margin.Horizontal;
                         if (usedWidth > 0 && usedWidth + needed > textWidth) { actionRows++; usedWidth = 0; }
@@ -675,11 +675,11 @@ namespace DeskStudy
                 DateTimeStyles.None, out due);
             if (task.Completed)
             {
-                text = "已完成" + (hasDue ? "  ·  截止 " + due.ToString(task.DueDateOnly ? "MM/dd" : "MM/dd HH:mm", CultureInfo.InvariantCulture) : "");
+                text = Lang.T("已完成") + (hasDue ? "  ·  " + Lang.T("截止 {0}", due.ToString(task.DueDateOnly ? "MM/dd" : "MM/dd HH:mm", CultureInfo.InvariantCulture)) : "");
                 color = Color.FromArgb(89, 132, 116);
                 return;
             }
-            if (!hasDue) { text = "未设置截止时间"; return; }
+            if (!hasDue) { text = Lang.T("未设置截止时间"); return; }
             DateTime now = DateTime.Now;
             if (!String.IsNullOrEmpty(task.TimeZoneId))
             {
@@ -691,17 +691,17 @@ namespace DeskStudy
             string status;
             if (remaining.TotalSeconds < 0)
             {
-                status = "已逾期";
+                status = Lang.T("已逾期");
                 color = Color.FromArgb(175, 78, 65);
             }
             else if (remaining.TotalHours <= 24)
             {
-                status = remaining.TotalMinutes < 60 ? "即将截止" : "24 小时内截止";
+                status = remaining.TotalMinutes < 60 ? Lang.T("即将截止") : Lang.T("24 小时内截止");
                 color = Color.FromArgb(176, 114, 41);
             }
-            else { status = "待完成"; }
+            else { status = Lang.T("待完成"); }
             if (task.DueDateOnly) { text = status + "  ·  " + due.ToString("yyyy/MM/dd", CultureInfo.InvariantCulture) + "\r\n" + dayReminder; return; }
-            string reminder = task.ReminderMinutes <= 0 ? "到期提醒" : "提前 " + task.ReminderMinutes + " 分钟提醒";
+            string reminder = task.ReminderMinutes <= 0 ? Lang.T("到期提醒") : Lang.T("提前 {0} 分钟提醒", task.ReminderMinutes);
             text = status + "  ·  " + due.ToString("yyyy/MM/dd HH:mm") + "\r\n" + reminder;
         }
 
@@ -757,7 +757,7 @@ namespace DeskStudy
             if (page == null) return;
             TaskItem task = page.Tasks.Find(delegate(TaskItem item) { return item.Id == taskId; });
             if (task == null) return;
-            if (MessageBox.Show(this, "删除这项任务？此操作不会影响其他任务。", "删除任务",
+            if (MessageBox.Show(this, Lang.T("删除这项任务？此操作不会影响其他任务。"), Lang.T("删除任务"),
                 MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK) return;
             page = FindPage(pageId);
             if (page == null) return;
@@ -868,7 +868,7 @@ namespace DeskStudy
         {
             SuspendLayout();
             AutoScaleDimensions = new SizeF(96, 96);
-            Text = "重命名便签";
+            Text = Lang.T("重命名便签");
             Font = new Font("Microsoft YaHei UI", 9f);
             AutoScaleMode = AutoScaleMode.Dpi;
             ClientSize = new Size(344, 146);
@@ -878,19 +878,19 @@ namespace DeskStudy
             MinimizeBox = false;
             ShowInTaskbar = false;
             BackColor = Ui.Background;
-            Label label = Ui.Label("便签名称", 9f, Ui.Text);
+            Label label = Ui.Label(Lang.T("便签名称"), 9f, Ui.Text);
             label.SetBounds(20, 15, 302, 22);
             _name = new TextBox();
             _name.SetBounds(20, 42, 302, 28);
             _name.MaxLength = 40;
             _name.Text = currentName ?? "";
-            Button cancel = Ui.Button("取消", delegate { DialogResult = DialogResult.Cancel; });
+            Button cancel = Ui.Button(Lang.T("取消"), delegate { DialogResult = DialogResult.Cancel; });
             cancel.SetBounds(166, 93, 74, 32);
-            Button save = Ui.Button("保存", delegate
+            Button save = Ui.Button(Lang.T("保存"), delegate
             {
                 if (BookName.Length == 0)
                 {
-                    MessageBox.Show(this, "请输入便签名称。", "还差一个名称", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    MessageBox.Show(this, Lang.T("请输入便签名称。"), Lang.T("还差一个名称"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                     _name.Focus();
                     return;
                 }
@@ -931,7 +931,7 @@ namespace DeskStudy
         {
             SuspendLayout();
             AutoScaleDimensions = new SizeF(96, 96);
-            Text = task == null ? "添加任务" : "编辑任务";
+            Text = task == null ? Lang.T("添加任务") : Lang.T("编辑任务");
             Font = new Font("Microsoft YaHei UI", 9f);
             AutoScaleMode = AutoScaleMode.Dpi;
             ClientSize = new Size(412, 416);
@@ -944,7 +944,7 @@ namespace DeskStudy
             _originalTimeZone = task == null || String.IsNullOrEmpty(task.TimeZoneId) ? System.TimeZoneInfo.Local.Id : task.TimeZoneId;
             _originalDue = task == null ? "" : task.DueLocal;
 
-            Label name = Ui.Label("要完成什么？", 10f, Ui.Text);
+            Label name = Ui.Label(Lang.T("要完成什么？"), 10f, Ui.Text);
             name.SetBounds(22, 18, 366, 25);
             _text = new TextBox();
             _text.SetBounds(22, 49, 366, 80);
@@ -952,9 +952,9 @@ namespace DeskStudy
             _text.ScrollBars = ScrollBars.Vertical;
             _text.MaxLength = 2000;
             _text.Text = task == null ? "" : task.Text;
-            _text.AccessibleName = "任务内容";
+            _text.AccessibleName = Lang.T("任务内容");
             _hasDue = new CheckBox();
-            _hasDue.Text = "设置截止时间与提醒";
+            _hasDue.Text = Lang.T("设置截止时间与提醒");
             _hasDue.SetBounds(22, 146, 366, 25);
 
             _date = new DateTimePicker();
@@ -978,11 +978,11 @@ namespace DeskStudy
 
             _dateOnly = new CheckBox();
             _dateOnly.Name = "task-date-only";
-            _dateOnly.Text = "只设日期，不设具体时间（当天提醒一次）";
+            _dateOnly.Text = Lang.T("只设日期，不设具体时间（当天提醒一次）");
             _dateOnly.SetBounds(22, 216, 366, 25);
             _dateOnly.Checked = hasDue && task.DueDateOnly;
             _dateOnly.CheckedChanged += delegate { UpdateEnabled(); };
-            Label advance = Ui.Label("提前提醒", 9f, Ui.Text);
+            Label advance = Ui.Label(Lang.T("提前提醒"), 9f, Ui.Text);
             advance.SetBounds(22, 255, 90, 27);
             _advance = new NumericUpDown();
             _advance.SetBounds(113, 254, 116, 28);
@@ -990,25 +990,25 @@ namespace DeskStudy
             _advance.Maximum = 525600;
             _advance.ThousandsSeparator = true;
             _advance.Value = Math.Max(0, Math.Min(525600, task == null ? defaultLeadMinutes : task.ReminderMinutes));
-            Label minutes = Ui.Label("分钟（0 = 到期提醒）", 8.5f, Ui.Muted);
-            minutes.SetBounds(240, 255, 151, 27);
-            Label explanation = Ui.Label("翻到其他页面仍会提醒；完成后停止提醒。\r\n时间使用当前本地时区，提醒在应用运行时生效。", 8.5f, Ui.Muted);
-            explanation.SetBounds(22, 299, 366, 43);
+            Label minutes = Ui.Label(Lang.T("分钟（0 = 到期提醒）"), 8.5f, Ui.Muted);
+            minutes.AutoSize = false; minutes.SetBounds(240, 251, 160, 40);
+            Label explanation = Ui.Label(Lang.T("翻到其他页面仍会提醒；完成后停止提醒。\r\n时间使用当前本地时区，提醒在应用运行时生效。"), 8.5f, Ui.Muted);
+            explanation.AutoSize = false; explanation.SetBounds(22, 297, 372, 56);
             _hasDue.CheckedChanged += delegate { UpdateEnabled(); };
 
-            Button cancel = Ui.Button("取消", delegate { DialogResult = DialogResult.Cancel; });
+            Button cancel = Ui.Button(Lang.T("取消"), delegate { DialogResult = DialogResult.Cancel; });
             cancel.SetBounds(221, 361, 78, 34);
-            Button save = Ui.Button("保存任务", delegate
+            Button save = Ui.Button(Lang.T("保存任务"), delegate
             {
                 if (TaskText.Length == 0)
                 {
-                    MessageBox.Show(this, "请输入任务内容。", "还差一点内容", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    MessageBox.Show(this, Lang.T("请输入任务内容。"), Lang.T("还差一点内容"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                     _text.Focus();
                     return;
                 }
                 if (_hasDue.Checked && !_dateOnly.Checked && System.TimeZoneInfo.Local.IsInvalidTime(DateTime.SpecifyKind(SelectedDue, DateTimeKind.Unspecified)))
                 {
-                    MessageBox.Show(this, "此时间处于夏令时跳转区间，请选择一个有效的本地时间。", "时间不可用", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    MessageBox.Show(this, Lang.T("此时间处于夏令时跳转区间，请选择一个有效的本地时间。"), Lang.T("时间不可用"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                     return;
                 }
                 DialogResult = DialogResult.OK;

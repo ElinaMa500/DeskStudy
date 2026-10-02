@@ -53,7 +53,7 @@ namespace DeskStudy
         }
         public void SetWidgetMode(string mode)
         {
-            if (!SettingsLogic.WidgetModes.Contains(mode)) throw new InvalidOperationException("窗口模式无效。");
+            if (!SettingsLogic.WidgetModes.Contains(mode)) throw new InvalidOperationException(Lang.T("窗口模式无效。"));
             if (Data.Settings.WidgetMode == mode) return;
             foreach (var w in Widgets) w.Remember();
             Data.Settings.WidgetMode = mode;
@@ -67,7 +67,7 @@ namespace DeskStudy
 
         public void SetWidgetCorners(string style)
         {
-            if (!SettingsLogic.WidgetCornerStyles.Contains(style)) throw new InvalidOperationException("组件四角样式无效。");
+            if (!SettingsLogic.WidgetCornerStyles.Contains(style)) throw new InvalidOperationException(Lang.T("组件四角样式无效。"));
             if (Data.Settings.WidgetCorners == style) return;
             Data.Settings.WidgetCorners = style;
             foreach (var w in Widgets) w.ApplyCorners();
@@ -89,19 +89,19 @@ namespace DeskStudy
         // Only the real instance claims a system-wide shortcut; isolated test and preview runs never do.
         public void RegisterShowHotkey()
         {
-            if (!UsesSystemStartup) { HotkeyStatus = "隔离数据模式下不注册全局快捷键。"; return; }
+            if (!UsesSystemStartup) { HotkeyStatus = Lang.T("隔离数据模式下不注册全局快捷键。"); return; }
             if (hotkeyWindow == null) hotkeyWindow = new HotkeyWindow { Pressed = ToggleWidgets };
             if (hotkeyRegistered) { UnregisterHotKey(hotkeyWindow.Handle, 1); hotkeyRegistered = false; }
             HotkeySpec spec;
-            if (!HotkeySpec.TryParse(Data.Settings.ShowHotkey, out spec)) { HotkeyStatus = "快捷键已停用。"; return; }
+            if (!HotkeySpec.TryParse(Data.Settings.ShowHotkey, out spec)) { HotkeyStatus = Lang.T("快捷键已停用。"); return; }
             hotkeyRegistered = RegisterHotKey(hotkeyWindow.Handle, 1, (uint)spec.Modifiers | 0x4000, (uint)spec.VirtualKey);
-            HotkeyStatus = hotkeyRegistered ? "快捷键已生效。" : "这个快捷键已被其他程序占用，请换一个。";
+            HotkeyStatus = hotkeyRegistered ? Lang.T("快捷键已生效。") : Lang.T("这个快捷键已被其他程序占用，请换一个。");
         }
         public void SetShowHotkey(string text)
         {
             text = (text ?? "").Trim();
             HotkeySpec spec;
-            if (text != "" && !HotkeySpec.TryParse(text, out spec)) throw new InvalidOperationException("快捷键需要包含 Ctrl、Alt 或 Win，并以字母、数字或 F1–F12 结尾。");
+            if (text != "" && !HotkeySpec.TryParse(text, out spec)) throw new InvalidOperationException(Lang.T("快捷键需要包含 Ctrl、Alt 或 Win，并以字母、数字或 F1–F12 结尾。"));
             Data.Settings.ShowHotkey = text;
             RegisterShowHotkey(); SettingsChanged();
         }

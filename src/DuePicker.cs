@@ -79,7 +79,7 @@ namespace DeskStudy
         public MonthGrid()
         {
             SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.Selectable | ControlStyles.ResizeRedraw, true);
-            TabStop = true; AccessibleName = "选择截止日期"; AccessibleRole = AccessibleRole.Table;
+            TabStop = true; AccessibleName = Lang.T("选择截止日期"); AccessibleRole = AccessibleRole.Table;
             WeekStartDay = 1; Today = DateTime.Today;
             Month = new DateTime(Today.Year, Today.Month, 1); cursor = Today;
         }
@@ -134,7 +134,7 @@ namespace DeskStudy
             Graphics g = e.Graphics; g.Clear(Palette.Back); g.SmoothingMode = SmoothingMode.AntiAlias;
             int column = Width / 7;
             using (var bold = new Font(Font, FontStyle.Bold))
-                TextRenderer.DrawText(g, Month.Year + " 年 " + Month.Month + " 月", bold, new Rectangle(0, 0, Width, header), Palette.Ink, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+                TextRenderer.DrawText(g, Lang.MonthTitle(Month), bold, new Rectangle(0, 0, Width, header), Palette.Ink, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
             TextRenderer.DrawText(g, "‹", Font, new Rectangle(0, 0, header * 2, header), Palette.Sub, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
             TextRenderer.DrawText(g, "›", Font, new Rectangle(Width - header * 2, 0, header * 2, header), Palette.Sub, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
             for (int i = 0; i < 7; i++)
@@ -162,7 +162,7 @@ namespace DeskStudy
         private readonly DuePickerOptions options;
         private readonly MonthGrid grid = new MonthGrid();
         private readonly List<ChipButton> dateChips = new List<ChipButton>(), timeChips = new List<ChipButton>(), leadChips = new List<ChipButton>();
-        private readonly CompositionTextBox timeBox = new CompositionTextBox { Cue = "时:分" }, leadBox = new CompositionTextBox { Cue = "分钟" };
+        private readonly CompositionTextBox timeBox = new CompositionTextBox { Cue = Lang.T("时:分") }, leadBox = new CompositionTextBox { Cue = Lang.T("分钟") };
         private bool arranged, arrangedTimed;
         private readonly Label timeLabel = new Label(), leadLabel = new Label(), leadNote = new Label(), summary = new Label(), hint = new Label();
         private readonly Button done = new Button(), clear = new Button();
@@ -193,47 +193,47 @@ namespace DeskStudy
         {
             options = pickerOptions;
             DuePalette p = options.Palette;
-            Font = options.Font; BackColor = p.Back; ForeColor = p.Ink; Name = "due-picker"; AccessibleName = "设置截止时间";
+            Font = options.Font; BackColor = p.Back; ForeColor = p.Ink; Name = "due-picker"; AccessibleName = Lang.T("设置截止时间");
             SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
             lead = options.DefaultLead;
             DateTime today = DateTime.Today;
 
-            AddDateChip("今天", today);
-            AddDateChip("明天", today.AddDays(1));
+            AddDateChip(Lang.T("今天"), today);
+            AddDateChip(Lang.T("明天"), today.AddDays(1));
             int toFriday = ((int)DayOfWeek.Friday - (int)today.DayOfWeek + 7) % 7;
-            if (toFriday > 1) AddDateChip("本周五", today.AddDays(toFriday)); else AddDateChip("下周五", today.AddDays(toFriday + 7));
+            if (toFriday > 1) AddDateChip(Lang.T("本周五"), today.AddDays(toFriday)); else AddDateChip(Lang.T("下周五"), today.AddDays(toFriday + 7));
             int toMonday = ((int)DayOfWeek.Monday - (int)today.DayOfWeek + 7) % 7;
-            AddDateChip("下周一", today.AddDays(toMonday == 0 ? 7 : toMonday));
+            AddDateChip(Lang.T("下周一"), today.AddDays(toMonday == 0 ? 7 : toMonday));
             DateTime last;
             if (DateTime.TryParseExact(options.LastDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out last) && last >= today && dateChips.All(c => (DateTime)c.Value != last))
-                AddDateChip("上次 " + last.Month + "/" + last.Day, last);
+                AddDateChip(Lang.T("上次 {0}", last.Month + "/" + last.Day), last);
 
             grid.Palette = p; grid.WeekStartDay = options.WeekStartDay; grid.Font = Font; grid.Name = "due-month";
             grid.SelectionChanged += delegate { Sync(); };
             Controls.Add(grid);
 
-            Caption(timeLabel, "时间");
+            Caption(timeLabel, Lang.T("时间"));
             foreach (string preset in new[] { "12:00", "18:00", "23:59" }) AddTimeChip(preset, preset);
             TimeSpan lastTime;
-            if (TryTime(options.LastTime, out lastTime) && timeChips.All(c => (TimeSpan)c.Value != lastTime)) AddTimeChip("上次 " + options.LastTime, options.LastTime);
-            StyleBox(timeBox, "due-time", "自定义截止时间，例如 18:30");
+            if (TryTime(options.LastTime, out lastTime) && timeChips.All(c => (TimeSpan)c.Value != lastTime)) AddTimeChip(Lang.T("上次 {0}", options.LastTime), options.LastTime);
+            StyleBox(timeBox, "due-time", Lang.T("自定义截止时间，例如 18:30"));
             timeBox.TextChanged += delegate { if (updating) return; TimeSpan typed; time = TryTime(timeBox.Text, out typed) ? (TimeSpan?)typed : null; Sync(); };
 
-            Caption(leadLabel, "提醒");
+            Caption(leadLabel, Lang.T("提醒"));
             foreach (int minutes in new[] { 0, 30, 60, 1440 }) AddLeadChip(minutes);
             if (leadChips.All(c => (int)c.Value != lead)) AddLeadChip(lead);
-            StyleBox(leadBox, "due-lead", "自定义提前分钟数");
+            StyleBox(leadBox, "due-lead", Lang.T("自定义提前分钟数"));
             leadBox.TextChanged += delegate { if (updating) return; int typed; if (Int32.TryParse(leadBox.Text.Trim(), out typed) && typed >= 0 && typed <= 525600) { lead = typed; Sync(); } };
             leadNote.AutoSize = false; leadNote.ForeColor = p.Sub; leadNote.BackColor = p.Back; leadNote.TextAlign = ContentAlignment.MiddleLeft; leadNote.UseMnemonic = false;
             Controls.Add(leadNote);
 
             summary.AutoSize = false; summary.Name = "due-summary"; summary.ForeColor = p.Ink; summary.BackColor = p.Back; summary.TextAlign = ContentAlignment.MiddleLeft; summary.UseMnemonic = false; summary.AutoEllipsis = true;
-            hint.AutoSize = false; hint.Text = "Enter 完成 · Esc 取消"; hint.ForeColor = p.Faint; hint.BackColor = p.Back; hint.TextAlign = ContentAlignment.MiddleLeft;
+            hint.AutoSize = false; hint.Text = Lang.T("Enter 完成 · Esc 取消"); hint.ForeColor = p.Faint; hint.BackColor = p.Back; hint.TextAlign = ContentAlignment.MiddleLeft;
             Controls.Add(summary); Controls.Add(hint);
 
-            Flat(done, "完成", "due-done"); done.BackColor = p.Accent; done.ForeColor = p.Back; done.FlatAppearance.MouseOverBackColor = p.Accent;
+            Flat(done, Lang.T("完成"), "due-done"); done.BackColor = p.Accent; done.ForeColor = p.Back; done.FlatAppearance.MouseOverBackColor = p.Accent;
             done.Click += delegate { Complete(); };
-            Flat(clear, "清除截止时间", "due-clear"); clear.BackColor = p.Back; clear.ForeColor = p.Warm; clear.FlatAppearance.MouseOverBackColor = p.Soft; clear.Visible = options.AllowClear;
+            Flat(clear, Lang.T("清除截止时间"), "due-clear"); clear.BackColor = p.Back; clear.ForeColor = p.Warm; clear.FlatAppearance.MouseOverBackColor = p.Soft; clear.Visible = options.AllowClear;
             clear.Click += delegate { ClearRequested = true; grid.Selected = null; time = null; Complete(); };
 
             if (options.Initial != null && options.Initial.HasDue)
@@ -281,7 +281,7 @@ namespace DeskStudy
         }
         private void AddLeadChip(int minutes)
         {
-            string text = minutes == 0 ? "到期时" : minutes % 1440 == 0 ? minutes / 1440 + " 天前" : minutes % 60 == 0 ? minutes / 60 + " 小时前" : minutes + " 分钟前";
+            string text = minutes == 0 ? Lang.T("到期时") : minutes % 1440 == 0 ? Lang.Count(minutes / 1440, "{0} 天前", "{0} day before", "{0} days before") : minutes % 60 == 0 ? Lang.Count(minutes / 60, "{0} 小时前", "{0} hour before", "{0} hours before") : Lang.Count(minutes, "{0} 分钟前", "{0} min before", "{0} min before");
             var chip = Chip(text, minutes, leadChips, null); chip.Name = "due-lead-" + minutes;
             chip.Click += delegate { lead = minutes; updating = true; leadBox.Text = ""; updating = false; Sync(); };
         }
@@ -317,8 +317,8 @@ namespace DeskStudy
             foreach (ChipButton chip in dateChips.Concat(timeChips).Concat(leadChips)) chip.Width = TextRenderer.MeasureText(chip.Text, Font).Width + px(9);
             int y = FlowRow(dateChips.Cast<Control>(), pad, pad, right, chipHeight, gap) + px(8);
             grid.Measure(column, px(28)); grid.Location = new Point(pad, y); y = grid.Bottom + px(10);
-            int label = TextRenderer.MeasureText("提醒", Font).Width + px(6);
-            timeBox.Width = px(46); leadBox.Width = px(46);
+            int label = TextRenderer.MeasureText(Lang.T("提醒"), Font).Width + px(6);
+            timeBox.Width = px(Lang.IsEnglish ? 54 : 46); leadBox.Width = px(46);
             timeLabel.SetBounds(pad, y, label, chipHeight);
             y = FlowRow(timeChips.Cast<Control>().Concat(new Control[] { timeBox }), pad + label, y, right, chipHeight, gap) + px(8);
             leadLabel.SetBounds(pad, y, label, chipHeight);
@@ -349,13 +349,13 @@ namespace DeskStudy
             foreach (ChipButton chip in timeChips) { chip.Selected = timed && (TimeSpan)chip.Value == time.Value && timeBox.Text.Trim().Length == 0; chip.Invalidate(); }
             if (arranged && arrangedTimed != timed) Arrange();
             foreach (ChipButton chip in leadChips) { chip.Selected = (int)chip.Value == lead && leadBox.Text.Trim().Length == 0; chip.Invalidate(); }
-            leadNote.Text = "只选日期：当天 " + options.DateOnlyReminderTime + " 提醒一次";
+            leadNote.Text = Lang.T("只选日期：当天 {0} 提醒一次", options.DateOnlyReminderTime);
             DueChoice choice = Build();
-            if (!choice.HasDue) { summary.Text = options.AllowClear ? "未选择日期" : "不设置截止时间"; summary.ForeColor = options.Palette.Sub; return; }
+            if (!choice.HasDue) { summary.Text = options.AllowClear ? Lang.T("未选择日期") : Lang.T("不设置截止时间"); summary.ForeColor = options.Palette.Sub; return; }
             DateTime moment = choice.DateOnly ? choice.Date.AddDays(1) : choice.Date.Add(choice.Time);
             bool passed = moment <= DateTime.Now;
             string text = choice.Date.Month + "/" + choice.Date.Day + " " + Lang.Weekday(choice.Date.DayOfWeek) + (choice.DateOnly ? "" : " " + choice.Time.ToString(@"hh\:mm"));
-            summary.Text = passed ? text + " · 这个时间已经过了" : text;
+            summary.Text = passed ? text + " · " + Lang.T("这个时间已经过了") : text;
             summary.ForeColor = passed ? options.Palette.Warm : options.Palette.Ink;
         }
         private DueChoice Build()
@@ -368,10 +368,10 @@ namespace DeskStudy
         }
         public void Complete()
         {
-            if (!ClearRequested && timeBox.Text.Trim().Length > 0 && !time.HasValue) { summary.Text = "时间格式应为 18:30"; summary.ForeColor = options.Palette.Warm; timeBox.Focus(); return; }
+            if (!ClearRequested && timeBox.Text.Trim().Length > 0 && !time.HasValue) { summary.Text = Lang.T("时间格式应为 18:30"); summary.ForeColor = options.Palette.Warm; timeBox.Focus(); return; }
             DueChoice choice = Build();
             if (choice.HasDue && !choice.DateOnly && TimeZoneInfo.Local.IsInvalidTime(DateTime.SpecifyKind(choice.Date.Add(choice.Time), DateTimeKind.Unspecified)))
-            { summary.Text = "这个时间处于夏令时跳转区间"; summary.ForeColor = options.Palette.Warm; return; }
+            { summary.Text = Lang.T("这个时间处于夏令时跳转区间"); summary.ForeColor = options.Palette.Warm; return; }
             Result = choice; Completed = true;
             if (Finished != null) Finished(this, EventArgs.Empty);
         }

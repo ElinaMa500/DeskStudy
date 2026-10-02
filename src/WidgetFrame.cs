@@ -46,7 +46,7 @@ namespace DeskStudy
         private void InitializeFrame()
         {
             closeButton = Ui.Button("✕", delegate { Hide(); });
-            closeButton.Name = "close-widget"; closeButton.AccessibleName = "隐藏这个组件"; closeButton.AutoSize = false; closeButton.Visible = false;
+            closeButton.Name = "close-widget"; closeButton.AccessibleName = Lang.T("隐藏这个组件"); closeButton.AutoSize = false; closeButton.Visible = false;
             closeButton.FlatStyle = FlatStyle.Flat; closeButton.FlatAppearance.BorderSize = 0; closeButton.Margin = Padding.Empty; closeButton.TabStop = false;
             // A small ✕ tucked into the top-right corner, apart from the other buttons so it is not hit by mistake.
             header.Controls.Add(closeButton);

@@ -42,7 +42,7 @@ namespace DeskStudy
         private readonly Dictionary<string, Font> refFonts = new Dictionary<string, Font>();
         public string AppliedCalendarStyle { get { return calendarStyle; } }
 
-        public CalendarForm(AppController app) : base(app, "calendar", "日历 · 课表", Color.FromArgb(76, 118, 108), new Size(900, 710))
+        public CalendarForm(AppController app) : base(app, "calendar", Lang.T("日历 · 课表"), Color.FromArgb(76, 118, 108), new Size(900, 710))
         {
             MinimumSize = new Size(680, 520);
             Body.BackColor = Color.FromArgb(250, 250, 247);
@@ -107,11 +107,11 @@ namespace DeskStudy
             toolbar.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 146));
             toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 312));
+            toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, Lang.IsEnglish ? 340 : 312));
             FlowLayoutPanel navigation = new FlowLayoutPanel(); navigation.Dock = DockStyle.Fill; navigation.WrapContents = false;
             navigation.Padding = new Padding(0, 5, 0, 0);
             navigation.Controls.Add(MakeButton("‹", 32, delegate { MovePeriod(-1); }));
-            navigation.Controls.Add(MakeButton("今天", 59, delegate { focusDate = DateTime.Today; RefreshData(); }));
+            navigation.Controls.Add(MakeButton(Lang.T("今天"), 59, delegate { focusDate = DateTime.Today; RefreshData(); }));
             navigation.Controls.Add(MakeButton("›", 32, delegate { MovePeriod(1); }));
             toolbar.Controls.Add(navigation, 0, 0);
             period = new Label(); period.Dock = DockStyle.Fill; period.TextAlign = ContentAlignment.MiddleLeft;
@@ -120,12 +120,12 @@ namespace DeskStudy
             toolbar.Controls.Add(period, 1, 0);
             FlowLayoutPanel actions = new FlowLayoutPanel(); actions.Dock = DockStyle.Fill; actions.WrapContents = false;
             actions.Padding = new Padding(0, 5, 0, 0);
-            workWeekButton = MakeButton("工作周", 72, delegate { SetView(false, true); });
-            weekButton = MakeButton("周", 42, delegate { SetView(false, false); });
-            monthButton = MakeButton("月", 42, delegate { SetView(true, false); });
+            workWeekButton = MakeButton(Lang.T("工作周"), Lang.IsEnglish ? 86 : 72, delegate { SetView(false, true); });
+            weekButton = MakeButton(Lang.T("周"), Lang.IsEnglish ? 54 : 42, delegate { SetView(false, false); });
+            monthButton = MakeButton(Lang.T("月"), Lang.IsEnglish ? 58 : 42, delegate { SetView(true, false); });
             workWeekButton.Name = "calendar-original-workweek"; weekButton.Name = "calendar-original-week"; monthButton.Name = "calendar-original-month";
             actions.Controls.Add(workWeekButton); actions.Controls.Add(weekButton); actions.Controls.Add(monthButton);
-            Button add = MakeButton("＋ 添加日程", 125, delegate { AddEvent(focusDate, 9); });
+            Button add = MakeButton(Lang.T("＋ 添加日程"), Lang.IsEnglish ? 108 : 125, delegate { AddEvent(focusDate, 9); });
             add.BackColor = Color.FromArgb(73, 111, 101); add.ForeColor = Color.White;
             actions.Controls.Add(add); toolbar.Controls.Add(actions, 2, 0);
             Panel topRow = new Panel { Dock = DockStyle.Fill, Margin = Padding.Empty };
@@ -134,7 +134,7 @@ namespace DeskStudy
             layout.Controls.Add(topRow, 0, 0);
 
             hint = new Label(); hint.Dock = DockStyle.Fill;
-            hint.Text = "每一天，留一点从容   ·   点击课程编辑；双击空白处添加";
+            hint.Text = Lang.T("每一天，留一点从容   ·   点击课程编辑；双击空白处添加");
             hint.Font = new Font("Microsoft YaHei UI", 9F); hint.ForeColor = muted;
             hint.TextAlign = ContentAlignment.MiddleLeft; hint.Padding = new Padding(6, 0, 0, 0);
             layout.Controls.Add(hint, 0, 1);
@@ -207,9 +207,9 @@ namespace DeskStudy
             periodShort = monthView ? periodFull : start.ToString("M.d") + " – " + end.ToString("M.d");
             FitPeriod();
             int teachingWeek = SettingsLogic.TeachingWeek(App.Data.Settings, focusDate);
-            hint.Text = (teachingWeek > 0 ? "教学第 " + teachingWeek + " 周   ·   " : "") + "点击课程编辑；双击空白处添加";
+            hint.Text = (teachingWeek > 0 ? Lang.T("教学第 {0} 周", teachingWeek) + "   ·   " : "") + Lang.T("点击课程编辑；双击空白处添加");
             refRange.Text = monthView ? Lang.MonthTitle(focusDate) : start.ToString("M.d") + " – " + end.ToString("M.d");
-            refMeta.Text = monthView ? (teachingWeek > 0 ? "教学第 " + teachingWeek + " 周" : "") : focusDate.Year + (teachingWeek > 0 ? " · 教学第 " + teachingWeek + " 周" : "");
+            refMeta.Text = monthView ? (teachingWeek > 0 ? Lang.T("教学第 {0} 周", teachingWeek) : "") : focusDate.Year + (teachingWeek > 0 ? " · " + Lang.T("教学第 {0} 周", teachingWeek) : "");
             ArrangeReferenceBar();
             surface.SetData(start, focusDate, monthView, occurrences, ViewDays);
             ApplyAppearance();
@@ -263,7 +263,7 @@ namespace DeskStudy
                 contentLayout.RowStyles[0].Height = originalToolbarRow; contentLayout.RowStyles[1].Height = originalHintRow;
             }
             using (Font headerFont = new Font("Microsoft YaHei UI", appearance.FontSize, FontStyle.Bold))
-                contentLayout.RowStyles[2].Height = Math.Max(Px(45), TextRenderer.MeasureText(monthView ? "周一" : "周一\n9/28", headerFont).Height + Px(10));
+                contentLayout.RowStyles[2].Height = Math.Max(Px(45), TextRenderer.MeasureText(monthView ? Lang.T("周一") : Lang.T("周一\n9/28"), headerFont).Height + Px(10));
         }
 
         // 清爽 / 纸页: the same header as the reference notebooks, one navigation row, a one-line day header.
@@ -318,18 +318,18 @@ namespace DeskStudy
         private void BuildReferenceBar()
         {
             refBar = new Panel { Name = "calendar-reference-bar", Dock = DockStyle.Fill, Visible = false };
-            refPrev = RefButton("‹", "calendar-previous", "上一周或上一月", delegate { MovePeriod(-1); });
-            refNext = RefButton("›", "calendar-next", "下一周或下一月", delegate { MovePeriod(1); });
-            refToday = RefButton("今天", "calendar-today", "回到今天", delegate { focusDate = DateTime.Today; RefreshData(); });
-            refWorkWeek = RefButton("工作周", "calendar-workweek", "工作周视图：只看周一至周五", delegate { SetView(false, true); });
-            refWeek = RefButton("周", "calendar-week", "周视图", delegate { SetView(false, false); });
-            refMonth = RefButton("月", "calendar-month", "月视图", delegate { SetView(true, false); });
-            refAdd = RefButton("＋", "calendar-add", "添加日程", delegate { AddEvent(focusDate, 9); });
+            refPrev = RefButton("‹", "calendar-previous", Lang.T("上一周或上一月"), delegate { MovePeriod(-1); });
+            refNext = RefButton("›", "calendar-next", Lang.T("下一周或下一月"), delegate { MovePeriod(1); });
+            refToday = RefButton(Lang.T("今天"), "calendar-today", Lang.T("回到今天"), delegate { focusDate = DateTime.Today; RefreshData(); });
+            refWorkWeek = RefButton(Lang.T("工作周"), "calendar-workweek", Lang.T("工作周视图：只看周一至周五"), delegate { SetView(false, true); });
+            refWeek = RefButton(Lang.T("周"), "calendar-week", Lang.T("周视图"), delegate { SetView(false, false); });
+            refMonth = RefButton(Lang.T("月"), "calendar-month", Lang.T("月视图"), delegate { SetView(true, false); });
+            refAdd = RefButton("＋", "calendar-add", Lang.T("添加日程"), delegate { AddEvent(focusDate, 9); });
             refRange = new Label { Name = "calendar-range", AutoSize = false, TextAlign = ContentAlignment.MiddleLeft, Tag = "appearance-custom-font", UseMnemonic = false };
             refMeta = new Label { Name = "calendar-meta", AutoSize = false, TextAlign = ContentAlignment.MiddleLeft, Tag = "appearance-custom-font", UseMnemonic = false, AutoEllipsis = true };
             refBar.Controls.AddRange(new Control[] { refPrev, refRange, refNext, refMeta, refToday, refWorkWeek, refWeek, refMonth, refAdd });
             refBar.Resize += delegate { ArrangeReferenceBar(); };
-            var tips = new ToolTip(); tips.SetToolTip(refWorkWeek, "只看周一至周五"); Disposed += delegate { tips.Dispose(); };
+            var tips = new ToolTip(); tips.SetToolTip(refWorkWeek, Lang.T("只看周一至周五")); Disposed += delegate { tips.Dispose(); };
         }
 
         private void ArrangeReferenceBar()
@@ -342,12 +342,12 @@ namespace DeskStudy
             refRange.SetBounds(refPrev.Right, 0, rangeWidth, h);
             refNext.SetBounds(refRange.Right, y, arrow, bh);
             int add = Px(26); refAdd.SetBounds(w - add, y, add, bh);
-            int segment = Math.Max(Px(28), TextRenderer.MeasureText("月", refMonth.Font).Width + Px(14));
+            int segment = Math.Max(Px(28), TextRenderer.MeasureText(Lang.T("月"), refMonth.Font).Width + Px(14));
             refMonth.SetBounds(refAdd.Left - Px(8) - segment, y, segment, bh);
             refWeek.SetBounds(refMonth.Left - segment, y, segment, bh);
-            int workSegment = TextRenderer.MeasureText("工作周", refWorkWeek.Font).Width + Px(14);
+            int workSegment = TextRenderer.MeasureText(Lang.T("工作周"), refWorkWeek.Font).Width + Px(14);
             refWorkWeek.SetBounds(refWeek.Left - workSegment, y, workSegment, bh);
-            int today = TextRenderer.MeasureText("今天", refToday.Font).Width + Px(14);
+            int today = TextRenderer.MeasureText(Lang.T("今天"), refToday.Font).Width + Px(14);
             refToday.SetBounds(refWorkWeek.Left - Px(8) - today, y, today, bh);
             int metaLeft = refNext.Right + Px(8);
             refMeta.SetBounds(metaLeft, 0, Math.Max(0, refToday.Left - Px(8) - metaLeft), h);
@@ -740,7 +740,7 @@ namespace DeskStudy
             }
             if (items.Count == 0)
                 using (Font font = new Font("Microsoft YaHei UI", 10F * fontScale))
-                    TextRenderer.DrawText(graphics, "本周还没有日程 · 双击时间格开始安排", font, new Rectangle(TimeGutter + S(8), 9 * HourHeight + S(15), Math.Max(S(100), width - TimeGutter - S(16)), T(28)), secondary, TextFormatFlags.HorizontalCenter | ScrolledText);
+                    TextRenderer.DrawText(graphics, Lang.T("本周还没有日程 · 双击时间格开始安排"), font, new Rectangle(TimeGutter + S(8), 9 * HourHeight + S(15), Math.Max(S(100), width - TimeGutter - S(16)), T(28)), secondary, TextFormatFlags.HorizontalCenter | ScrolledText);
         }
 
         private void DrawMonth(Graphics graphics)
@@ -769,7 +769,7 @@ namespace DeskStudy
                         TextRenderer.DrawText(graphics, date.Day.ToString(), dateFont, dot, canvas, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | ScrolledText);
                     }
                     else
-                        TextRenderer.DrawText(graphics, date.Day.ToString() + (!reference && date == DateTime.Today ? " 今天" : ""), dateFont, new Rectangle(x + S(6), y + S(5), (int)col - S(10), T(24)), date.Month == focusDate.Month ? foreground : secondary, TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine | ScrolledText);
+                        TextRenderer.DrawText(graphics, date.Day.ToString() + (!reference && date == DateTime.Today ? Lang.T(" 今天") : ""), dateFont, new Rectangle(x + S(6), y + S(5), (int)col - S(10), T(24)), date.Month == focusDate.Month ? foreground : secondary, TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine | ScrolledText);
                     List<Occurrence> dayItems = items.Where(o => o.Date == date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)).OrderBy(o => o.StartTime).ToList();
                     int capacity = Math.Max(1, ((int)row - T(37)) / T(25));
                     int shown = dayItems.Count > capacity ? Math.Max(0, capacity - 1) : dayItems.Count;
@@ -781,7 +781,7 @@ namespace DeskStudy
                     if (shown < dayItems.Count)
                     {
                         Rectangle rect = new Rectangle(x + S(4), y + T(32) + shown * T(25), (int)col - S(8), T(24));
-                        TextRenderer.DrawText(graphics, "+ " + (dayItems.Count - shown) + " 项 · 查看", smallFont, rect, foreground, TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | ScrolledText);
+                        TextRenderer.DrawText(graphics, Lang.T("+ {0} 项 · 查看", dayItems.Count - shown), smallFont, rect, foreground, TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | ScrolledText);
                         hits.Add(new CalendarHit(rect, date));
                     }
                 }
@@ -901,15 +901,15 @@ namespace DeskStudy
         public OccurrenceScopeDialog()
         {
             SuspendLayout(); AutoScaleDimensions = new SizeF(96F, 96F); AutoScaleMode = AutoScaleMode.Dpi;
-            Text = "循环课程"; Size = new Size(470, 208); FormBorderStyle = FormBorderStyle.FixedDialog;
+            Text = Lang.T("循环课程"); Size = new Size(470, 208); FormBorderStyle = FormBorderStyle.FixedDialog;
             StartPosition = FormStartPosition.CenterParent; MaximizeBox = false; MinimizeBox = false;
             Font = new Font("Microsoft YaHei UI", 10F); BackColor = Color.FromArgb(250, 250, 247);
-            Label heading = new Label { Text = "要修改或删除哪一部分？", AutoSize = true, Location = new Point(22, 22), Font = new Font("Microsoft YaHei UI", 12F, FontStyle.Bold) };
-            Label detail = new Label { Text = "“仅这一次”保留其他日期的课程安排。", AutoSize = true, Location = new Point(22, 60), ForeColor = Color.FromArgb(113, 126, 117) };
+            Label heading = new Label { Text = Lang.T("要修改或删除哪一部分？"), AutoSize = true, Location = new Point(22, 22), Font = new Font("Microsoft YaHei UI", 12F, FontStyle.Bold) };
+            Label detail = new Label { Text = Lang.T("“仅这一次”保留其他日期的课程安排。"), AutoSize = true, Location = new Point(22, 60), ForeColor = Color.FromArgb(113, 126, 117) };
             Controls.Add(heading); Controls.Add(detail);
-            Button single = new Button { Text = "仅这一次", Location = new Point(22, 111), Size = new Size(125, 34) };
-            Button all = new Button { Text = "整个系列", Location = new Point(159, 111), Size = new Size(125, 34) };
-            Button cancel = new Button { Text = "取消", Location = new Point(296, 111), Size = new Size(125, 34), DialogResult = DialogResult.Cancel };
+            Button single = new Button { Text = Lang.T("仅这一次"), Location = new Point(22, 111), Size = new Size(125, 34) };
+            Button all = new Button { Text = Lang.T("整个系列"), Location = new Point(159, 111), Size = new Size(125, 34) };
+            Button cancel = new Button { Text = Lang.T("取消"), Location = new Point(296, 111), Size = new Size(125, 34), DialogResult = DialogResult.Cancel };
             single.Click += delegate { WholeSeries = false; DialogResult = DialogResult.OK; };
             all.Click += delegate { WholeSeries = true; DialogResult = DialogResult.OK; };
             Controls.Add(single); Controls.Add(all); Controls.Add(cancel); CancelButton = cancel;
@@ -934,7 +934,7 @@ namespace DeskStudy
         {
             SuspendLayout(); AutoScaleDimensions = new SizeF(96F, 96F); AutoScaleMode = AutoScaleMode.Dpi;
             source = item; seriesMode = allowSeries;
-            Text = existing ? (allowSeries ? "编辑日程" : "编辑 · 仅这一次") : "添加日程";
+            Text = existing ? (allowSeries ? Lang.T("编辑日程") : Lang.T("编辑 · 仅这一次")) : Lang.T("添加日程");
             ClientSize = new Size(564, 624); MinimumSize = new Size(580, 650);
             StartPosition = FormStartPosition.CenterParent; MaximizeBox = false; MinimizeBox = false;
             Font = new Font("Microsoft YaHei UI", 9.5F); BackColor = Color.FromArgb(250, 250, 247);
@@ -962,48 +962,48 @@ namespace DeskStudy
             Panel scroll = new Panel(); scroll.Dock = DockStyle.Fill; scroll.AutoScroll = true; scroll.Padding = new Padding(20, 16, 20, 8);
             outer.Controls.Add(scroll, 0, 0);
             TableLayoutPanel table = new TableLayoutPanel(); table.Dock = DockStyle.Top; table.AutoSize = true; table.ColumnCount = 2;
-            table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 93)); table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, Lang.IsEnglish ? 122 : 93)); table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             scroll.Controls.Add(table);
-            titleBox = new TextBox(); titleBox.MaxLength = 180; AddRow(table, "名称", titleBox, 42);
-            datePicker = new DateTimePicker { Format = DateTimePickerFormat.Custom, CustomFormat = "yyyy 年 MM 月 dd 日" };
-            AddRow(table, "日期 / 起日", datePicker, 42);
+            titleBox = new TextBox(); titleBox.MaxLength = 180; AddRow(table, Lang.T("名称"), titleBox, 42);
+            datePicker = new DateTimePicker { Format = DateTimePickerFormat.Custom, CustomFormat = Lang.T("yyyy 年 MM 月 dd 日") };
+            AddRow(table, Lang.T("日期 / 起日"), datePicker, 42);
             FlowLayoutPanel times = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false };
             startPicker = new DateTimePicker { Format = DateTimePickerFormat.Custom, CustomFormat = "HH:mm", ShowUpDown = true, Width = 115 };
             endPicker = new DateTimePicker { Format = DateTimePickerFormat.Custom, CustomFormat = "HH:mm", ShowUpDown = true, Width = 115 };
-            times.Controls.Add(startPicker); times.Controls.Add(new Label { Text = "至", Width = 28, Height = 26, TextAlign = ContentAlignment.MiddleCenter }); times.Controls.Add(endPicker);
-            AddRow(table, "上课时间", times, 42);
+            times.Controls.Add(startPicker); times.Controls.Add(new Label { Text = Lang.T("至"), Width = 28, Height = 26, TextAlign = ContentAlignment.MiddleCenter }); times.Controls.Add(endPicker);
+            AddRow(table, Lang.T("上课时间"), times, 42);
             times.Margin = Padding.Empty;
-            locationBox = new TextBox(); locationBox.MaxLength = 300; AddRow(table, "地点", locationBox, 42);
-            notesBox = new TextBox { Multiline = true, ScrollBars = ScrollBars.Vertical, MaxLength = 10000 }; AddRow(table, "备注", notesBox, 78);
+            locationBox = new TextBox(); locationBox.MaxLength = 300; AddRow(table, Lang.T("地点"), locationBox, 42);
+            notesBox = new TextBox { Multiline = true, ScrollBars = ScrollBars.Vertical, MaxLength = 10000 }; AddRow(table, Lang.T("备注"), notesBox, 78);
             colorBox = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList };
-            colorBox.Items.AddRange(new object[] { "鼠尾草绿", "雾蓝", "浅紫", "杏茶", "玫瑰", "橄榄" }); AddRow(table, "颜色", colorBox, 42);
+            colorBox.Items.AddRange(new object[] { Lang.T("鼠尾草绿"), Lang.T("雾蓝"), Lang.T("浅紫"), Lang.T("杏茶"), Lang.T("玫瑰"), Lang.T("橄榄") }); AddRow(table, Lang.T("颜色"), colorBox, 42);
             repeatBox = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Enabled = seriesMode };
-            repeatBox.Items.AddRange(new object[] { "不重复", "每周", "每两周" }); AddRow(table, "重复", repeatBox, 42);
+            repeatBox.Items.AddRange(new object[] { Lang.T("不重复"), Lang.T("每周"), Lang.T("每两周") }); AddRow(table, Lang.T("重复"), repeatBox, 42);
             weekdays = new CheckedListBox { CheckOnClick = true, MultiColumn = true, ColumnWidth = 54, Height = 47, BorderStyle = BorderStyle.None, BackColor = BackColor, IntegralHeight = false };
-            weekdays.Items.AddRange(new object[] { "周一", "周二", "周三", "周四", "周五", "周六", "周日" }); AddRow(table, "每逢", weekdays, 54);
-            untilPicker = new DateTimePicker { Format = DateTimePickerFormat.Custom, CustomFormat = "yyyy 年 MM 月 dd 日" }; AddRow(table, "循环截止", untilPicker, 42);
-            anchorPicker = new DateTimePicker { Format = DateTimePickerFormat.Custom, CustomFormat = "yyyy 年 MM 月 dd 日", ShowCheckBox = true };
-            AddRow(table, "双周基准日", anchorPicker, 42);
+            weekdays.Items.AddRange(new object[] { Lang.T("周一"), Lang.T("周二"), Lang.T("周三"), Lang.T("周四"), Lang.T("周五"), Lang.T("周六"), Lang.T("周日") }); AddRow(table, Lang.T("每逢"), weekdays, 54);
+            untilPicker = new DateTimePicker { Format = DateTimePickerFormat.Custom, CustomFormat = Lang.T("yyyy 年 MM 月 dd 日") }; AddRow(table, Lang.T("循环截止"), untilPicker, 42);
+            anchorPicker = new DateTimePicker { Format = DateTimePickerFormat.Custom, CustomFormat = Lang.T("yyyy 年 MM 月 dd 日"), ShowCheckBox = true };
+            AddRow(table, Lang.T("双周基准日"), anchorPicker, 42);
             ToolTip anchorHint = new ToolTip();
-            anchorHint.SetToolTip(anchorPicker, "勾选：以此日期所在周作为每两周循环的第 1 周。取消勾选：按课程起日所在周循环。已有课程不会跟随全局教学周设置改动。\n要从教学第 2 周上课，请将此日期设为第 2 周内任一天。");
+            anchorHint.SetToolTip(anchorPicker, Lang.T("勾选：以此日期所在周作为每两周循环的第 1 周。取消勾选：按课程起日所在周循环。已有课程不会跟随全局教学周设置改动。\n要从教学第 2 周上课，请将此日期设为第 2 周内任一天。"));
             Disposed += delegate { anchorHint.Dispose(); };
-            Label timezone = new Label { AutoSize = false, Text = "按本地上课时间循环（含夏令时）。时区：\n" + TimeZoneLabel(source.TimeZoneId), ForeColor = Color.FromArgb(113, 124, 117) };
-            AddRow(table, "时区", timezone, 68);
+            Label timezone = new Label { AutoSize = false, Text = Lang.T("按本地上课时间循环（含夏令时）。时区：\n") + TimeZoneLabel(source.TimeZoneId), ForeColor = Color.FromArgb(113, 124, 117) };
+            AddRow(table, Lang.T("时区"), timezone, 68);
             repeatBox.SelectedIndexChanged += delegate { bool enabled = seriesMode && repeatBox.SelectedIndex > 0; weekdays.Enabled = enabled; untilPicker.Enabled = enabled; anchorPicker.Enabled = seriesMode && repeatBox.SelectedIndex == 2; };
 
             TableLayoutPanel footer = new TableLayoutPanel(); footer.Dock = DockStyle.Fill; footer.RowCount = 2; footer.ColumnCount = 1; footer.Padding = new Padding(20, 0, 20, 12);
             footer.RowStyles.Add(new RowStyle(SizeType.Absolute, 28)); footer.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); outer.Controls.Add(footer, 0, 1);
             error = new Label { Dock = DockStyle.Fill, ForeColor = Color.FromArgb(171, 69, 67), TextAlign = ContentAlignment.MiddleLeft }; footer.Controls.Add(error, 0, 0);
             FlowLayoutPanel buttons = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.RightToLeft, WrapContents = false };
-            Button save = new Button { Text = "保存日程", Width = 109, Height = 34, BackColor = Color.FromArgb(72, 112, 98), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
-            Button cancel = new Button { Text = "取消", Width = 83, Height = 34, DialogResult = DialogResult.Cancel };
+            Button save = new Button { Text = Lang.T("保存日程"), Width = 109, Height = 34, BackColor = Color.FromArgb(72, 112, 98), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
+            Button cancel = new Button { Text = Lang.T("取消"), Width = 83, Height = 34, DialogResult = DialogResult.Cancel };
             buttons.Controls.Add(save); buttons.Controls.Add(cancel); save.Click += SaveEditor; CancelButton = cancel;
             if (existing)
             {
-                Button delete = new Button { Text = seriesMode ? "删除日程" : "取消这次课程", Width = 125, Height = 34, ForeColor = Color.FromArgb(170, 76, 71) };
+                Button delete = new Button { Text = seriesMode ? Lang.T("删除日程") : Lang.T("取消这次课程"), Width = 125, Height = 34, ForeColor = Color.FromArgb(170, 76, 71) };
                 delete.Click += delegate {
-                    string text = seriesMode && source.RepeatWeeks > 0 ? "确定删除整个循环系列及其例外安排？" : "确定删除这次日程？";
-                    if (MessageBox.Show(this, text, "删除确认", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+                    string text = seriesMode && source.RepeatWeeks > 0 ? Lang.T("确定删除整个循环系列及其例外安排？") : Lang.T("确定删除这次日程？");
+                    if (MessageBox.Show(this, text, Lang.T("删除确认"), MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
                     { DeleteRequested = true; DialogResult = DialogResult.OK; }
                 };
                 buttons.Controls.Add(delete);
@@ -1013,7 +1013,14 @@ namespace DeskStudy
 
         private static string TimeZoneLabel(string id)
         {
-            try { return TimeZoneInfo.FindSystemTimeZoneById(String.IsNullOrWhiteSpace(id) ? TimeZoneInfo.Local.Id : id).DisplayName; }
+            try
+            {
+                var zone = TimeZoneInfo.FindSystemTimeZoneById(String.IsNullOrWhiteSpace(id) ? TimeZoneInfo.Local.Id : id);
+                // Windows names zones in its own display language; the English interface shows the zone's English ID instead.
+                if (!Lang.IsEnglish) return zone.DisplayName;
+                TimeSpan offset = zone.BaseUtcOffset;
+                return "(UTC" + (offset < TimeSpan.Zero ? "-" : "+") + offset.ToString(@"hh\:mm") + ") " + zone.Id;
+            }
             catch { return id; }
         }
 
@@ -1046,14 +1053,14 @@ namespace DeskStudy
 
         private void SaveEditor(object sender, EventArgs args)
         {
-            if (String.IsNullOrWhiteSpace(titleBox.Text)) { error.Text = "请填写日程名称。"; titleBox.Focus(); return; }
+            if (String.IsNullOrWhiteSpace(titleBox.Text)) { error.Text = Lang.T("请填写日程名称。"); titleBox.Focus(); return; }
             TimeSpan start = new TimeSpan(startPicker.Value.Hour, startPicker.Value.Minute, 0);
             TimeSpan end = new TimeSpan(endPicker.Value.Hour, endPicker.Value.Minute, 0);
-            if (end <= start) { error.Text = "结束时间须晚于开始时间；跨天日程请分成两条。"; return; }
+            if (end <= start) { error.Text = Lang.T("结束时间须晚于开始时间；跨天日程请分成两条。"); return; }
             int repeat = seriesMode ? repeatBox.SelectedIndex : 0;
-            if (repeat > 0 && untilPicker.Value.Date < datePicker.Value.Date) { error.Text = "循环截止日期不能早于开始日期。"; return; }
-            if (repeat > 0 && (untilPicker.Value.Date - datePicker.Value.Date).TotalDays > 36600) { error.Text = "循环跨度不能超过 100 年。"; return; }
-            if (repeat > 0 && weekdays.CheckedItems.Count == 0) { error.Text = "请至少选择一个重复星期。"; return; }
+            if (repeat > 0 && untilPicker.Value.Date < datePicker.Value.Date) { error.Text = Lang.T("循环截止日期不能早于开始日期。"); return; }
+            if (repeat > 0 && (untilPicker.Value.Date - datePicker.Value.Date).TotalDays > 36600) { error.Text = Lang.T("循环跨度不能超过 100 年。"); return; }
+            if (repeat > 0 && weekdays.CheckedItems.Count == 0) { error.Text = Lang.T("请至少选择一个重复星期。"); return; }
             List<int> days = new List<int>(); foreach (int index in weekdays.CheckedIndices) days.Add((index + 1) % 7);
             Result = new CalendarEvent {
                 Id = source.Id, Title = titleBox.Text.Trim(), Date = datePicker.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),

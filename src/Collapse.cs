@@ -20,7 +20,7 @@ namespace DeskStudy
         private void InitializeCollapse()
         {
             collapseButton = Ui.Button("−", delegate { ToggleCollapse(); });
-            collapseButton.Name = "collapse-widget"; collapseButton.AccessibleName = "折叠"; collapseButton.AutoSize = false; collapseButton.Width = 40;
+            collapseButton.Name = "collapse-widget"; collapseButton.AccessibleName = Lang.T("折叠"); collapseButton.AutoSize = false; collapseButton.Width = 40;
             collapseTip = new ToolTip();
             Disposed += delegate { collapseTip.Dispose(); if (iconFont != null) iconFont.Dispose(); };
         }
@@ -47,8 +47,8 @@ namespace DeskStudy
                 collapseButton.Font = iconFont;
                 collapseButton.Text = collapsed ? "" : "";
             }
-            collapseButton.AccessibleName = collapsed ? "展开" : "折叠";
-            collapseTip.SetToolTip(collapseButton, collapsed ? "展开，回到原来的位置（双击顶栏也可以）" : "折叠到屏幕底部（双击顶栏也可以）");
+            collapseButton.AccessibleName = collapsed ? Lang.T("展开") : Lang.T("折叠");
+            collapseTip.SetToolTip(collapseButton, collapsed ? Lang.T("展开，回到原来的位置（双击顶栏也可以）") : Lang.T("折叠到屏幕底部（双击顶栏也可以）"));
             UpdateHeaderActionsWidth();
         }
 

@@ -12,7 +12,7 @@ namespace DeskStudy
         public string Caption { get; private set; }
         public string Description { get; private set; }
         private bool selected;
-        public bool SelectedLayout { get { return selected; } set { selected = value; AccessibleDescription = Description + (value ? "，当前已选中" : "，点击选择"); Invalidate(); } }
+        public bool SelectedLayout { get { return selected; } set { selected = value; AccessibleDescription = Description + (value ? Lang.T("，当前已选中") : Lang.T("，点击选择")); Invalidate(); } }
         public NotebookLayoutPreview(string id, string caption, string description)
         {
             LayoutId = id; Caption = caption; Description = description;
@@ -27,7 +27,7 @@ namespace DeskStudy
             g.Clear(selected ? Color.FromArgb(243, 247, 255) : Color.White);
             using (var pen = new Pen(selected ? Ui.Accent : Ui.Border, selected ? 2 : 1)) g.DrawRectangle(pen, 1, 1, Width - 3, Height - 3);
             using (var bold = new Font(Font, FontStyle.Bold)) TextRenderer.DrawText(g, Caption, bold, new Rectangle(p, p, Width - p * 2, (int)(25 * d)), Ui.Text, TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
-            TextRenderer.DrawText(g, selected ? "✓ 已选中" : LayoutId == "Card" ? "默认推荐" : "点击使用", Font, new Rectangle(p, Height - (int)(30 * d), Width - p * 2, (int)(22 * d)), selected ? Ui.Accent : Ui.Muted, TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
+            TextRenderer.DrawText(g, selected ? Lang.T("✓ 已选中") : LayoutId == "Card" ? Lang.T("默认推荐") : Lang.T("点击使用"), Font, new Rectangle(p, Height - (int)(30 * d), Width - p * 2, (int)(22 * d)), selected ? Ui.Accent : Ui.Muted, TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
             TextRenderer.DrawText(g, Description, Font, new Rectangle(p, (int)(155 * d), Width - p * 2, (int)(42 * d)), Ui.Muted, TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix);
             var state = g.Save(); g.TranslateTransform(p, 43 * d); g.ScaleTransform((Width - p * 2) / 168F, 102 * d / 102F);
             if (LayoutId == "Clean" || LayoutId == "Journal") { DrawReferenceSchematic(g, LayoutId == "Journal"); g.Restore(state); DrawFocus(g); return; }

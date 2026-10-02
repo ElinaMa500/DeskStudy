@@ -237,17 +237,17 @@ namespace DeskStudy
         private Notebook Book(string id) { return Data.Books.First(b => b.Id == id); }
         public void RenameBook(string id, string name)
         {
-            if (String.IsNullOrWhiteSpace(name)) throw new ArgumentException("便签名称不能为空。");
+            if (String.IsNullOrWhiteSpace(name)) throw new ArgumentException(Lang.T("便签名称不能为空。"));
             Book(id).Name = name.Trim(); Save();
         }
         public void AddPage(string bookId)
         {
-            var book = Book(bookId); var page = new NotePage { Title = "未命名页" };
+            var book = Book(bookId); var page = new NotePage { Title = Lang.T("未命名页") };
             book.Pages.Add(page); book.CurrentPageId = page.Id; Save();
         }
         public void RenamePage(string bookId, string pageId, string title)
         {
-            if (String.IsNullOrWhiteSpace(title)) throw new ArgumentException("页面名称不能为空。");
+            if (String.IsNullOrWhiteSpace(title)) throw new ArgumentException(Lang.T("页面名称不能为空。"));
             Book(bookId).Pages.First(p => p.Id == pageId).Title = title.Trim(); Save();
         }
         public void MovePage(string bookId, string pageId, int delta)
@@ -267,7 +267,7 @@ namespace DeskStudy
             if (archived && book.CurrentPageId == pageId)
             {
                 var active = book.Pages.FirstOrDefault(p => !p.Archived);
-                if (active == null) { active = new NotePage { Title = "未命名页" }; book.Pages.Add(active); }
+                if (active == null) { active = new NotePage { Title = Lang.T("未命名页") }; book.Pages.Add(active); }
                 book.CurrentPageId = active.Id;
             }
             Save();
@@ -308,8 +308,8 @@ namespace DeskStudy
                 catch (Exception ex)
                 {
                     if (!(ex is UnauthorizedAccessException || ex is System.Security.SecurityException || ex is IOException)) throw;
-                    StartupWarning = "数据已恢复，但 Windows 未允许更新开机启动项。请检查权限后重新设置。";
-                    MessageBox.Show(StartupWarning + "\n\n" + ex.Message, "开机启动未应用", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    StartupWarning = Lang.T("数据已恢复，但 Windows 未允许更新开机启动项。请检查权限后重新设置。");
+                    MessageBox.Show(StartupWarning + "\n\n" + ex.Message, Lang.T("开机启动未应用"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 }
             }
             CheckReminders(DateTime.UtcNow);
@@ -328,7 +328,7 @@ namespace DeskStudy
                 catch (Exception ex)
                 {
                     if (!(ex is UnauthorizedAccessException || ex is System.Security.SecurityException || ex is IOException)) throw;
-                    StartupWarning = "无法读取 Windows 开机启动项；此处显示已保存的偏好。";
+                    StartupWarning = Lang.T("无法读取 Windows 开机启动项；此处显示已保存的偏好。");
                     return Data.Settings.LaunchAtStartup;
                 }
             }
@@ -341,8 +341,8 @@ namespace DeskStudy
         }
         public void SendTestNotification()
         {
-            if (notifications && !NativeNotification.Show(tray, AppIcon, "桌面课笺 · 测试通知", "通知测试。测试按钮不受应用免打扰时段限制，Windows 勿扰仍可能影响横幅。", Data.Settings.Reminders.SoundEnabled))
-                throw new InvalidOperationException("Windows 未接受静音系统通知。提醒记录仍保留在提醒中心。");
+            if (notifications && !NativeNotification.Show(tray, AppIcon, Lang.T("桌面课笺 · 测试通知"), Lang.T("通知测试。测试按钮不受应用免打扰时段限制，Windows 勿扰仍可能影响横幅。"), Data.Settings.Reminders.SoundEnabled))
+                throw new InvalidOperationException(Lang.T("Windows 未接受静音系统通知。提醒记录仍保留在提醒中心。"));
         }
     }
 

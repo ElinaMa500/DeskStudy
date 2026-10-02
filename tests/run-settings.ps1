@@ -16,7 +16,7 @@ if ($Packaged) {
 }
 if ($CoreOnly) {
     $coreExe = Join-Path $artifactPath 'SettingsCoreTests.exe'
-    & $compilerPath /nologo /target:exe /codepage:65001 ('/out:' + $coreExe) /reference:System.Web.Extensions.dll (Join-Path $projectRoot 'src\Core.cs') (Join-Path $projectRoot 'src\SettingsModel.cs') (Join-Path $PSScriptRoot 'SettingsCoreTests.cs')
+    & $compilerPath /nologo /target:exe /codepage:65001 ('/out:' + $coreExe) /reference:System.Web.Extensions.dll (Join-Path $projectRoot 'src\Core.cs') (Join-Path $projectRoot 'src\Lang.cs') (Join-Path $projectRoot 'src\Lang.en.cs') (Join-Path $projectRoot 'src\SettingsModel.cs') (Join-Path $PSScriptRoot 'SettingsCoreTests.cs')
     if ($LASTEXITCODE -ne 0) { throw 'Settings core compilation failed.' }
     & $coreExe 2>&1 | Tee-Object -FilePath (Join-Path $artifactPath 'settings-core.log')
     if ($LASTEXITCODE -ne 0) { throw 'Settings core tests failed.' }

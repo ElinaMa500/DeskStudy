@@ -188,46 +188,46 @@ namespace DeskStudy
         private static void Timestamp(string value)
         {
             DateTime parsed;
-            Require(value != null && (value == "" || DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out parsed)), "设置中的保存时间无效。");
+            Require(value != null && (value == "" || DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out parsed)), Lang.T("设置中的保存时间无效。"));
         }
         private static void Appearance(AppearanceOptions value)
         {
-            Require(value != null, "外观设置不能为空。");
-            Require(value.CustomizedFields != null && value.CustomizedFields.Count <= 4 && value.CustomizedFields.Distinct().Count() == value.CustomizedFields.Count && value.CustomizedFields.All(f => new[] { "Theme", "BackgroundColor", "Opacity", "FontSize" }.Contains(f)), "自定义外观字段无效。");
-            Require(value.Theme == "Light" || value.Theme == "Dark", "主题设置无效。");
+            Require(value != null, Lang.T("外观设置不能为空。"));
+            Require(value.CustomizedFields != null && value.CustomizedFields.Count <= 4 && value.CustomizedFields.Distinct().Count() == value.CustomizedFields.Count && value.CustomizedFields.All(f => new[] { "Theme", "BackgroundColor", "Opacity", "FontSize" }.Contains(f)), Lang.T("自定义外观字段无效。"));
+            Require(value.Theme == "Light" || value.Theme == "Dark", Lang.T("主题设置无效。"));
             string color = value.BackgroundColor;
-            Require(color != null && color.Length == 7 && color[0] == '#' && color.Skip(1).All(c => Uri.IsHexDigit(c)), "背景颜色应为 #RRGGBB。");
-            Require(!Double.IsNaN(value.Opacity) && !Double.IsInfinity(value.Opacity) && value.Opacity >= 0.35 && value.Opacity <= 1.0, "透明度应在 35% 到 100% 之间。");
-            Require(!Single.IsNaN(value.FontSize) && !Single.IsInfinity(value.FontSize) && value.FontSize >= 8F && value.FontSize <= 14F, "字号应在 8 到 14 之间。");
+            Require(color != null && color.Length == 7 && color[0] == '#' && color.Skip(1).All(c => Uri.IsHexDigit(c)), Lang.T("背景颜色应为 #RRGGBB。"));
+            Require(!Double.IsNaN(value.Opacity) && !Double.IsInfinity(value.Opacity) && value.Opacity >= 0.35 && value.Opacity <= 1.0, Lang.T("透明度应在 35% 到 100% 之间。"));
+            Require(!Single.IsNaN(value.FontSize) && !Single.IsInfinity(value.FontSize) && value.FontSize >= 8F && value.FontSize <= 14F, Lang.T("字号应在 8 到 14 之间。"));
         }
         internal static void Check(AppSettings settings)
         {
-            Require(settings != null, "缺少设置数据。"); Appearance(settings.GlobalAppearance);
-            Require(NotebookLayouts.Contains(settings.NotebookLayout), "便签布局无效。");
-            Require(WidgetModes.Contains(settings.WidgetMode), "窗口模式无效。");
-            Require(WidgetCornerStyles.Contains(settings.WidgetCorners), "组件四角样式无效。");
-            Require(Languages.Contains(settings.Language), "界面语言无效。");
-            HotkeySpec hotkey; Require(settings.ShowHotkey == "" || HotkeySpec.TryParse(settings.ShowHotkey, out hotkey), "快捷键无效。");
-            Require(settings.AppearanceOverrides != null && settings.AppearanceOverrides.Count <= 3, "组件外观设置无效。");
+            Require(settings != null, Lang.T("缺少设置数据。")); Appearance(settings.GlobalAppearance);
+            Require(NotebookLayouts.Contains(settings.NotebookLayout), Lang.T("便签布局无效。"));
+            Require(WidgetModes.Contains(settings.WidgetMode), Lang.T("窗口模式无效。"));
+            Require(WidgetCornerStyles.Contains(settings.WidgetCorners), Lang.T("组件四角样式无效。"));
+            Require(Languages.Contains(settings.Language), Lang.T("界面语言无效。"));
+            HotkeySpec hotkey; Require(settings.ShowHotkey == "" || HotkeySpec.TryParse(settings.ShowHotkey, out hotkey), Lang.T("快捷键无效。"));
+            Require(settings.AppearanceOverrides != null && settings.AppearanceOverrides.Count <= 3, Lang.T("组件外观设置无效。"));
             foreach (KeyValuePair<string, AppearanceOptions> pair in settings.AppearanceOverrides)
-            { Require(new[] { "calendar", "todo", "ddl" }.Contains(pair.Key), "未知的组件外观设置。"); Appearance(pair.Value); }
+            { Require(new[] { "calendar", "todo", "ddl" }.Contains(pair.Key), Lang.T("未知的组件外观设置。")); Appearance(pair.Value); }
             CalendarOptions c = settings.Calendar;
-            Require(c != null, "缺少日历设置。"); Require(c.DefaultView == "Week" || c.DefaultView == "Month", "默认视图无效。");
-            Require(c.WeekStartDay >= 0 && c.WeekStartDay <= 6, "每周起始日无效。");
+            Require(c != null, Lang.T("缺少日历设置。")); Require(c.DefaultView == "Week" || c.DefaultView == "Month", Lang.T("默认视图无效。"));
+            Require(c.WeekStartDay >= 0 && c.WeekStartDay <= 6, Lang.T("每周起始日无效。"));
             DateTime start = TimeUtil.ParseDate(c.SemesterStart), end = TimeUtil.ParseDate(c.SemesterEnd);
-            Require(end >= start && (end - start).TotalDays <= 36600, "学期日期范围无效。"); TimeUtil.ParseDate(c.TeachingWeekOne);
+            Require(end >= start && (end - start).TotalDays <= 36600, Lang.T("学期日期范围无效。")); TimeUtil.ParseDate(c.TeachingWeekOne);
             ReminderOptions r = settings.Reminders;
-            Require(r != null, "缺少提醒设置。"); Require(r.DefaultLeadMinutes >= 0 && r.DefaultLeadMinutes <= 5256000, "默认提前时间无效。");
+            Require(r != null, Lang.T("缺少提醒设置。")); Require(r.DefaultLeadMinutes >= 0 && r.DefaultLeadMinutes <= 5256000, Lang.T("默认提前时间无效。"));
             DateTime.ParseExact(r.QuietStart, "HH:mm", CultureInfo.InvariantCulture); DateTime.ParseExact(r.QuietEnd, "HH:mm", CultureInfo.InvariantCulture);
             DateTime.ParseExact(r.DateOnlyReminderTime, "HH:mm", CultureInfo.InvariantCulture);
-            Require(settings.AutoSaveDelayMs >= 100 && settings.AutoSaveDelayMs <= 10000, "自动保存间隔应在 100 到 10000 毫秒之间。");
+            Require(settings.AutoSaveDelayMs >= 100 && settings.AutoSaveDelayMs <= 10000, Lang.T("自动保存间隔应在 100 到 10000 毫秒之间。"));
             Timestamp(settings.LastBackupUtc); Timestamp(settings.SavedLayoutUtc);
-            Require(settings.SavedLayout != null && (settings.SavedLayout.Count == 0 || settings.SavedLayout.Count == 3), "保存的布局无效。");
+            Require(settings.SavedLayout != null && (settings.SavedLayout.Count == 0 || settings.SavedLayout.Count == 3), Lang.T("保存的布局无效。"));
             foreach (KeyValuePair<string, WindowState> pair in settings.SavedLayout)
             {
-                Require(new[] { "calendar", "todo", "ddl" }.Contains(pair.Key), "保存的布局包含未知组件。");
+                Require(new[] { "calendar", "todo", "ddl" }.Contains(pair.Key), Lang.T("保存的布局包含未知组件。"));
                 WindowState w = pair.Value;
-                Require(w != null && w.Width >= 120 && w.Width <= 16000 && w.Height >= 100 && w.Height <= 16000 && Math.Abs((long)w.X) <= 100000 && Math.Abs((long)w.Y) <= 100000, "保存的窗口尺寸或位置无效。");
+                Require(w != null && w.Width >= 120 && w.Width <= 16000 && w.Height >= 100 && w.Height <= 16000 && Math.Abs((long)w.X) <= 100000 && Math.Abs((long)w.Y) <= 100000, Lang.T("保存的窗口尺寸或位置无效。"));
             }
         }
     }
