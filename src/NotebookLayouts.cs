@@ -85,7 +85,7 @@ namespace DeskStudy
         }
         private bool IsComposing
         {
-            get { return (_pageTitle as CompositionTextBox).IsComposing || (_notes as CompositionTextBox).IsComposing || (_quickText != null && _quickText.IsComposing); }
+            get { return (_pageTitle as CompositionTextBox).IsComposing || (_notes as CompositionTextBox).IsComposing || (_quickText != null && _quickText.IsComposing) || (_inlineEditor != null && _inlineEditor.IsComposing); }
         }
         protected override bool CanApplyAppearance()
         {

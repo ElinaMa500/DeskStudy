@@ -359,6 +359,7 @@ namespace DeskStudy
             if (_saving || _rendering || IsDisposed) return;
             if (InvokeRequired) { BeginInvoke(new Action(OnDataChanged)); return; }
             if (IsComposing) { _layoutRetry.Start(); return; }
+            if (DeferRefreshForInlineEdit()) return;
             EnsureNotebook();
             RefreshFromData();
         }
@@ -591,6 +592,7 @@ namespace DeskStudy
             row.Card.Controls.Add(row.Actions);
             row.Card.Controls.Add(row.More);
             WireDueRow(row);
+            WireInlineEdit(row);
             return row;
         }
 
