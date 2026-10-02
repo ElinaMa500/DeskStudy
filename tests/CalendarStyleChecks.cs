@@ -12,6 +12,8 @@ public static class CalendarStyleChecks
 {
     [System.Runtime.InteropServices.DllImport("user32.dll")] static extern int GetWindowRgnBox(IntPtr hwnd, out RECT box);
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)] struct RECT { public int Left, Top, Right, Bottom; }
+    [System.Runtime.InteropServices.DllImport("gdi32.dll")] static extern bool PtInRegion(IntPtr region, int x, int y);
+    [System.Runtime.InteropServices.DllImport("gdi32.dll")] static extern bool DeleteObject(IntPtr handle);
     static bool Clipped(Form f) { RECT box; return GetWindowRgnBox(f.Handle, out box) > 1; }
     static void Assert(bool condition, string message) { if (!condition) throw new Exception(message); Console.WriteLine("PASS " + message); }
     static void Pump(int ms) { var clock = Stopwatch.StartNew(); while (clock.ElapsedMilliseconds < ms) { Application.DoEvents(); Thread.Sleep(10); } }
@@ -93,6 +95,18 @@ public static class CalendarStyleChecks
         Assert(!Clipped(todo), "while dragging the clip is lifted so the system corners and shadow show");
         SendMessage(todo.Handle, 0x0232, IntPtr.Zero, IntPtr.Zero); Pump(400);
         Assert(Clipped(todo), "after the drag the rounded clip is back");
+        {
+            // The rounded outline is the same at all four corners (GDI's own round-rect region is not).
+            IntPtr region = WidgetForm.RoundedRegion(433, 488, 10); bool symmetric = true;
+            for (int x = 0; x < 12; x++) for (int y = 0; y < 12; y++)
+            {
+                bool tl = PtInRegion(region, x, y), tr = PtInRegion(region, 432 - x, y), bl = PtInRegion(region, x, 487 - y), br = PtInRegion(region, 432 - x, 487 - y);
+                if (tl != tr || tl != bl || tl != br) symmetric = false;
+            }
+            bool cut = !PtInRegion(region, 0, 0) && PtInRegion(region, 10, 0) && PtInRegion(region, 216, 244);
+            DeleteObject(region);
+            Assert(symmetric && cut, "the rounded corners are identical at all four corners");
+        }
         app.SetWidgetCorners("Square"); Pump(100);
         Assert(app.Widgets.All(w => !Clipped(w)), "直角: no clipping");
         bool rejected = false; try { app.SetWidgetCorners("Oval"); } catch (InvalidOperationException) { rejected = true; }

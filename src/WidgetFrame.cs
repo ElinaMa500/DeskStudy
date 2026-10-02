@@ -81,8 +81,7 @@ namespace DeskStudy
             bool clip = desktopMode && !shadowOn && WindowState == FormWindowState.Normal && App != null && App.Data.Settings.WidgetCorners != "Square";
             if (!clip) { if (cornerClipped) { SetWindowRgn(Handle, IntPtr.Zero, true); cornerClipped = false; } return; }
             float dpi; using (Graphics g = CreateGraphics()) dpi = g.DpiX / 96F;
-            int diameter = (int)Math.Round(16 * dpi);
-            IntPtr region = CreateRoundRectRgn(0, 0, Width + 1, Height + 1, diameter, diameter);
+            IntPtr region = RoundedRegion(Width, Height, (int)Math.Round(8 * dpi));
             // The window owns the region after this call.
             if (SetWindowRgn(Handle, region, true) == 0) DeleteObject(region); else cornerClipped = true;
         }
@@ -92,7 +91,27 @@ namespace DeskStudy
             base.OnSizeChanged(e);
             if (cornerClipped || (desktopMode && !shadowOn)) ApplyCorners();
         }
-        [DllImport("gdi32.dll")] private static extern IntPtr CreateRoundRectRgn(int left, int top, int right, int bottom, int widthEllipse, int heightEllipse);
+        // GDI's CreateRoundRectRgn cuts the right and bottom corners differently from the left and top ones,
+        // so the rounded outline is built row by row from the circle, identical at all four corners.
+        internal static IntPtr RoundedRegion(int width, int height, int radius)
+        {
+            radius = Math.Max(0, Math.Min(radius, Math.Min(width, height) / 2));
+            IntPtr region = CreateRectRgn(0, radius, width, height - radius);
+            for (int row = 0; row < radius; row++)
+            {
+                double dy = radius - row - 0.5;
+                int inset = (int)Math.Round(radius - Math.Sqrt(radius * radius - dy * dy));
+                foreach (int y in new[] { row, height - 1 - row })
+                {
+                    IntPtr line = CreateRectRgn(inset, y, width - inset, y + 1);
+                    CombineRgn(region, region, line, 2);
+                    DeleteObject(line);
+                }
+            }
+            return region;
+        }
+        [DllImport("gdi32.dll")] private static extern IntPtr CreateRectRgn(int left, int top, int right, int bottom);
+        [DllImport("gdi32.dll")] private static extern int CombineRgn(IntPtr destination, IntPtr first, IntPtr second, int mode);
         [DllImport("gdi32.dll")] private static extern bool DeleteObject(IntPtr handle);
         [DllImport("user32.dll")] private static extern int SetWindowRgn(IntPtr hwnd, IntPtr region, bool redraw);
         private Font closeFont;
@@ -179,6 +198,10 @@ namespace DeskStudy
             // The whole window is client area: no title bar. The thick frame style stays so Windows keeps the shadow and rounded corners.
             if (m.Msg == 0x0083) { m.Result = IntPtr.Zero; return true; }
             if (m.Msg == 0x0084) { m.Result = new IntPtr(EdgeHit(ScreenPoint(m.LParam))); return true; }
+            // With a rounded window region Windows stops composing the frame and would paint the old-style
+            // border over the edges of the widget (most visibly when it becomes active). There is no frame to paint.
+            if (cornerClipped && m.Msg == 0x0085) { m.Result = IntPtr.Zero; return true; }
+            if (cornerClipped && m.Msg == 0x0086) { m.Result = new IntPtr(1); return true; }
 
             return false;
         }
