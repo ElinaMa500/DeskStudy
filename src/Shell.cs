@@ -197,7 +197,8 @@ namespace DeskStudy
                 pin.Margin = new Padding(0, 0, (int)Math.Round(2 * dpi), 0);
                 settingsButton.BackColor = back; settingsButton.ForeColor = muted;
                 settingsButton.FlatAppearance.BorderSize = 0; settingsButton.FlatAppearance.MouseOverBackColor = soft; settingsButton.FlatAppearance.BorderColor = back;
-                settingsButton.Width = (int)Math.Round((slim ? 26 : 30) * dpi);
+                // Wide enough for the ⚙ glyph with the button's own padding (the notebooks get this from their minimum size).
+                settingsButton.Width = slim ? (int)Math.Round(26 * dpi) : Math.Max(settingsButton.MinimumSize.Width, (int)Math.Round(40 * dpi));
                 settingsButton.Margin = Padding.Empty;
                 pin.AutoSize = false;
                 pin.Size = new Size(TextRenderer.MeasureText("置顶", pin.Font).Width + (int)Math.Round((slim ? 12 : 16) * dpi), settingsButton.Height);
@@ -336,6 +337,8 @@ namespace DeskStudy
             foreach (var w in Widgets) if (visible[w.WidgetKey]) w.Show();
             foreach (var w in Widgets) w.ApplyAppearance();
             // Widgets saved partly off screen or on top of each other (older versions, a monitor since removed) are tidied once.
+            // First start: the calendar opens tall enough to show 07:00 to 12:00, within the screen.
+            if (Store.IsNew) foreach (var w in Widgets.OfType<CalendarForm>()) w.FitDefaultHeight();
             ArrangeWidgets(); WatchDisplays();
             FinishStartup(quietStart);
             if (framesConverted) QueueSave();

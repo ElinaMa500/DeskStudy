@@ -335,6 +335,8 @@ namespace DeskStudy
         public string DirectoryPath { get; private set; }
         public string LoadWarning { get; private set; }
         public AppData Data { get; private set; }
+        // No data file yet: the very first start.
+        public bool IsNew { get; private set; }
         public string LatestBackupUtc
         {
             get
@@ -362,7 +364,7 @@ namespace DeskStudy
         {
             DirectoryPath = Path.GetFullPath(directory); Directory.CreateDirectory(DirectoryPath);
             LoadWarning = "";
-            if (!File.Exists(DataPath)) { Data = new AppData(); return; }
+            if (!File.Exists(DataPath)) { Data = new AppData(); IsNew = true; return; }
             string migrationPrefix = "";
             try { Data = Read(DataPath, out migrationPrefix); }
             catch (NotSupportedException) { throw; } // Never downgrade a newer app's data.

@@ -29,6 +29,13 @@ public static class CalendarStyleChecks
             return;
         }
         app.ShowAll(); Pump(200);
+        {
+            // First start: tall enough to show 07:00 to 12:00 (or as tall as the screen allows).
+            var surface = All(calendar).OfType<CalendarSurface>().First();
+            Rectangle work = Screen.FromControl(calendar).WorkingArea;
+            int needed = calendar.Height - surface.ClientSize.Height + 5 * surface.HourPixels;
+            Assert(app.Store.IsNew && (calendar.Height >= needed || calendar.Bottom >= work.Bottom), "first start: the calendar shows 07:00 to 12:00 (" + calendar.Height + " ≥ " + needed + ")");
+        }
 
         // Original: the calendar keeps its old look, with a 工作周 button and uncut header buttons.
         Switch(app, "Original");

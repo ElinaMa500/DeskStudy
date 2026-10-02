@@ -223,6 +223,7 @@ namespace DeskStudy
                     var initial = new WindowState { Width = sizes[w.WidgetKey].Width, Height = sizes[w.WidgetKey].Height, X = places[w.WidgetKey].X, Y = places[w.WidgetKey].Y, Visible = true, TopMost = false, PositionLocked = false };
                     UpdateWindow(w.WidgetKey, initial);
                 }
+                foreach (var w in Widgets.OfType<CalendarForm>()) w.FitDefaultHeight();
             });
             SettingsChanged();
         }

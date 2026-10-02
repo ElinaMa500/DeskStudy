@@ -64,6 +64,7 @@ public static class FoldChecks
         Click(ddl);
         Assert(ddl.Collapsed && V(ddl).Bottom == work.Bottom && !V(ddl).IntersectsWith(V(calendar)), "a second folded widget lines up on the bottom edge beside the first: " + V(ddl) + " / " + V(calendar));
         Assert(Apart(app.Widgets), "folded bars never cover other widgets");
+        Assert(V(calendar).Height == V(ddl).Height, "the folded calendar bar is exactly as tall as the folded notebook bar (" + V(calendar).Height + " / " + V(ddl).Height + ")");
 
         // Dragging a folded bar: it always goes back to the bottom edge; near the right edge it snaps to it.
         Drop(ddl, new Point(work.Left + 200, work.Top + 300));

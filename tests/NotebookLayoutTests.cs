@@ -99,7 +99,8 @@ public static class NotebookLayoutTests
             Assert(second.Title == title.Text && second.Text == notes.Text && notes.Text.Contains("备注草稿二"), layout + " keeps title and complete notes");
             Assert(quick.Text == "未提交的连续录入草稿" && quick.SelectionStart == 4 && quick.SelectionLength == 3, layout + " retains unsubmitted task text and selection");
             Assert(controls.All(c => !c.IsDisposed) && Object.ReferenceEquals(title, Find<TextBox>(form, "page-title")) && Object.ReferenceEquals(notes, Find<TextBox>(form, "page-text")), layout + " reuses edit controls and keeps their draft contents");
-            Assert(app.Widgets.All(w => w.Handle == windowHandles[w.WidgetKey] && w.Bounds == windows[w.WidgetKey]) && form.TopMost && form.PositionLocked && !ddlForm.Visible, layout + " preserves native windows, geometry, pin, lock and hidden state");
+            // The calendar may grow to the original style's minimum height (1.5.1), so only the notebooks' bounds are compared.
+            Assert(app.Widgets.All(w => w.Handle == windowHandles[w.WidgetKey] && (w.WidgetKey == "calendar" ? w.Location == windows[w.WidgetKey].Location : w.Bounds == windows[w.WidgetKey])) && form.TopMost && form.PositionLocked && !ddlForm.Visible, layout + " preserves native windows, geometry, pin, lock and hidden state");
             var previous = Find<Button>(form, "previous-page"); var newPage = Find<Button>(form, "new-page");
             Assert((previous.PointToScreen(Point.Empty).Y < title.PointToScreen(Point.Empty).Y) == (layout == "Original"), layout + " restores original top navigation or modern bottom navigation");
             Assert(newPage.Visible && Find<Button>(form, "open-settings").Visible, layout + " keeps navigation and settings entrance");

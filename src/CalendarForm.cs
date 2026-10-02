@@ -175,6 +175,20 @@ namespace DeskStudy
             if (!month) surface.ScrollToMorning();
         }
 
+        // Default height: enough to show 07:00 to 12:00 below the toolbar, but never taller than the screen allows.
+        public void FitDefaultHeight()
+        {
+            if (!Visible || surface == null || WindowState != FormWindowState.Normal) return;
+            int desired = Height - surface.ClientSize.Height + 5 * surface.HourPixels + Px(24);
+            Rectangle work = Screen.FromControl(this).WorkingArea;
+            int top = Top, height = Math.Max(MinimumSize.Height, desired);
+            if (top + height > work.Bottom) height = Math.Max(MinimumSize.Height, work.Bottom - top);
+            if (top + height > work.Bottom) top = Math.Max(work.Top, work.Bottom - height);
+            Bounds = new Rectangle(Left, top, Width, Math.Min(height, work.Height));
+            surface.ScrollToMorning();
+            Remember();
+        }
+
         private void MovePeriod(int amount)
         {
             focusDate = monthView ? focusDate.AddMonths(amount) : focusDate.AddDays(amount * 7);
@@ -207,7 +221,8 @@ namespace DeskStudy
             return notebookLayout == "Card" || notebookLayout == "Clean" ? "Clean" : notebookLayout == "Paper" || notebookLayout == "Journal" ? "Journal" : "Original";
         }
         private bool IsReference { get { return calendarStyle != "Original"; } }
-        protected override bool SlimReferenceHeader { get { return true; } }
+        // Unfolded: the low, small-type header. Folded: the same bar as the notebooks, so folded bars match.
+        protected override bool SlimReferenceHeader { get { return !Collapsed; } }
         private int Px(float value) { using (Graphics g = CreateGraphics()) return (int)Math.Round(value * g.DpiY / 96F); }
 
         protected override void OnAppearanceChanged(AppearanceOptions appearance)
@@ -257,24 +272,24 @@ namespace DeskStudy
             bool journal = calendarStyle == "Journal";
             palette = CalendarPalette.For(AppearancePainter.Background(appearance), App.Data.Settings.NotebookLayout);
             CalendarPalette p = palette;
-            SetCompactNotebookHeader(true, 8F);
+            SetCompactNotebookHeader(true, Collapsed ? 8.5F : 8F);
             SetReferenceHeader(true, "", p.Back, p.Ink, journal ? p.Ink : p.Sub, p.Accent, p.Accent, p.Soft, p.Rule, journal);
             surface.SetReference(true, p);
             toolbar.Visible = false; refBar.Visible = true; hint.Visible = false;
             refBar.BackColor = p.Back; refBar.Parent.BackColor = p.Back; dayHeader.BackColor = p.Back; contentLayout.BackColor = p.Back; Body.BackColor = p.Back;
-            refRange.Font = RefFont(10.5F, FontStyle.Regular); refRange.ForeColor = p.Ink; refRange.BackColor = p.Back;
-            refMeta.Font = RefFont(8F, FontStyle.Regular); refMeta.ForeColor = p.Sub; refMeta.BackColor = p.Back;
+            refRange.Font = RefFont(11.5F, FontStyle.Regular); refRange.ForeColor = p.Ink; refRange.BackColor = p.Back;
+            refMeta.Font = RefFont(8.5F, FontStyle.Regular); refMeta.ForeColor = p.Sub; refMeta.BackColor = p.Back;
             foreach (Button b in new[] { refPrev, refNext, refToday, refWorkWeek, refWeek, refMonth, refAdd })
             {
-                b.BackColor = p.Back; b.ForeColor = p.Sub; b.Font = RefFont(8F, FontStyle.Regular);
+                b.BackColor = p.Back; b.ForeColor = p.Sub; b.Font = RefFont(9F, FontStyle.Regular);
                 ((CalendarBarButton)b).HoverColor = p.Soft;
             }
-            refPrev.Font = refNext.Font = RefFont(11F, FontStyle.Regular);
-            refAdd.Font = RefFont(10F, FontStyle.Regular); refAdd.ForeColor = p.Accent;
+            refPrev.Font = refNext.Font = RefFont(12F, FontStyle.Regular);
+            refAdd.Font = RefFont(11F, FontStyle.Regular); refAdd.ForeColor = p.Accent;
             // The ‹ › glyphs sit low in their line box.
             ((CalendarBarButton)refPrev).TextOffset = ((CalendarBarButton)refNext).TextOffset = -Px(2);
             Button selected = monthView ? refMonth : workWeek ? refWorkWeek : refWeek;
-            selected.BackColor = p.Soft; selected.ForeColor = p.Ink; selected.Font = RefFont(8F, FontStyle.Bold);
+            selected.BackColor = p.Soft; selected.ForeColor = p.Ink; selected.Font = RefFont(9F, FontStyle.Bold);
             SetExpandedMinimumSize(new Size(ExpandedMinimumSize.Width, Px(420)));
             if (!contentReady) return;
             Body.Padding = new Padding(0, 0, 0, Px(2));
@@ -574,6 +589,7 @@ namespace DeskStudy
         private int S(int value) { return (int)Math.Round(value * dpiScale, MidpointRounding.AwayFromZero); }
         private int T(int value) { return (int)Math.Round(value * dpiScale * fontScale, MidpointRounding.AwayFromZero); }
         private int HourHeight { get { return T(62); } }
+        public int HourPixels { get { return HourHeight; } }
         public int TimeGutter { get { return T(49); } }
         private int MonthHeight { get { return Math.Max(T(600), ClientSize.Height); } }
         private const TextFormatFlags ScrolledText = TextFormatFlags.PreserveGraphicsTranslateTransform | TextFormatFlags.PreserveGraphicsClipping;

@@ -71,6 +71,8 @@ namespace DeskStudy
             foldedFrom = Bounds; expandedMinimum = MinimumSize; expandedMaximum = MaximumSize;
             collapsed = true;
             Body.Visible = false;
+            // The header may look different when folded (the calendar's grows to match the notebooks).
+            ApplyAppearance();
             int height = FoldedHeight;
             // Fixed size while folded: no resizing from the edges.
             MinimumSize = new Size(Width, height); MaximumSize = new Size(Width, height);
@@ -86,7 +88,7 @@ namespace DeskStudy
             collapsed = false;
             MaximumSize = expandedMaximum; MinimumSize = expandedMinimum;
             Body.Visible = true;
-            StyleCollapseButton();
+            ApplyAppearance();
             Padding insets = VisualInsets();
             Rectangle target = Rectangle.FromLTRB(foldedFrom.Left + insets.Left, foldedFrom.Top + insets.Top, foldedFrom.Right - insets.Right, foldedFrom.Bottom - insets.Bottom);
             if (App != null) target = App.ResolveFor(this, target);
@@ -100,7 +102,7 @@ namespace DeskStudy
             collapsed = false;
             MaximumSize = expandedMaximum; MinimumSize = expandedMinimum;
             Body.Visible = true;
-            StyleCollapseButton();
+            ApplyAppearance();
         }
 
         // The header can change height with the font size; the folded bar follows it and stays on the bottom edge.
