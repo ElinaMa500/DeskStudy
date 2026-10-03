@@ -856,6 +856,7 @@ namespace DeskStudy
                 App.DataChanged -= OnDataChanged;
                 if (_statusTimer != null) { _statusTimer.Stop(); _statusTimer.Dispose(); }
                 if (_flashTimer != null) { _flashTimer.Stop(); _flashTimer.Dispose(); _flashTimer = null; }
+                if (_inlineClicks != null) { Application.RemoveMessageFilter(_inlineClicks); _inlineClicks = null; }
                 DisposeNotebookLayouts();
             }
             base.Dispose(disposing);

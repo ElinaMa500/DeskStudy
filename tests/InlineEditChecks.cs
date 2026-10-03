@@ -13,6 +13,9 @@ using DeskStudy;
 public static class InlineEditChecks
 {
     [DllImport("user32.dll")] static extern IntPtr SendMessage(IntPtr hwnd, int msg, IntPtr wparam, IntPtr lparam);
+    [DllImport("user32.dll")] static extern bool PostMessage(IntPtr hwnd, int msg, IntPtr wparam, IntPtr lparam);
+    // A real click arrives through the message queue; posted, it goes through the same path.
+    static void Click(Control target, int x, int y) { PostMessage(target.Handle, 0x0201, new IntPtr(1), new IntPtr((y << 16) | (x & 0xFFFF))); PostMessage(target.Handle, 0x0202, IntPtr.Zero, new IntPtr((y << 16) | (x & 0xFFFF))); Pump(200); }
     [DllImport("user32.dll")] static extern bool PrintWindow(IntPtr hwnd, IntPtr dc, uint flags);
     static void Capture(Form form, string file)
     {
@@ -95,6 +98,28 @@ public static class InlineEditChecks
         All(form).OfType<TextBox>().First(t => t.Name == "quick-task").Focus(); Pump(150);
         Assert(Editor(form) == null && Task(app, task.Id).Text == "读完论文第三章\n记下问题", "clicking elsewhere saves, keeping the line break");
         Assert(TitleOf(form, "读完论文第三章\n记下问题").Height > oneLine, "the task shows on two lines");
+
+        // Clicking anywhere outside the edit box saves, also where the click does not move the keyboard focus.
+        var clickTargets = new List<KeyValuePair<string, Func<Control>>> {
+            new KeyValuePair<string, Func<Control>>("the blank space of the task list", () => All(form).OfType<ScrollableControl>().Where(c => c.Visible && c.Controls.OfType<Control>().Any(x => x.Controls.OfType<CheckBox>().Any())).First()),
+            new KeyValuePair<string, Func<Control>>("another task's text", () => All(form).OfType<Label>().First(l => l.Visible && l.Text == "读完论文第三章\n记下问题")),
+            new KeyValuePair<string, Func<Control>>("the notebook's header", () => form.Controls.OfType<Control>().First(c => c.Dock == DockStyle.Top && c.Visible)),
+        };
+        var other = new TaskItem { Text = "点外面保存", TimeZoneId = TimeZoneInfo.Local.Id };
+        page.Tasks.Add(other); app.Save(); Pump(200);
+        int round = 0;
+        foreach (var target in clickTargets)
+        {
+            string current = Task(app, other.Id).Text, next = "点外面保存 " + (++round);
+            DoubleClick(TitleOf(form, current), new Point(4, 8));
+            box = Editor(form); box.Text = next; Pump(60);
+            Click(box, 3, 3);
+            Assert(Editor(form) != null, "clicking inside the edit box keeps editing (" + target.Key + " round)");
+            Control where = target.Value();
+            Click(where, 2, 2);
+            Assert(Editor(form) == null && Task(app, other.Id).Text == next && TitleOf(form, next).Visible, "clicking " + target.Key + " saves the edit");
+        }
+        page.Tasks.RemoveAll(t => t.Id == other.Id); app.Save(); Pump(200);
 
         // A completed task can be edited too.
         var done = new TaskItem { Text = "已完成的任务", Completed = true, TimeZoneId = TimeZoneInfo.Local.Id };

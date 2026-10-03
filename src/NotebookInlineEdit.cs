@@ -5,14 +5,34 @@ using System.Windows.Forms;
 namespace DeskStudy
 {
     // Double-click a task's text to edit it in place (1.5.1). Enter saves, Shift+Enter starts a new line,
-    // Esc cancels, and clicking elsewhere or switching to another program saves.
+    // Esc cancels, and a click anywhere outside the edit box or switching to another program saves.
     public sealed partial class NotebookForm
     {
         private CompositionTextBox _inlineEditor;
         private TaskRow _inlineRow;
         private string _inlineOriginal;
         private bool _inlineClosing, _inlineRefreshPending;
+        private OutsideClick _inlineClicks;
         public bool InlineEditing { get { return _inlineRow != null; } }
+
+        // While editing, a mouse click anywhere in the program outside the edit box saves first; the click then
+        // does what it normally does. Clicks that do not move the keyboard focus (blank space, labels, the header)
+        // would otherwise leave the edit open. Clicks in other programs are covered by Deactivate.
+        private sealed class OutsideClick : IMessageFilter
+        {
+            [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool IsChild(IntPtr parent, IntPtr child);
+            private readonly NotebookForm owner; private readonly Control box;
+            public OutsideClick(NotebookForm owner, Control box) { this.owner = owner; this.box = box; }
+            public bool PreFilterMessage(ref Message m)
+            {
+                // Left, right and middle button down, in a window or on its frame.
+                if (m.Msg != 0x0201 && m.Msg != 0x0204 && m.Msg != 0x0207 && m.Msg != 0x00A1 && m.Msg != 0x00A4 && m.Msg != 0x00A7) return false;
+                if (box.IsDisposed || !box.IsHandleCreated) return false;
+                if (m.HWnd == box.Handle || IsChild(box.Handle, m.HWnd)) return false;
+                owner.EndInlineEdit(true);
+                return false;
+            }
+        }
 
         private void WireInlineEdit(TaskRow row)
         {
@@ -51,6 +71,7 @@ namespace DeskStudy
             box.TextChanged += delegate { FitInlineEditor(); };
             box.Leave += delegate { EndInlineEdit(true); };
             Deactivate += InlineEditorDeactivated;
+            _inlineClicks = new OutsideClick(this, box); Application.AddMessageFilter(_inlineClicks);
             box.Focus();
             box.Select(CaretAt(box, at), 0);
         }
@@ -96,6 +117,7 @@ namespace DeskStudy
             bool changed = save && edited.Length > 0 && edited != original.Replace("\r\n", "\n");
             _inlineRow = null; _inlineEditor = null;
             Deactivate -= InlineEditorDeactivated;
+            if (_inlineClicks != null) { Application.RemoveMessageFilter(_inlineClicks); _inlineClicks = null; }
             try
             {
                 if (box != null && !box.IsDisposed) { if (!row.Card.IsDisposed) row.Card.Controls.Remove(box); box.Dispose(); }
