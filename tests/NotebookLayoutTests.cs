@@ -430,6 +430,7 @@ public static class NotebookLayoutTests
                 else if (mode == "ddl") DeadlineChecks.Run(app, path);
                 else if (mode == "taskbar") TaskbarChecks.Run(app, path);
                 else if (mode == "outlook") OutlookChecks.Run(app, path);
+                else if (mode == "pageturn") PageTurnChecks.Run(app, args[2], true);
                 else if (mode == "outlookread") OutlookChecks.Read(app);
                 else if (mode == "taskbarread") TaskbarChecks.Read(app);
                 else if (mode == "titlegap") TitleGapShot.Run(app, path, args[2]);

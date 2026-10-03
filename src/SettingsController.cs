@@ -103,6 +103,13 @@ namespace DeskStudy
             }
             finally { publishing = false; }
         }
+        // Only the notebook's current page changed: save it, and let an open settings center catch up.
+        // The other widgets do not depend on it, so they are not refreshed or restyled.
+        public void SavePageTurn()
+        {
+            QueueSave();
+            if (settingsCenter != null && !settingsCenter.IsDisposed && settingsCenter.Visible) settingsCenter.RefreshData();
+        }
         public void SettingsChanged()
         {
             saveTimer.Interval = Data.Settings.AutoSaveDelayMs;

@@ -137,7 +137,7 @@ namespace DeskStudy
                 var book = FindBook(); var page = (PageChoice)_paperTabs.SelectedItem;
                 // A recreated handle replays the displayed selection; only a different page is a user choice.
                 if (book == null || page.Id == _displayedPageId) return;
-                if (book.CurrentPageId != page.Id) { book.CurrentPageId = page.Id; Persist(); RefreshFromData(); }
+                if (book.CurrentPageId != page.Id) ShowPage(page.Id);
             };
             _quickEntry = new Panel { Name = "quick-task-row", Margin = Padding.Empty };
             _quickText = new CompositionTextBox { Name = "quick-task", BorderStyle = BorderStyle.None, MaxLength = 2000, Font = new Font("Microsoft YaHei UI", 9.5F), AccessibleName = Lang.T("添加任务内容，按回车连续录入") };
@@ -163,7 +163,10 @@ namespace DeskStudy
             _layoutRetry.Tick += delegate { if (!IsComposing) { _layoutRetry.Stop(); ApplyAppearance(); RefreshFromData(); } };
             App.SaveStateChanged += UpdateSaveStatus;
         }
-        private int Px(float value) { using (var g = CreateGraphics()) return (int)Math.Round(value * g.DpiX / 96F); }
+        // The program is system-DPI aware, so the scale never changes while it runs; measured once per window.
+        private float _dpiScale;
+        private float Dpi { get { if (_dpiScale <= 0) using (var g = CreateGraphics()) _dpiScale = g.DpiX / 96F; return _dpiScale; } }
+        private int Px(float value) { return (int)Math.Round(value * Dpi); }
         private void ApplyNotebookLayout()
         {
             if (!_contentReady || _changingLayout || IsComposing) return;
@@ -234,35 +237,17 @@ namespace DeskStudy
             _paperTabs.BackColor = bg; _paperTabs.ForeColor = fg;
             if (!IsReference) SetPaperTabsMetrics(ReferenceFont(9F, FontStyle.Regular), Px(12));
             _pageTitle.ReadOnly = false;
-            foreach (var row in _rows)
-            {
-                var card = (TaskCardPanel)row.Card; card.LayoutKind = _appliedLayout; card.SurfaceColor = surface;
-                var check = row.Toggle as TaskCheckBox; if (check != null && check.Reference) { check.Reference = false; check.Invalidate(); }
-                row.More.Visible = IsModern; row.Actions.Visible = !IsModern;
-                if (!IsModern) { row.Status.Visible = true; row.Card.Margin = new Padding(0, 0, 0, 8); }
-                row.More.FlatAppearance.BorderSize = 0;
-                row.More.BackColor = _appliedLayout == "Card" ? surface : bg;
-                if (IsModern) { row.Card.BackColor = bg; row.Title.BackColor = Color.Transparent; row.Status.BackColor = Color.Transparent; row.Toggle.BackColor = _appliedLayout == "Card" ? surface : bg; }
-                card.Invalidate();
-            }
             foreach (Button b in new[] { _previous, _next, _newPageButton, _directory, _details, _quickAdd }) { b.FlatAppearance.BorderSize = IsModern ? 0 : 1; b.BackColor = IsModern ? bg : surface; b.Padding = Padding.Empty; }
             _newPageButton.Text = Lang.T("＋ 新页");
             _quickAdd.Text = Lang.T("＋ 添加"); _quickText.Cue = Lang.T("记下一件事，回车添加"); _quickPlus.Visible = false; _quickEntry.Margin = Padding.Empty;
             if (IsReference) StyleReferenceLayout();
             else SetReferenceHeader(false, "", bg, fg, Ui.Muted, _accent, _accent, surface, Ui.Border, false);
             StyleQuickDue();
-            foreach (var row in _rows)
-            {
-                if (row.AddDue == null) continue;
-                row.AddDue.BackColor = row.More.BackColor; row.AddDue.ForeColor = IsReference ? Palette().Faint : Ui.Muted;
-                row.AddDue.Font = ReferenceFont(8.5F, FontStyle.Regular);
-                if (!OffersHoverDue(row)) row.AddDue.Visible = false;
-            }
+            StyleRows(appearance);
             if (!IsModern)
             {
                 var page = FindPage(_displayedPageId);
                 if (page != null) _taskCount.Text = Lang.T("任务  {0} / {1} 已完成", page.Tasks.Count(t => t.Completed), page.Tasks.Count);
-                foreach (Control control in _tasks.Controls) if (control is Label) { control.Text = Lang.T("这一页还没有任务\r\n\r\n记下一件小事，完成后也会留在这里。"); control.Height = 110; }
                 ArrangeOriginalNotes();
             }
             UpdateNotesCaption();
@@ -296,16 +281,55 @@ namespace DeskStudy
             _quickPlus.Visible = true; _quickPlus.ForeColor = p.Sub; _quickPlus.BackColor = p.Back; _quickPlus.Font = ReferenceFont(11F, FontStyle.Regular);
             _paperTabs.BackColor = p.Soft; _paperTabs.ForeColor = p.Sub;
             SetPaperTabsMetrics(ReferenceFont(8F, FontStyle.Regular), Px(16));
+            _modern.Invalidate();
+        }
+
+        // Everything about the task rows' look, for the current layout. Run after a full restyle, and on its own
+        // when only the rows were rebuilt (turning a page), which is much cheaper than restyling the notebook.
+        private void StyleRows(AppearanceOptions appearance)
+        {
+            Color background = AppearancePainter.Background(appearance), foreground = AppearancePainter.Foreground(appearance), surface = AppearancePainter.Surface(appearance);
+            bool dark = AppearancePainter.Dark(background);
+            Color muted = dark ? Color.FromArgb(181, 191, 200) : Ui.Muted;
             foreach (var row in _rows)
             {
-                var card = (TaskCardPanel)row.Card; card.BorderColor = p.Rule; card.BackColor = p.Back;
-                row.Title.ForeColor = row.Task.Completed ? p.Sub : p.Ink;
-                row.More.ForeColor = p.Faint; row.More.BackColor = p.Back; row.More.FlatAppearance.MouseOverBackColor = p.Soft;
-                var check = row.Toggle as TaskCheckBox;
-                if (check != null) { check.Reference = true; check.Accent = p.Accent; check.Box = Blend(p.Sub, p.Back, .25); check.BackColor = p.Back; check.Invalidate(); }
+                var card = (TaskCardPanel)row.Card;
+                row.Card.BackColor = row.Task.Completed ? background : surface;
+                row.Title.Font = row.Task.Completed ? _doneFont : _taskFont;
+                row.Title.ForeColor = row.Task.Completed ? muted : foreground;
+                card.BorderColor = dark ? Color.FromArgb(76, 87, 101) : Ui.Border;
+                card.LayoutKind = _appliedLayout; card.SurfaceColor = surface;
+                var check = row.Toggle as TaskCheckBox; if (check != null && check.Reference) { check.Reference = false; check.Invalidate(); }
+                row.More.Visible = IsModern; row.Actions.Visible = !IsModern;
+                if (!IsModern) { row.Status.Visible = true; row.Card.Margin = new Padding(0, 0, 0, 8); }
+                row.More.FlatAppearance.BorderSize = 0;
+                row.More.BackColor = _appliedLayout == "Card" ? surface : background;
+                if (IsModern) { row.Card.BackColor = background; row.Title.BackColor = Color.Transparent; row.Status.BackColor = Color.Transparent; row.Toggle.BackColor = _appliedLayout == "Card" ? surface : background; }
+                if (row.AddDue != null)
+                {
+                    row.AddDue.BackColor = row.More.BackColor; row.AddDue.ForeColor = IsReference ? Palette().Faint : Ui.Muted;
+                    row.AddDue.Font = ReferenceFont(8.5F, FontStyle.Regular);
+                    if (!OffersHoverDue(row)) row.AddDue.Visible = false;
+                }
+                card.Invalidate();
             }
-            foreach (Control c in _tasks.Controls) if (c is Label) { c.ForeColor = p.Sub; c.Font = ReferenceFont(9F, FontStyle.Regular); }
-            _modern.Invalidate();
+            if (!IsModern)
+                foreach (Control control in _tasks.Controls) if (control is Label) { control.Text = Lang.T("这一页还没有任务\r\n\r\n记下一件小事，完成后也会留在这里。"); control.Height = 110; }
+            if (IsReference)
+            {
+                var p = Palette();
+                foreach (var row in _rows)
+                {
+                    var card = (TaskCardPanel)row.Card; card.BorderColor = p.Rule; card.BackColor = p.Back;
+                    row.Title.ForeColor = row.Task.Completed ? p.Sub : p.Ink;
+                    row.More.ForeColor = p.Faint; row.More.BackColor = p.Back; row.More.FlatAppearance.MouseOverBackColor = p.Soft;
+                    if (row.AddDue != null) row.AddDue.BackColor = p.Back;
+                    var check = row.Toggle as TaskCheckBox;
+                    if (check != null) { check.Reference = true; check.Accent = p.Accent; check.Box = Blend(p.Sub, p.Back, .25); check.BackColor = p.Back; check.Invalidate(); }
+                }
+                foreach (Control c in _tasks.Controls) if (c is Label) { c.ForeColor = p.Sub; c.Font = ReferenceFont(9F, FontStyle.Regular); }
+            }
+            ApplyFlash();
         }
         private void SetPaperTabsMetrics(Font font, int padding)
         {
@@ -413,7 +437,7 @@ namespace DeskStudy
             float wanted = _notesExpanded ? Math.Min(Px(82), Math.Max(_notes.Font.Height + Px(5), available)) : 0;
             if (Math.Abs(_layout.RowStyles[4].Height - wanted) > 1) _layout.RowStyles[4].Height = wanted;
         }
-        private float DpiScale() { using (var g = CreateGraphics()) return g.DpiX / 96F; }
+        private float DpiScale() { return Dpi; }
         private void UpdateSaveStatus()
         {
             if (_saveLabel == null || IsDisposed) return;
@@ -480,7 +504,7 @@ namespace DeskStudy
                 var open = Ui.Button(Lang.T("打开页面"), delegate { dialog.DialogResult = DialogResult.OK; }); open.Dock = DockStyle.Bottom;
                 list.DoubleClick += delegate { dialog.DialogResult = DialogResult.OK; };
                 dialog.Controls.Add(list); dialog.Controls.Add(open); dialog.AcceptButton = open;
-                if (dialog.ShowDialog(this) == DialogResult.OK && list.SelectedItem != null) { FindBook().CurrentPageId = ((PageChoice)list.SelectedItem).Id; Persist(); RefreshFromData(); }
+                if (dialog.ShowDialog(this) == DialogResult.OK && list.SelectedItem != null) { ShowPage(((PageChoice)list.SelectedItem).Id); }
             }
         }
         private void OpenPageDetails()

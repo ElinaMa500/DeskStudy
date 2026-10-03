@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
+using System.Linq;
 using System.Text;
 using System.Windows.Forms;
 
@@ -90,9 +91,7 @@ namespace DeskStudy
                 PageChoice choice = (PageChoice)_pages.SelectedItem;
                 Notebook book = FindBook();
                 if (book == null || book.CurrentPageId == choice.Id) return;
-                book.CurrentPageId = choice.Id;
-                Persist();
-                RefreshFromData();
+                ShowPage(choice.Id);
             };
             navigation.Controls.Add(_previous, 0, 0);
             navigation.Controls.Add(_pages, 1, 0);
@@ -252,22 +251,8 @@ namespace DeskStudy
                 _taskFont = new Font("Microsoft YaHei UI", desired, FontStyle.Regular);
                 _doneFont = new Font(_taskFont, FontStyle.Strikeout);
             }
-            Color background = AppearancePainter.Background(appearance);
-            Color foreground = AppearancePainter.Foreground(appearance);
-            bool dark = AppearancePainter.Dark(background);
-            Color muted = dark ? Color.FromArgb(181, 191, 200) : Ui.Muted;
-            foreach (TaskRow row in _rows)
-            {
-                row.Card.BackColor = row.Task.Completed ? background : AppearancePainter.Surface(appearance);
-                row.Title.Font = row.Task.Completed ? _doneFont : _taskFont;
-                row.Title.ForeColor = row.Task.Completed ? muted : foreground;
-                TaskCardPanel card = row.Card as TaskCardPanel;
-                if (card != null) card.BorderColor = dark ? Color.FromArgb(76, 87, 101) : Ui.Border;
-            }
-            if (oldTask != null) oldTask.Dispose();
-            if (oldDone != null) oldDone.Dispose();
             float dpi;
-            using (Graphics graphics = CreateGraphics()) dpi = graphics.DpiY / 96F;
+            dpi = Dpi;
             _layout.RowStyles[0].Height = Math.Max(34 * dpi, Math.Max(_pages.PreferredHeight + 7 * dpi, _newPageButton.Font.Height + 12 * dpi));
             _layout.RowStyles[1].Height = Math.Max(34 * dpi, _pageTitle.PreferredHeight + 6 * dpi);
             _layout.RowStyles[2].Height = Math.Max(26 * dpi, _renameButton.Font.Height + 10 * dpi);
@@ -284,6 +269,9 @@ namespace DeskStudy
             StyleNotebookLayout(appearance);
             LayoutTaskCards();
             ApplyFlash();
+            // Only now do no rows use the previous fonts (StyleRows gave them the new ones).
+            if (oldTask != null) oldTask.Dispose();
+            if (oldDone != null) oldDone.Dispose();
         }
 
         private static float PreferredButtonWidth(Button button, int minimum, float dpi)
@@ -454,9 +442,21 @@ namespace DeskStudy
             int index = visible.FindIndex(delegate(NotePage page) { return page.Id == book.CurrentPageId; });
             int target = index + step;
             if (target < 0 || target >= visible.Count) return;
-            book.CurrentPageId = visible[target].Id;
-            Persist();
-            RefreshFromData();
+            ShowPage(visible[target].Id);
+        }
+
+        // Turning to another page: a quiet save and one repaint of the notebook, nothing else.
+        private void ShowPage(string pageId)
+        {
+            Notebook book = FindBook();
+            if (book == null) return;
+            // Rows are reused for the new page, so an edit in progress is finished first.
+            if (InlineEditing) EndInlineEdit(true);
+            book.CurrentPageId = pageId;
+            _saving = true;
+            try { App.SavePageTurn(); }
+            finally { _saving = false; }
+            using (new RedrawPause(Body)) RefreshFromData();
         }
 
         private void AddPage()
@@ -491,7 +491,7 @@ namespace DeskStudy
         {
             _notesExpanded = !_notesExpanded;
             _notes.Visible = _notesExpanded;
-            using (var graphics = CreateGraphics()) _layout.RowStyles[4].Height = _notesExpanded ? (float)Math.Round(82 * graphics.DpiY / 96F) : 0;
+            _layout.RowStyles[4].Height = _notesExpanded ? (float)Math.Round(82 * Dpi) : 0;
             _notesToggle.Text = _notesExpanded ? Lang.T("文字记录  ▾") : Lang.T("文字记录  ▸  （点击展开）");
             if (IsModern) { UpdateNotesCaption(); ArrangeModernLayout(); }
             else ArrangeOriginalNotes();
@@ -504,19 +504,22 @@ namespace DeskStudy
             try
             {
                 if (_quickEntry != null && _quickEntry.Parent == _tasks) _tasks.Controls.Remove(_quickEntry);
-                _rows.Clear();
-                while (_tasks.Controls.Count > 0)
+                List<TaskItem> shown = DisplayTasks(page);
+                // Existing rows are refilled with this page's tasks; only extra rows are created or removed.
+                // Creating and destroying every row is what made turning a page slow.
+                foreach (Control old in _tasks.Controls.Cast<Control>().Where(c => !_rows.Any(r => r.Card == c)).ToList()) { _tasks.Controls.Remove(old); old.Dispose(); }
+                while (_rows.Count > shown.Count)
                 {
-                    Control old = _tasks.Controls[0];
-                    _tasks.Controls.RemoveAt(0);
-                    old.Dispose();
+                    TaskRow extra = _rows[_rows.Count - 1]; _rows.RemoveAt(_rows.Count - 1);
+                    if (_inlineRow == extra) EndInlineEdit(false);
+                    _tasks.Controls.Remove(extra.Card); extra.Card.Dispose();
                 }
                 int completed = 0;
-                List<TaskItem> shown = DisplayTasks(page);
                 for (int i = 0; i < shown.Count; i++)
                 {
                     TaskItem task = shown[i];
                     if (task.Completed) completed++;
+                    if (i < _rows.Count) { BindTaskRow(_rows[i], task, i, shown.Count); continue; }
                     TaskRow row = MakeTaskRow(page.Id, task, i, shown.Count);
                     _rows.Add(row);
                     _tasks.Controls.Add(row.Card);
@@ -534,7 +537,14 @@ namespace DeskStudy
                 if (IsModern && _quickEntry != null) _tasks.Controls.Add(_quickEntry);
             }
             finally { _tasks.ResumeLayout(); }
-            if (_contentReady) ApplyAppearance();
+            // Only the rows are new: style them, not the whole notebook (its header, tabs and title did not change).
+            if (_contentReady)
+            {
+                AppearanceOptions appearance = SettingsLogic.EffectiveAppearance(App.Data, WidgetKey);
+                ApplyAppearanceTo(_tasks);
+                StyleRows(appearance);
+                if (IsModern) ArrangeModernLayout();
+            }
             LayoutTaskCards();
             _tasks.AutoScrollPosition = new Point(0, scroll);
         }
@@ -555,8 +565,8 @@ namespace DeskStudy
             row.Toggle.CheckedChanged += delegate
             {
                 if (_rendering) return;
-                NotePage currentPage = FindPage(pageId);
-                TaskItem current = currentPage == null ? null : currentPage.Tasks.Find(delegate(TaskItem item) { return item.Id == task.Id; });
+                NotePage currentPage = FindPage(_displayedPageId);
+                TaskItem current = currentPage == null ? null : currentPage.Tasks.Find(delegate(TaskItem item) { return item.Id == row.Task.Id; });
                 if (current == null) return;
                 current.Completed = row.Toggle.Checked;
                 if (!current.Completed) ReminderEngine.Reset(current);
@@ -577,13 +587,10 @@ namespace DeskStudy
             row.Actions.WrapContents = false;
             row.Actions.Height = 27;
             row.Actions.Margin = Padding.Empty;
-            Button edit = ActionButton(Lang.T("编辑"), 45, delegate { EditTask(task.Id); });
-            Button up = ActionButton("↑", 29, delegate { MoveTask(pageId, task.Id, -1); });
-            Button down = ActionButton("↓", 29, delegate { MoveTask(pageId, task.Id, 1); });
-            Button delete = ActionButton(Lang.T("删除"), 45, delegate { DeleteTask(pageId, task.Id); });
-            up.Enabled = index > 0 && !SortsByDue;
-            down.Enabled = index < total - 1 && !SortsByDue;
-            up.Visible = down.Visible = !SortsByDue;
+            Button edit = ActionButton(Lang.T("编辑"), 45, delegate { EditTask(row.Task.Id); });
+            Button up = ActionButton("↑", 29, delegate { MoveTask(_displayedPageId, row.Task.Id, -1); });
+            Button down = ActionButton("↓", 29, delegate { MoveTask(_displayedPageId, row.Task.Id, 1); });
+            Button delete = ActionButton(Lang.T("删除"), 45, delegate { DeleteTask(_displayedPageId, row.Task.Id); });
             up.AccessibleName = Lang.T("上移任务");
             down.AccessibleName = Lang.T("下移任务");
             delete.ForeColor = Color.FromArgb(155, 95, 82);
@@ -600,7 +607,24 @@ namespace DeskStudy
             row.Card.Controls.Add(row.More);
             WireDueRow(row);
             WireInlineEdit(row);
+            BindTaskRow(row, task, index, total);
             return row;
+        }
+
+        // Puts a task into a row: used for new rows and for rows reused when another page is shown.
+        private void BindTaskRow(TaskRow row, TaskItem task, int index, int total)
+        {
+            row.Task = task;
+            row.Toggle.Name = "task-checkbox-" + task.Id;
+            row.Toggle.AccessibleName = Lang.T("完成任务：{0}", task.Text);
+            if (row.Toggle.Checked != task.Completed) row.Toggle.Checked = task.Completed;
+            if (row.Title.Text != task.Text) row.Title.Text = task.Text;
+            row.Title.Font = task.Completed ? _doneFont : _taskFont;
+            Control up = row.Actions.Controls[1], down = row.Actions.Controls[2];
+            up.Enabled = index > 0 && !SortsByDue;
+            down.Enabled = index < total - 1 && !SortsByDue;
+            up.Visible = down.Visible = !SortsByDue;
+            if (row.AddDue != null) { row.AddDue.Name = "add-due-" + task.Id; row.AddDue.Visible = false; }
         }
 
         private Button ActionButton(string text, int width, EventHandler action)
@@ -616,15 +640,22 @@ namespace DeskStudy
             return button;
         }
 
+        // Rows are sized one by one; the list itself lays them out once at the end, not after every row.
         private void LayoutTaskCards()
         {
             if (_layingOut || _tasks == null || _tasks.IsDisposed) return;
+            _tasks.SuspendLayout();
+            try { LayoutTaskCardsNow(); }
+            finally { _tasks.ResumeLayout(true); }
+        }
+        private void LayoutTaskCardsNow()
+        {
             if (IsModern) { LayoutModernTasks(); return; }
             _layingOut = true;
             try
             {
                 float scale;
-                using (var graphics = CreateGraphics()) scale = graphics.DpiX / 96F;
+                scale = Dpi;
                 int inset = (int)(35 * scale), pad = (int)(10 * scale);
                 int width = Math.Max((int)(240 * scale), _tasks.ClientSize.Width - SystemInformation.VerticalScrollBarWidth - 3);
                 foreach (TaskRow row in _rows)

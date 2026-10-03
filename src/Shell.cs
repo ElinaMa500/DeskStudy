@@ -130,6 +130,12 @@ namespace DeskStudy
             if (App != null && PositionLocked && m.Msg == 0x84 && m.Result.ToInt64() >= 10 && m.Result.ToInt64() <= 17) m.Result = new IntPtr(1);
             if (App != null) { AfterFrameWndProc(ref m); AfterPlacementWndProc(ref m); }
         }
+        // Fonts and colors for one part of the window, e.g. rows that were just created.
+        protected void ApplyAppearanceTo(Control root)
+        {
+            if (IsDisposed || App.Data.Settings == null) return;
+            AppearancePainter.Apply(root, SettingsLogic.EffectiveAppearance(App.Data, WidgetKey), appearanceBaselines);
+        }
         public void ApplyAppearance()
         {
             if (applyingAppearance || IsDisposed || App.Data.Settings == null) return;
