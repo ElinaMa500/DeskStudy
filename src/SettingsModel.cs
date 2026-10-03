@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -24,13 +24,15 @@ namespace DeskStudy
         public string WidgetCorners { get; set; }
         // Interface language: "zh-CN" or "en" (1.5.1). Takes effect after a restart.
         public string Language { get; set; }
+        // DDL book: list tasks by deadline instead of the order they were arranged in. The stored order is kept.
+        public bool SortDeadlines { get; set; }
         // Global shortcut that raises or lowers all widgets, e.g. "Ctrl+Alt+Shift+D". Empty disables it.
         public string ShowHotkey { get; set; }
         // Set when the file predates WidgetMode: its window bounds still include the system frame.
         [System.Web.Script.Serialization.ScriptIgnore] public bool FramedWindowBounds { get; set; }
         public AppSettings()
         {
-            WidgetMode = "Desktop"; ShowHotkey = HotkeySpec.Default; WidgetCorners = "Round"; Language = "zh-CN";
+            WidgetMode = "Desktop"; ShowHotkey = HotkeySpec.Default; WidgetCorners = "Round"; Language = "zh-CN"; SortDeadlines = true;
             NotebookLayout = "Card";
             GlobalAppearance = new AppearanceOptions();
             AppearanceOverrides = new Dictionary<string, AppearanceOptions>();
@@ -53,13 +55,15 @@ namespace DeskStudy
         public string DefaultView { get; set; }
         // 工作周 (Monday–Friday) is a week view, so DefaultView stays "Week" and older versions still read the file.
         public bool WorkWeek { get; set; }
+        // Unfinished DDL deadlines drawn on the calendar.
+        public bool ShowDeadlines { get; set; }
         public int WeekStartDay { get; set; }
         public string SemesterStart { get; set; }
         public string SemesterEnd { get; set; }
         public string TeachingWeekOne { get; set; }
         public CalendarOptions()
         {
-            DefaultView = "Week"; WeekStartDay = 1;
+            DefaultView = "Week"; WeekStartDay = 1; ShowDeadlines = true;
             DateTime today = DateTime.Today;
             DateTime start = today.Month >= 8 ? new DateTime(today.Year, 9, 1) :
                 (today.Month == 1 ? new DateTime(today.Year - 1, 9, 1) : new DateTime(today.Year, 2, 1));

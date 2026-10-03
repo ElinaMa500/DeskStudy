@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -275,7 +275,7 @@ namespace DeskStudy
             SetCompactNotebookHeader(true, 8.5F);
             SetReferenceHeader(true, _bookId == "ddl" ? Lang.T(" · 截止本") : Lang.T(" · 待办本"), p.Back, p.Ink, journal ? p.Ink : p.Sub, p.Dot, p.Accent, p.Soft, p.Rule, journal);
             Font small = ReferenceFont(8.5F, FontStyle.Regular);
-            _pageTitle.Font = ReferenceFont(journal ? 14F : 15F, FontStyle.Regular);
+            _pageTitle.Font = ReferenceFont(journal ? 12.5F : 15F, FontStyle.Regular);
             _pageTitle.ForeColor = p.Ink; _pageTitle.BackColor = p.Back;
             _taskCount.Font = small; _taskCount.ForeColor = p.Sub; _taskCount.TextAlign = ContentAlignment.MiddleLeft;
             _saveLabel.Font = small;
@@ -333,8 +333,8 @@ namespace DeskStudy
             _modernFooter.SetBounds(0, footerY, clientWidth, footer);
             int rail = RailWidth(), side = journal ? Px(16) : Px(20);
             int left = rail + side, width = Math.Max(Px(160), clientWidth - left - side);
-            if (journal) _paperTabs.SetBounds(Px(4), Px(16), rail - Px(8), Math.Max(Px(40), footerY - Px(20)));
-            int top = journal ? Px(14) : Px(2), detailWidth = Px(28);
+            if (journal) _paperTabs.SetBounds(Px(4), Px(8), rail - Px(8), Math.Max(Px(40), footerY - Px(12)));
+            int top = journal ? Px(6) : Px(2), detailWidth = Px(28);
             int titleHeight = _pageTitle.PreferredHeight + Px(2);
             _pageTitle.SetBounds(left, top, width - detailWidth - Px(4), titleHeight);
             _details.SetBounds(left + width - detailWidth, top, detailWidth, titleHeight);
@@ -343,7 +343,7 @@ namespace DeskStudy
             int saveWidth = failed ? Math.Min(width / 2, TextRenderer.MeasureText(App.SaveStatus, _saveLabel.Font).Width + Px(8)) : 0;
             _taskCount.SetBounds(left, _pageTitle.Bottom, Math.Max(Px(60), width - saveWidth), small);
             _saveLabel.SetBounds(left + width - saveWidth, _pageTitle.Bottom, Math.Max(1, saveWidth), small);
-            int y = _taskCount.Bottom + Px(journal ? 9 : 14);
+            int y = _taskCount.Bottom + Px(journal ? 3 : 14);
             int toggle = _notesToggle.Font.Height + Px(10);
             int notesHeight = _notesExpanded ? Math.Max(Px(60), Math.Min(Px(90), clientHeight / 5)) : 0;
             int notesBlock = toggle + (_notesExpanded ? notesHeight + Px(4) : 0) + Px(8);
@@ -501,8 +501,11 @@ namespace DeskStudy
             _taskMenu = new ContextMenuStrip { Font = Font };
             string page = _displayedPageId, task = row.Task.Id;
             _taskMenu.Items.Add(Lang.T("编辑任务 / 截止时间…"), null, delegate { EditTask(task); });
-            var up = _taskMenu.Items.Add(Lang.T("上移任务"), null, delegate { MoveTask(page, task, -1); }); up.Enabled = row.Actions.Controls[1].Enabled;
-            var down = _taskMenu.Items.Add(Lang.T("下移任务"), null, delegate { MoveTask(page, task, 1); }); down.Enabled = row.Actions.Controls[2].Enabled;
+            if (!SortsByDue)
+            {
+                var up = _taskMenu.Items.Add(Lang.T("上移任务"), null, delegate { MoveTask(page, task, -1); }); up.Enabled = row.Actions.Controls[1].Enabled;
+                var down = _taskMenu.Items.Add(Lang.T("下移任务"), null, delegate { MoveTask(page, task, 1); }); down.Enabled = row.Actions.Controls[2].Enabled;
+            }
             _taskMenu.Items.Add(Lang.T("删除任务…"), null, delegate { DeleteTask(page, task); });
             _taskMenu.Show(row.More, new Point(0, row.More.Height));
         }

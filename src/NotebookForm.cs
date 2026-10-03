@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
@@ -283,6 +283,7 @@ namespace DeskStudy
             RefreshStatuses();
             StyleNotebookLayout(appearance);
             LayoutTaskCards();
+            ApplyFlash();
         }
 
         private static float PreferredButtonWidth(Button button, int minimum, float dpi)
@@ -432,9 +433,13 @@ namespace DeskStudy
             finally { _pages.EndUpdate(); _rendering = rendering; }
         }
 
-        private static string TaskSignature(NotePage page)
+        // DDL: listed by deadline (the stored, hand-arranged order stays in the data).
+        private bool SortsByDue { get { return _bookId == "ddl" && App.Data.Settings.SortDeadlines; } }
+        private List<TaskItem> DisplayTasks(NotePage page) { return SortsByDue ? DeadlineLogic.Ordered(page.Tasks) : page.Tasks; }
+
+        private string TaskSignature(NotePage page)
         {
-            StringBuilder key = new StringBuilder(page.Id);
+            StringBuilder key = new StringBuilder(page.Id).Append(SortsByDue ? "|due" : "");
             foreach (TaskItem task in page.Tasks)
                 key.Append('\n').Append(task.Id).Append('\t').Append(task.Text).Append('\t').Append(task.Completed)
                     .Append('\t').Append(task.DueLocal).Append('\t').Append(task.TimeZoneId).Append('\t').Append(task.ReminderMinutes).Append('\t').Append(task.DueDateOnly);
@@ -507,11 +512,12 @@ namespace DeskStudy
                     old.Dispose();
                 }
                 int completed = 0;
-                for (int i = 0; i < page.Tasks.Count; i++)
+                List<TaskItem> shown = DisplayTasks(page);
+                for (int i = 0; i < shown.Count; i++)
                 {
-                    TaskItem task = page.Tasks[i];
+                    TaskItem task = shown[i];
                     if (task.Completed) completed++;
-                    TaskRow row = MakeTaskRow(page.Id, task, i, page.Tasks.Count);
+                    TaskRow row = MakeTaskRow(page.Id, task, i, shown.Count);
                     _rows.Add(row);
                     _tasks.Controls.Add(row.Card);
                 }
@@ -575,8 +581,9 @@ namespace DeskStudy
             Button up = ActionButton("↑", 29, delegate { MoveTask(pageId, task.Id, -1); });
             Button down = ActionButton("↓", 29, delegate { MoveTask(pageId, task.Id, 1); });
             Button delete = ActionButton(Lang.T("删除"), 45, delegate { DeleteTask(pageId, task.Id); });
-            up.Enabled = index > 0;
-            down.Enabled = index < total - 1;
+            up.Enabled = index > 0 && !SortsByDue;
+            down.Enabled = index < total - 1 && !SortsByDue;
+            up.Visible = down.Visible = !SortsByDue;
             up.AccessibleName = Lang.T("上移任务");
             down.AccessibleName = Lang.T("下移任务");
             delete.ForeColor = Color.FromArgb(155, 95, 82);
@@ -719,22 +726,62 @@ namespace DeskStudy
                 if (page == null) return;
                 TaskItem task = taskId == null ? new TaskItem() : page.Tasks.Find(delegate(TaskItem item) { return item.Id == taskId; });
                 if (task == null) return;
-                bool scheduleChanged = task.DueLocal != dialog.DueLocal || task.ReminderMinutes != dialog.ReminderMinutes || task.TimeZoneId != dialog.TimeZoneId || task.DueDateOnly != dialog.DueDateOnly;
                 if (taskId == null) task.Id = Guid.NewGuid().ToString("N");
-                task.Text = dialog.TaskText;
-                task.DueLocal = dialog.DueLocal;
-                task.DueDateOnly = dialog.DueDateOnly;
-                task.ReminderMinutes = dialog.ReminderMinutes;
-                task.TimeZoneId = dialog.TimeZoneId;
-                if (scheduleChanged || taskId == null)
-                {
-                    ReminderEngine.Reset(task);
-                    ReminderEngine.SkipPassedDateOnlyReminder(task, App.Data.Settings, DateTime.UtcNow);
-                }
+                ApplyEditor(task, dialog, App.Data.Settings, taskId == null);
                 if (taskId == null) page.Tasks.Add(task);
                 Persist();
                 RefreshFromData();
+                if (SortsByDue) HighlightTask(task.Id, true);
             }
+        }
+
+        // Copies the editor's values into the task; a changed schedule starts its reminders afresh.
+        internal static void ApplyEditor(TaskItem task, TaskEditorDialog dialog, AppSettings settings, bool isNew)
+        {
+            bool scheduleChanged = task.DueLocal != dialog.DueLocal || task.ReminderMinutes != dialog.ReminderMinutes || task.TimeZoneId != dialog.TimeZoneId || task.DueDateOnly != dialog.DueDateOnly;
+            task.Text = dialog.TaskText;
+            task.DueLocal = dialog.DueLocal;
+            task.DueDateOnly = dialog.DueDateOnly;
+            task.ReminderMinutes = dialog.ReminderMinutes;
+            task.TimeZoneId = dialog.TimeZoneId;
+            if (scheduleChanged || isNew)
+            {
+                ReminderEngine.Reset(task);
+                ReminderEngine.SkipPassedDateOnlyReminder(task, settings, DateTime.UtcNow);
+            }
+        }
+
+        private Timer _flashTimer;
+        // Re-applied after every appearance pass so a refresh during the highlight does not cut it short.
+        private void ApplyFlash()
+        {
+            if (FlashingTaskId == null) return;
+            TaskRow row = _rows.Find(delegate(TaskRow r) { return r.Task.Id == FlashingTaskId; });
+            TaskCardPanel card = row == null ? null : row.Card as TaskCardPanel;
+            if (card == null || card.IsDisposed) return;
+            Color baseColor = card.LayoutKind == "Card" ? card.SurfaceColor : card.BackColor;
+            Color tint = Color.FromArgb((baseColor.R * 3 + _accent.R) / 4, (baseColor.G * 3 + _accent.G) / 4, (baseColor.B * 3 + _accent.B) / 4);
+            if (card.LayoutKind == "Card") card.SurfaceColor = tint; else card.BackColor = tint;
+            row.Toggle.BackColor = tint; row.More.BackColor = tint;
+            card.Invalidate();
+        }
+        public string FlashingTaskId { get; private set; }
+        // Briefly tints one task so it can be found after it moved (sorting) or was opened from the calendar.
+        public void HighlightTask(string taskId, bool scroll)
+        {
+            TaskRow row = _rows.Find(delegate(TaskRow r) { return r.Task.Id == taskId; });
+            if (row == null || row.Card.IsDisposed) return;
+            if (_flashTimer != null) { _flashTimer.Stop(); _flashTimer.Dispose(); _flashTimer = null; FlashingTaskId = null; if (_contentReady) ApplyAppearance(); }
+            if (scroll) _tasks.ScrollControlIntoView(row.Card);
+            FlashingTaskId = taskId;
+            ApplyFlash();
+            _flashTimer = new Timer { Interval = 1600 };
+            _flashTimer.Tick += delegate
+            {
+                _flashTimer.Stop(); _flashTimer.Dispose(); _flashTimer = null; FlashingTaskId = null;
+                if (!IsDisposed && _contentReady) ApplyAppearance();
+            };
+            _flashTimer.Start();
         }
 
         private void MoveTask(string pageId, string taskId, int direction)
@@ -772,6 +819,7 @@ namespace DeskStudy
             {
                 App.DataChanged -= OnDataChanged;
                 if (_statusTimer != null) { _statusTimer.Stop(); _statusTimer.Dispose(); }
+                if (_flashTimer != null) { _flashTimer.Stop(); _flashTimer.Dispose(); _flashTimer = null; }
                 DisposeNotebookLayouts();
             }
             base.Dispose(disposing);

@@ -178,6 +178,48 @@ internal static class CoreTests
                 string[] backups = Directory.GetFiles(destination.DirectoryPath, "before-import-*.json");
                 Assert(backups.Length == 1 && File.ReadAllText(backups[0]).Contains("Original text"), "Import did not preserve previous content.");
             });
+            Run("DDL order: by deadline across time zones, date-only after timed, undated next, done last, ties stable", delegate
+            {
+                var tokyo = new TaskItem { Text = "tokyo 10:00", DueLocal = "2027-01-15T10:00:00", TimeZoneId = "Tokyo Standard Time" };
+                var london = new TaskItem { Text = "london 09:00", DueLocal = "2027-01-15T09:00:00", TimeZoneId = "GMT Standard Time" };
+                var dayOnly = new TaskItem { Text = "day only", DueLocal = "2027-01-15T23:59:00", DueDateOnly = true, TimeZoneId = "GMT Standard Time" };
+                var late = new TaskItem { Text = "london 22:00", DueLocal = "2027-01-15T22:00:00", TimeZoneId = "GMT Standard Time" };
+                var undatedA = new TaskItem { Text = "undated A" }; var undatedB = new TaskItem { Text = "undated B" };
+                var done = new TaskItem { Text = "done early", DueLocal = "2027-01-01T08:00:00", TimeZoneId = "GMT Standard Time", Completed = true };
+                var broken = new TaskItem { Text = "broken due", DueLocal = "not a date" };
+                var stored = new List<TaskItem> { undatedA, done, dayOnly, late, broken, london, undatedB, tokyo };
+                string order = String.Join("|", DeadlineLogic.Ordered(stored).Select(t => t.Text));
+                Assert(order == "tokyo 10:00|london 09:00|london 22:00|day only|undated A|broken due|undated B|done early", "Unexpected DDL order: " + order);
+                Assert(stored[0] == undatedA && stored[7] == tokyo, "Sorting must not change the stored order.");
+            });
+            Run("DDL on the calendar: unfinished, in range, archived pages included, local time", delegate
+            {
+                AppData data = new AppData(); Notebook book = data.Books.First(b => b.Id == "ddl");
+                var page = book.Pages[0]; page.Title = "Homework";
+                var archived = new NotePage { Title = "Last term", Archived = true }; book.Pages.Add(archived);
+                page.Tasks.Add(new TaskItem { Text = "timed", DueLocal = "2027-03-10T15:00:00", TimeZoneId = "GMT Standard Time" });
+                page.Tasks.Add(new TaskItem { Text = "finished", DueLocal = "2027-03-10T12:00:00", TimeZoneId = "GMT Standard Time", Completed = true });
+                page.Tasks.Add(new TaskItem { Text = "no due" });
+                page.Tasks.Add(new TaskItem { Text = "next month", DueLocal = "2027-04-20T12:00:00", TimeZoneId = "GMT Standard Time" });
+                archived.Tasks.Add(new TaskItem { Text = "library", DueLocal = "2027-03-12T23:59:00", DueDateOnly = true, TimeZoneId = "Tokyo Standard Time" });
+                data.Books.First(b => b.Id == "todo").Pages[0].Tasks.Add(new TaskItem { Text = "todo item", DueLocal = "2027-03-11T09:00:00", TimeZoneId = "GMT Standard Time" });
+                List<DeadlineMark> marks = DeadlineLogic.Marks(data, D("2027-03-08"), D("2027-03-14"));
+                Assert(String.Join("|", marks.Select(m => m.Text)) == "timed|library", "Only unfinished DDL deadlines in range belong on the calendar.");
+                DateTime local = TimeZoneInfo.ConvertTimeFromUtc(U("2027-03-10T15:00:00Z"), TimeZoneInfo.Local);
+                Assert(marks[0].Date == local.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) && marks[0].Time == local.ToString("HH:mm", CultureInfo.InvariantCulture) && !marks[0].DateOnly && marks[0].PageTitle == "Homework", "A timed deadline is shown at this computer's local time.");
+                Assert(marks[1].Date == "2027-03-12" && marks[1].DateOnly && marks[1].Archived && marks[1].Minutes == 24 * 60, "A date-only deadline keeps its day, wherever it was set; archived pages are included.");
+                Assert(DeadlineLogic.Marks(data, D("2027-03-13"), D("2027-03-13")).Count == 0, "The range is by day and excludes other days.");
+            });
+            Run("DDL settings: on by default, also for files written before they existed", delegate
+            {
+                AppSettings fresh = new AppSettings();
+                Assert(fresh.SortDeadlines && fresh.Calendar.ShowDeadlines, "Both DDL options start switched on.");
+                var json = new System.Web.Script.Serialization.JavaScriptSerializer();
+                AppSettings old = json.Deserialize<AppSettings>("{\"WidgetMode\":\"Desktop\",\"Calendar\":{\"DefaultView\":\"Month\"}}");
+                Assert(old.SortDeadlines && old.Calendar.ShowDeadlines && old.Calendar.DefaultView == "Month", "Older files without the options read as switched on.");
+                AppSettings off = json.Deserialize<AppSettings>(json.Serialize(new AppSettings { SortDeadlines = false, Calendar = new CalendarOptions { ShowDeadlines = false } }));
+                Assert(!off.SortDeadlines && !off.Calendar.ShowDeadlines, "Switched-off options survive a save and load.");
+            });
             Run("Invalid/future import: reject without mutating live data or on-disk data", delegate
             {
                 AppStore store = NewStore("invalid-import"); store.Data.Books[0].Pages[0].Text = "Do not change"; store.Save();

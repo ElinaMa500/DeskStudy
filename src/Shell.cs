@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -119,14 +119,15 @@ namespace DeskStudy
         {
             if (App != null && PositionLocked)
             {
-                int command = m.WParam.ToInt32() & 0xFFF0;
+                // Message parameters are pointer-sized; a wheel-down delta does not fit ToInt32 on 64-bit Windows.
+                int command = unchecked((int)m.WParam.ToInt64()) & 0xFFF0;
                 if (m.Msg == 0x112 && (command == 0xF010 || command == 0xF000 || command == 0xF030)) return;
-                if ((m.Msg == 0xA1 || m.Msg == 0xA3) && m.WParam.ToInt32() == 2) return;
+                if ((m.Msg == 0xA1 || m.Msg == 0xA3) && m.WParam.ToInt64() == 2) return;
             }
             if (App != null && FrameWndProc(ref m)) return;
             if (App != null) PlacementWndProc(ref m);
             base.WndProc(ref m);
-            if (App != null && PositionLocked && m.Msg == 0x84 && m.Result.ToInt32() >= 10 && m.Result.ToInt32() <= 17) m.Result = new IntPtr(1);
+            if (App != null && PositionLocked && m.Msg == 0x84 && m.Result.ToInt64() >= 10 && m.Result.ToInt64() <= 17) m.Result = new IntPtr(1);
             if (App != null) { AfterFrameWndProc(ref m); AfterPlacementWndProc(ref m); }
         }
         public void ApplyAppearance()
@@ -190,6 +191,12 @@ namespace DeskStudy
                     settingsButton.MinimumSize = Size.Empty;
                     settingsButton.Height = Math.Max((int)Math.Round(22 * dpi), slimFont.Height + (int)Math.Round(6 * dpi));
                 }
+                else
+                {
+                    // Notebook header (and the folded calendar bar, which matches it): a lower bar than the 32 px buttons give.
+                    settingsButton.MinimumSize = Size.Empty;
+                    settingsButton.Height = Math.Max((int)Math.Round(28 * dpi), pin.Font.Height + (int)Math.Round(8 * dpi));
+                }
                 pin.BackColor = back; pin.ForeColor = pin.Checked ? accent : ink;
                 pin.FlatAppearance.CheckedBackColor = soft; pin.FlatAppearance.MouseOverBackColor = soft; pin.FlatAppearance.MouseDownBackColor = soft;
                 pin.Padding = Padding.Empty;
@@ -201,7 +208,7 @@ namespace DeskStudy
                 settingsButton.Margin = Padding.Empty;
                 pin.AutoSize = false;
                 pin.Size = new Size(TextRenderer.MeasureText(Lang.T("置顶"), pin.Font).Width + (int)Math.Round((slim ? 12 : 16) * dpi), settingsButton.Height);
-                header.Height = slim ? settingsButton.Height + header.Padding.Vertical : (int)Math.Max(42 * dpi, settingsButton.Height + 12 * dpi);
+                header.Height = slim ? settingsButton.Height + header.Padding.Vertical : (int)Math.Max(36 * dpi, settingsButton.Height + 8 * dpi);
             }
             else
             {

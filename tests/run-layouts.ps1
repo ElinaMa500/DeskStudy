@@ -1,4 +1,4 @@
-param([switch]$Render, [switch]$CardOnly, [switch]$CompileOnly, [switch]$Due, [switch]$Frame, [switch]$Place, [switch]$CalendarStyle, [switch]$Fold, [switch]$InlineEdit, [switch]$Language, [switch]$English)
+﻿param([switch]$Render, [switch]$CardOnly, [switch]$CompileOnly, [switch]$Due, [switch]$Frame, [switch]$Place, [switch]$CalendarStyle, [switch]$Fold, [switch]$InlineEdit, [switch]$Language, [switch]$English, [switch]$Deadline, [string]$TitleGap = '')
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $compilerPath = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
@@ -7,12 +7,14 @@ New-Item -ItemType Directory -Force -Path $artifactPath | Out-Null
 $testExe = Join-Path $artifactPath 'NotebookLayoutTests.exe'
 $sourceFiles = Get-ChildItem -LiteralPath (Join-Path $projectRoot 'src') -Filter '*.cs' | ForEach-Object FullName
 $buildArgs = @('/nologo', '/target:exe', '/main:NotebookLayoutTests', '/codepage:65001', ('/out:' + $testExe), ('/win32manifest:' + (Join-Path $projectRoot 'src\app.manifest')), '/reference:System.dll', '/reference:System.Core.dll', '/reference:System.Drawing.dll', '/reference:System.Windows.Forms.dll', '/reference:System.Web.Extensions.dll')
-& $compilerPath @buildArgs @sourceFiles (Join-Path $PSScriptRoot 'NotebookLayoutTests.cs') (Join-Path $PSScriptRoot 'PlacementChecks.cs') (Join-Path $PSScriptRoot 'CalendarStyleChecks.cs') (Join-Path $PSScriptRoot 'FoldChecks.cs') (Join-Path $PSScriptRoot 'InlineEditChecks.cs') (Join-Path $PSScriptRoot 'LangChecks.cs') (Join-Path $PSScriptRoot 'EnglishChecks.cs')
+& $compilerPath @buildArgs @sourceFiles (Join-Path $PSScriptRoot 'NotebookLayoutTests.cs') (Join-Path $PSScriptRoot 'PlacementChecks.cs') (Join-Path $PSScriptRoot 'CalendarStyleChecks.cs') (Join-Path $PSScriptRoot 'FoldChecks.cs') (Join-Path $PSScriptRoot 'InlineEditChecks.cs') (Join-Path $PSScriptRoot 'LangChecks.cs') (Join-Path $PSScriptRoot 'EnglishChecks.cs') (Join-Path $PSScriptRoot 'DeadlineChecks.cs') (Join-Path $PSScriptRoot 'TitleGapShot.cs')
 if ($LASTEXITCODE -ne 0) { throw 'Notebook layout test compilation failed.' }
 if ($CompileOnly) { Write-Output "Compiled: $testExe"; exit 0 }
 $dataPath = Join-Path $artifactPath ('layouts-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 if ($Due) { & $testExe $dataPath due 2>&1 | Tee-Object -FilePath (Join-Path $artifactPath 'layouts-due.log'); if ($LASTEXITCODE -ne 0) { throw 'Notebook deadline picker checks failed.' }; exit 0 }
 if ($Frame) { & $testExe $dataPath frame 2>&1 | Tee-Object -FilePath (Join-Path $artifactPath 'layouts-frame.log'); if ($LASTEXITCODE -ne 0) { throw 'Desktop widget mode checks failed.' }; exit 0 }
+if ($TitleGap -ne '') { & $testExe $dataPath titlegap $TitleGap 2>&1 | Tee-Object -FilePath (Join-Path $artifactPath 'layouts-titlegap.log'); if ($LASTEXITCODE -ne 0) { throw 'Title gap shot failed.' }; exit 0 }
+if ($Deadline) { & $testExe $dataPath ddl 2>&1 | Tee-Object -FilePath (Join-Path $artifactPath 'layouts-ddl.log'); if ($LASTEXITCODE -ne 0) { throw 'Deadline checks failed.' }; exit 0 }
 if ($English) { & $testExe $dataPath english 2>&1 | Tee-Object -FilePath (Join-Path $artifactPath 'layouts-english.log'); if ($LASTEXITCODE -ne 0) { throw 'English checks failed.' }; Write-Output "English screens: $dataPath\english"; exit 0 }
 if ($Language) { & $testExe $dataPath lang 2>&1 | Tee-Object -FilePath (Join-Path $artifactPath 'layouts-lang.log'); if ($LASTEXITCODE -ne 0) { throw 'Language checks failed.' }; & $testExe ($dataPath + '-en') langfresh 2>&1 | Tee-Object -FilePath (Join-Path $artifactPath 'layouts-langfresh.log'); if ($LASTEXITCODE -ne 0) { throw 'English first-run check failed.' }; exit 0 }
 if ($InlineEdit) { & $testExe $dataPath inline 2>&1 | Tee-Object -FilePath (Join-Path $artifactPath 'layouts-inline.log'); if ($LASTEXITCODE -ne 0) { throw 'Inline edit checks failed.' }; & $testExe $dataPath inlineread 2>&1 | Tee-Object -FilePath (Join-Path $artifactPath 'layouts-inlineread.log'); if ($LASTEXITCODE -ne 0) { throw 'Inline edit restart check failed.' }; exit 0 }

@@ -143,6 +143,10 @@ public static class PlacementChecks
         app.Data.Windows["todo"].PositionLocked = true; Rectangle lockedAt = V(todo);
         Drop(ddl, at(1150, 100));
         Assert(V(todo) == lockedAt && !V(ddl).IntersectsWith(lockedAt), "dropped onto a locked widget: the locked one stays, the dropped one moves");
+        // Wheel-down over a locked widget: the delta makes wParam 0xFF88xxxx, more than a 32-bit int holds on 64-bit Windows.
+        SendMessage(todo.Handle, 0x020A, new IntPtr(0xFF880000L), IntPtr.Zero);
+        SendMessage(todo.Handle, 0x0112, new IntPtr(unchecked((long)0xFFFFFFFFFFFFF012UL)), IntPtr.Zero); Pump(60);
+        Assert(V(todo) == lockedAt, "a locked widget takes a mouse-wheel-down and an odd system command without an overflow error");
         app.Data.Windows["todo"].PositionLocked = false;
 
         // Hidden widgets are not obstacles; one coming back into view moves out of the way.

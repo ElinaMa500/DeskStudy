@@ -147,6 +147,8 @@ namespace DeskStudy
             page.Tasks.Add(task);
             _pendingDue = null; _quickDue.Text = Lang.T("+ 截止时间");
             _quickText.Clear(); Persist(); RefreshFromData(); _quickText.Focus(); _tasks.ScrollControlIntoView(_quickEntry);
+            // Sorted into place, maybe out of view: tint it where it landed; typing continues below.
+            if (SortsByDue) HighlightTask(task.Id, false);
         }
 
         private void OpenTaskDue(TaskRow row, Control anchor)
@@ -159,6 +161,7 @@ namespace DeskStudy
                 TaskItem task = page == null ? null : page.Tasks.Find(delegate(TaskItem item) { return item.Id == taskId; });
                 if (task == null) return;
                 SetDue(task, choice); Persist(); RefreshFromData();
+                if (SortsByDue) HighlightTask(taskId, true);
             }, null);
         }
 

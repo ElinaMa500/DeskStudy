@@ -31,7 +31,7 @@ namespace DeskStudy
         private TextBox hotkeyBox;
         private Label hotkeyStatus;
         private NumericUpDown opacity, fontSize, leadMinutes;
-        private CheckBox followingGlobal, quietEnabled, soundEnabled, startup;
+        private CheckBox followingGlobal, quietEnabled, soundEnabled, startup, showDeadlines, sortDeadlines;
         private Button backgroundColor;
         private readonly List<NotebookLayoutPreview> notebookLayouts = new List<NotebookLayoutPreview>();
         private DateTimePicker semesterStart, semesterEnd, teachingWeekOne, quietStart, quietEnd, dateOnlyReminder;
@@ -405,6 +405,8 @@ namespace DeskStudy
             weekStart = Combo("calendar-week-start", new Choice("1", Lang.T("星期一")), new Choice("0", Lang.T("星期日")), new Choice("2", Lang.T("星期二")), new Choice("3", Lang.T("星期三")), new Choice("4", Lang.T("星期四")), new Choice("5", Lang.T("星期五")), new Choice("6", Lang.T("星期六"))); Field(card, Lang.T("一周起始日"), weekStart);
             semesterStart = DatePicker("semester-start"); semesterEnd = DatePicker("semester-end"); teachingWeekOne = DatePicker("teaching-week-one");
             Field(card, Lang.T("学期开始"), semesterStart); Field(card, Lang.T("学期结束"), semesterEnd); Field(card, Lang.T("教学第 1 周起点"), teachingWeekOne);
+            showDeadlines = Check("calendar-show-deadlines", Lang.T("在日历上显示 DDL 截止时间")); Field(card, Lang.T("DDL"), showDeadlines);
+            showDeadlines.CheckedChanged += delegate { ChangeSetting(delegate { app.Data.Settings.Calendar.ShowDeadlines = showDeadlines.Checked; }); };
             Add(card, Ui.Label(Lang.T("日历会记住你上次在组件上选的视图，下次打开仍是它。"), 8.5F, Ui.Muted));
             Add(card, Ui.Label(Lang.T("学期与教学周用于新增课程的默认循环范围；有效日期会自动保存。"), 8.5F, Ui.Muted));
             defaultView.SelectedIndexChanged += delegate { ChangeSetting(delegate { string view = SelectedId(defaultView); app.Data.Settings.Calendar.DefaultView = view == "Month" ? "Month" : "Week"; app.Data.Settings.Calendar.WorkWeek = view == "WorkWeek"; }); };
@@ -445,6 +447,8 @@ namespace DeskStudy
             bookName = new TextBox { Name = "notebook-name", Width = 230, MaxLength = 60, Margin = new Padding(0, 6, 6, 0) };
             Field(card, Lang.T("便签名称"), Buttons(bookName, ActionButton("rename-notebook", Lang.T("保存名称"), delegate { var book = CurrentBook(); if (book != null && !String.IsNullOrWhiteSpace(bookName.Text)) app.RenameBook(book.Id, bookName.Text.Trim()); })));
             desktopPage = Combo("desktop-current-page"); desktopPage.Width = 330; Field(card, Lang.T("桌面当前页"), desktopPage);
+            sortDeadlines = Check("ddl-sort-by-due", Lang.T("DDL 按截止时间排序")); Field(card, Lang.T("DDL 排序"), sortDeadlines);
+            sortDeadlines.CheckedChanged += delegate { ChangeSetting(delegate { app.Data.Settings.SortDeadlines = sortDeadlines.Checked; }); };
             bookChoice.SelectedIndexChanged += delegate { if (!syncing) { pageSignature = ""; RefreshData(); } };
             desktopPage.SelectedIndexChanged += delegate { if (!syncing) { var book = CurrentBook(); string id = SelectedId(desktopPage); if (book != null && id != "") Run(delegate { app.SelectPage(book.Id, id); }); } };
             var pageCard = Card(page, Lang.T("全部页面 · 包含归档")); pageList = List("notebook-pages", 220, Lang.T("页面标题"), Lang.T("状态"), Lang.T("创建日期")); Add(pageCard, pageList);
@@ -543,6 +547,7 @@ namespace DeskStudy
                 appearanceHint.Text = target == "global" ? Lang.T("正在调整全局外观，所有跟随全局的组件会同步变化。") : follows ? Lang.T("此组件正在跟随全局。取消勾选后可以单独调整。") : Lang.T("此组件使用独立外观。勾选“跟随全局外观”即可恢复同步。");
                 SelectId(defaultView, app.Data.Settings.Calendar.WorkWeek && app.Data.Settings.Calendar.DefaultView == "Week" ? "WorkWeek" : app.Data.Settings.Calendar.DefaultView); SelectId(weekStart, app.Data.Settings.Calendar.WeekStartDay.ToString(CultureInfo.InvariantCulture));
                 if (!calendarDatesPending) { SetDate(semesterStart, app.Data.Settings.Calendar.SemesterStart); SetDate(semesterEnd, app.Data.Settings.Calendar.SemesterEnd); SetDate(teachingWeekOne, app.Data.Settings.Calendar.TeachingWeekOne); }
+                showDeadlines.Checked = app.Data.Settings.Calendar.ShowDeadlines; sortDeadlines.Checked = app.Data.Settings.SortDeadlines;
                 RefreshCourses(); RefreshBooks();
                 SetNumber(leadMinutes, app.Data.Settings.Reminders.DefaultLeadMinutes); quietEnabled.Checked = app.Data.Settings.Reminders.QuietHoursEnabled;
                 quietStart.Enabled = quietEnabled.Checked; quietEnd.Enabled = quietEnabled.Checked;

@@ -194,6 +194,73 @@ namespace DeskStudy
         }
     }
 
+    // A deadline from the DDL book as the calendar shows it, in this computer's local time.
+    public sealed class DeadlineMark
+    {
+        public string TaskId { get; set; }
+        public string PageId { get; set; }
+        public string PageTitle { get; set; }
+        public bool Archived { get; set; }
+        public string Text { get; set; }
+        public string Date { get; set; }
+        public string Time { get; set; }
+        public bool DateOnly { get; set; }
+        public int Minutes { get { return DateOnly ? 24 * 60 : (int)TimeSpan.ParseExact(Time, @"hh\:mm", CultureInfo.InvariantCulture).TotalMinutes; } }
+    }
+
+    public static class DeadlineLogic
+    {
+        // The DDL book's display order: unfinished first, then by deadline (date-only counts as 23:59 that day),
+        // tasks without a deadline after the dated ones, ties in the order they were added.
+        public static List<TaskItem> Ordered(IEnumerable<TaskItem> tasks)
+        {
+            return tasks.Select((task, index) => new { task, index, due = DueUtc(task) })
+                .OrderBy(x => x.task.Completed ? 1 : 0).ThenBy(x => x.due.HasValue ? 0 : 1)
+                .ThenBy(x => x.due ?? DateTime.MaxValue).ThenBy(x => x.index).Select(x => x.task).ToList();
+        }
+
+        public static DateTime? DueUtc(TaskItem task)
+        {
+            if (task == null || String.IsNullOrEmpty(task.DueLocal)) return null;
+            try
+            {
+                DateTime wall = TimeUtil.ParseLocal(task.DueLocal);
+                try { return TimeUtil.LocalToUtc(wall, task.TimeZoneId); }
+                catch (TimeZoneNotFoundException) { return TimeUtil.LocalToUtc(wall, null); }
+                catch (InvalidTimeZoneException) { return TimeUtil.LocalToUtc(wall, null); }
+            }
+            catch (FormatException) { return null; }
+            catch (ArgumentException) { return null; }
+        }
+
+        // Unfinished DDL tasks with a deadline between the two dates (inclusive), archived pages included.
+        public static List<DeadlineMark> Marks(AppData data, DateTime from, DateTime to)
+        {
+            var marks = new List<DeadlineMark>();
+            Notebook book = data == null || data.Books == null ? null : data.Books.FirstOrDefault(b => b != null && b.Id == "ddl");
+            if (book == null || book.Pages == null) return marks;
+            foreach (NotePage page in book.Pages)
+            {
+                if (page == null || page.Tasks == null) continue;
+                foreach (TaskItem task in page.Tasks)
+                {
+                    if (task == null || task.Completed) continue;
+                    DateTime? utc = DueUtc(task);
+                    if (!utc.HasValue) continue;
+                    // A date-only deadline belongs to its calendar day wherever the computer is now.
+                    DateTime local = task.DueDateOnly ? TimeUtil.ParseLocal(task.DueLocal) : utc.Value.ToLocalTime();
+                    if (local.Date < from.Date || local.Date > to.Date) continue;
+                    marks.Add(new DeadlineMark {
+                        TaskId = task.Id, PageId = page.Id, PageTitle = page.Title ?? "", Archived = page.Archived, Text = task.Text ?? "",
+                        Date = local.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), Time = local.ToString("HH:mm", CultureInfo.InvariantCulture),
+                        DateOnly = task.DueDateOnly
+                    });
+                }
+            }
+            return marks.OrderBy(m => m.Date, StringComparer.Ordinal).ThenBy(m => m.Minutes).ToList();
+        }
+    }
+
     public static class CalendarEngine
     {
         public static List<Occurrence> GetOccurrences(AppData data, DateTime from, DateTime to)

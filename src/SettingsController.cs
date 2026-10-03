@@ -153,6 +153,37 @@ namespace DeskStudy
             state.Visible = true;
             UpdateWindow(key, state); w.Reveal();
         }
+        // From the calendar: open the DDL book on the task's page and tint the task. A task on an archived page
+        // has no page to turn to, so its editor opens instead.
+        public void ShowDeadline(IWin32Window owner, string pageId, string taskId)
+        {
+            var book = Book("ddl"); var page = book.Pages.FirstOrDefault(p => p.Id == pageId);
+            if (page == null || !page.Tasks.Any(t => t.Id == taskId)) return;
+            if (page.Archived) { EditDeadline(owner, pageId, taskId); return; }
+            var w = (NotebookForm)Widgets.First(f => f.WidgetKey == "ddl");
+            if (book.CurrentPageId != pageId) { book.CurrentPageId = pageId; Save(); }
+            if (!w.Visible) { var state = CopyWindow(Data.Windows["ddl"]); state.Visible = true; UpdateWindow("ddl", state); }
+            if (w.Collapsed) w.Unfold(true);
+            w.Reveal(); w.RefreshData();
+            w.HighlightTask(taskId, true);
+        }
+
+        public void EditDeadline(IWin32Window owner, string pageId, string taskId)
+        {
+            var page = Book("ddl").Pages.FirstOrDefault(p => p.Id == pageId);
+            var task = page == null ? null : page.Tasks.FirstOrDefault(t => t.Id == taskId);
+            if (task == null) return;
+            using (var dialog = new TaskEditorDialog(task, Color.FromArgb(184, 113, 75), Data.Settings.Reminders.DefaultLeadMinutes))
+            {
+                if (dialog.ShowDialog(owner) != DialogResult.OK) return;
+                page = Book("ddl").Pages.FirstOrDefault(p => p.Id == pageId);
+                task = page == null ? null : page.Tasks.FirstOrDefault(t => t.Id == taskId);
+                if (task == null) return;
+                NotebookForm.ApplyEditor(task, dialog, Data.Settings, false);
+                Save();
+            }
+        }
+
         // Calendar at the top left, the notebooks along the right edge: DDL under Todo when it fits, otherwise beside it.
         // Anything that still collides (small screens) is sorted out by the placement rules afterwards.
         private Dictionary<string, Point> Tiled(Rectangle area, Dictionary<string, Size> sizes)

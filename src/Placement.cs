@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -52,7 +52,7 @@ namespace DeskStudy
         private void PlacementWndProc(ref Message m)
         {
             if (m.Msg == 0x0231) { StopSlide(); sizingEdge = 0; SetShadow(true); }
-            else if (m.Msg == 0x0214) sizingEdge = m.WParam.ToInt32();
+            else if (m.Msg == 0x0214) sizingEdge = unchecked((int)m.WParam.ToInt64());
         }
         private void AfterPlacementWndProc(ref Message m)
         {

@@ -23,6 +23,13 @@ namespace DeskStudy
         private readonly Timer clockTimer = new Timer();
         private DateTime lastToday = DateTime.Today;
         private List<Occurrence> occurrences = new List<Occurrence>();
+        // DDL deadlines in view; the date-only ones of a week view show as a ⚑ badge beside their date.
+        private List<DeadlineMark> deadlines = new List<DeadlineMark>();
+        private readonly List<KeyValuePair<Rectangle, List<DeadlineMark>>> badgeHits = new List<KeyValuePair<Rectangle, List<DeadlineMark>>>();
+        private readonly ClickOrDouble<List<DeadlineMark>> badgeClicks = new ClickOrDouble<List<DeadlineMark>>();
+        private readonly ToolTip badgeTip = new ToolTip { AutoPopDelay = 12000, InitialDelay = 300 };
+        private string badgeTipText = "";
+        private List<DeadlineMark> DayDeadlines { get { return monthView ? new List<DeadlineMark>() : deadlines.Where(m => m.DateOnly).ToList(); } }
         private readonly Color ink = Color.FromArgb(38, 49, 65);
         private readonly Color muted = Color.FromArgb(119, 128, 141);
         // Reference styles follow the notebook layout: 清爽 for 轻量卡片 / 清爽卡片, 纸页 for 纸页本 / 手账纸页.
@@ -71,7 +78,7 @@ namespace DeskStudy
         {
             if (disposing)
             {
-                clockTimer.Dispose();
+                clockTimer.Dispose(); badgeClicks.Dispose(); badgeTip.Dispose();
                 App.DataChanged -= RefreshData;
                 foreach (Font font in refFonts.Values) font.Dispose();
                 refFonts.Clear();
@@ -138,10 +145,23 @@ namespace DeskStudy
             hint.Font = new Font("Microsoft YaHei UI", 9F); hint.ForeColor = muted;
             hint.TextAlign = ContentAlignment.MiddleLeft; hint.Padding = new Padding(6, 0, 0, 0);
             layout.Controls.Add(hint, 0, 1);
-            dayHeader = new Panel(); dayHeader.Dock = DockStyle.Fill; dayHeader.Margin = Padding.Empty; dayHeader.Paint += PaintHeader;
+            dayHeader = new DoubleBufferedPanel(); dayHeader.Dock = DockStyle.Fill; dayHeader.Margin = Padding.Empty; dayHeader.Paint += PaintHeader;
+            dayHeader.Name = "calendar-day-header";
+            dayHeader.MouseClick += delegate(object sender, MouseEventArgs e) { var hit = BadgeHit(e.Location); if (hit != null) badgeClicks.Click(hit); };
+            dayHeader.MouseDoubleClick += delegate(object sender, MouseEventArgs e) { var hit = BadgeHit(e.Location); if (hit != null) badgeClicks.DoubleClick(hit); };
+            dayHeader.MouseMove += delegate(object sender, MouseEventArgs e)
+            {
+                var hit = BadgeHit(e.Location); dayHeader.Cursor = hit == null ? Cursors.Default : Cursors.Hand;
+                string text = hit == null ? "" : hit.Count == 1 ? CalendarSurface.DeadlineTip(hit[0]) : String.Join("\n", hit.Select(m => "⚑ " + m.Text)) + "\n" + Lang.T("单击选择要查看的任务");
+                if (text != badgeTipText) { badgeTipText = text; badgeTip.SetToolTip(dayHeader, text); }
+            };
+            badgeClicks.Single += OpenBadge;
+            badgeClicks.Double += delegate(List<DeadlineMark> hit) { if (hit.Count == 1) App.EditDeadline(this, hit[0].PageId, hit[0].TaskId); else OpenBadge(hit); };
             layout.Controls.Add(dayHeader, 0, 2);
             surface = new CalendarSurface(); surface.Dock = DockStyle.Fill;
             surface.OpenOccurrence += EditEvent;
+            surface.OpenDeadline += delegate(DeadlineMark mark) { App.ShowDeadline(this, mark.PageId, mark.TaskId); };
+            surface.EditDeadline += delegate(DeadlineMark mark) { App.EditDeadline(this, mark.PageId, mark.TaskId); };
             surface.CreateEvent += AddEvent;
             surface.SelectDate += delegate(DateTime date) { focusDate = date; };
             surface.SizeChanged += delegate { dayHeader.Invalidate(); };
@@ -203,6 +223,8 @@ namespace DeskStudy
             DateTime start = monthView ? WeekStart(new DateTime(focusDate.Year, focusDate.Month, 1)) : ViewStart();
             DateTime end = start.AddDays(monthView ? 41 : ViewDays - 1);
             occurrences = CalendarEngine.GetOccurrences(App.Data, start, end).ToList();
+            deadlines = App.Data.Settings.Calendar.ShowDeadlines ? DeadlineLogic.Marks(App.Data, start, end) : new List<DeadlineMark>();
+            surface.SetDeadlines(deadlines);
             periodFull = monthView ? Lang.MonthTitle(focusDate) : start.ToString("M.d") + " – " + end.ToString("M.d") + "  ·  " + focusDate.Year;
             periodShort = monthView ? periodFull : start.ToString("M.d") + " – " + end.ToString("M.d");
             FitPeriod();
@@ -355,6 +377,7 @@ namespace DeskStudy
 
         private void PaintHeader(object sender, PaintEventArgs e)
         {
+            badgeHits.Clear();
             if (IsReference) { PaintReferenceHeader(e.Graphics); return; }
             AppearanceOptions appearance = SettingsLogic.EffectiveAppearance(App.Data, "calendar");
             Color foreground = AppearancePainter.Foreground(appearance);
@@ -373,7 +396,11 @@ namespace DeskStudy
                 if (today) using (Brush b = new SolidBrush(dark ? Color.FromArgb(58, 83, 77) : Color.FromArgb(226, 237, 231))) e.Graphics.FillRectangle(b, rect);
                 string text = Lang.Weekday(date.DayOfWeek) + (monthView ? "" : "\n" + date.ToString("M/d"));
                 using (Font font = new Font("Microsoft YaHei UI", appearance.FontSize, today ? FontStyle.Bold : FontStyle.Regular))
+                {
                     TextRenderer.DrawText(e.Graphics, text, font, rect, foreground, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+                    Size label = TextRenderer.MeasureText(e.Graphics, text, font);
+                    DrawDayBadge(e.Graphics, date, rect.Left + (rect.Width + label.Width) / 2 + Px(2), rect.Top, rect.Height, AppearancePainter.Background(appearance));
+                }
             }
         }
 
@@ -409,8 +436,61 @@ namespace DeskStudy
                 }
                 TextRenderer.DrawText(graphics, day, font, new Point(x, y), today ? p.Accent : p.Sub, flags);
                 if (number != "") TextRenderer.DrawText(graphics, number, font, new Point(x + daySize.Width, y), today ? p.Accent : p.Ink, flags);
+                if (!monthView) DrawDayBadge(graphics, date, x + total + (today ? Px(11) : Px(4)), pillTop, pillHeight, p.Back);
             }
             using (Pen rule = new Pen(p.Rule)) graphics.DrawLine(rule, 0, height - 1, dayHeader.Width, height - 1);
+        }
+
+        // ⚑ beside the date, "⚑2" for several; hover shows them, a click opens one (or a menu to pick from).
+        private void DrawDayBadge(Graphics graphics, DateTime date, int x, int top, int height, Color back)
+        {
+            if (monthView) return;
+            string key = date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            List<DeadlineMark> day = DayDeadlines.Where(m => m.Date == key).ToList();
+            if (day.Count == 0) return;
+            using (Font font = BadgeFont())
+            {
+                const TextFormatFlags flags = TextFormatFlags.NoPadding | TextFormatFlags.SingleLine | TextFormatFlags.VerticalCenter;
+                string text = "⚑" + (day.Count > 1 ? day.Count.ToString(CultureInfo.InvariantCulture) : "");
+                Size size = TextRenderer.MeasureText(graphics, text, font, Size.Empty, flags);
+                Rectangle badge = new Rectangle(x, top + (height - size.Height - Px(4)) / 2, size.Width + Px(8), size.Height + Px(4));
+                Color line = CalendarSurface.DeadlineColor(back);
+                var smoothing = graphics.SmoothingMode; graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                using (var path = CalendarSurface.Rounded(badge, badge.Height / 2))
+                using (Brush fill = new SolidBrush(Blend(back, line, .14F))) graphics.FillPath(fill, path);
+                graphics.SmoothingMode = smoothing;
+                TextRenderer.DrawText(graphics, text, font, badge, line, flags | TextFormatFlags.HorizontalCenter);
+                Rectangle target = badge; target.Inflate(Px(3), Px(3));
+                badgeHits.Add(new KeyValuePair<Rectangle, List<DeadlineMark>>(target, day));
+            }
+        }
+
+        private Font BadgeFont() { return new Font("Microsoft YaHei UI", 8F * SettingsLogic.EffectiveAppearance(App.Data, "calendar").FontSize / 9F, FontStyle.Bold); }
+
+        private List<DeadlineMark> BadgeHit(Point point)
+        {
+            foreach (var hit in badgeHits) if (hit.Key.Contains(point)) return hit.Value;
+            return null;
+        }
+
+        // One deadline: open it in the DDL notebook. Several: pick one from a short menu.
+        private void OpenBadge(List<DeadlineMark> hit)
+        {
+            if (hit.Count == 1) { App.ShowDeadline(this, hit[0].PageId, hit[0].TaskId); return; }
+            var menu = new ContextMenuStrip { Font = new Font("Microsoft YaHei UI", 9F), ShowImageMargin = false };
+            foreach (DeadlineMark mark in hit)
+            {
+                DeadlineMark captured = mark;
+                var item = menu.Items.Add("⚑ " + mark.Text + (mark.Archived ? Lang.T("（已归档）") : ""), null, delegate { App.ShowDeadline(this, captured.PageId, captured.TaskId); });
+                item.ToolTipText = CalendarSurface.DeadlineTip(mark);
+            }
+            menu.Closed += delegate { BeginInvoke(new Action(menu.Dispose)); };
+            menu.Show(dayHeader, dayHeader.PointToClient(Cursor.Position));
+        }
+
+        private static Color Blend(Color background, Color color, float amount)
+        {
+            return Color.FromArgb((int)(background.R * (1F - amount) + color.R * amount), (int)(background.G * (1F - amount) + color.G * amount), (int)(background.B * (1F - amount) + color.B * amount));
         }
 
         private void AddEvent(DateTime date, int hour)
@@ -481,6 +561,28 @@ namespace DeskStudy
                 WeekDays = new List<int>(), ExcludedDates = new List<string>(), Overrides = new List<EventOverride>()
             };
         }
+    }
+
+    internal sealed class DoubleBufferedPanel : Panel
+    {
+        public DoubleBufferedPanel() { DoubleBuffered = true; ResizeRedraw = true; }
+    }
+
+    // Tells a single click from the first half of a double click: the single action waits out the double-click time.
+    internal sealed class ClickOrDouble<T> : IDisposable where T : class
+    {
+        public event Action<T> Single;
+        public event Action<T> Double;
+        private readonly Timer timer = new Timer();
+        private T pending;
+        public ClickOrDouble()
+        {
+            timer.Interval = Math.Max(100, SystemInformation.DoubleClickTime);
+            timer.Tick += delegate { timer.Stop(); T value = pending; pending = null; if (value != null && Single != null) Single(value); };
+        }
+        public void Click(T value) { pending = value; timer.Stop(); timer.Start(); }
+        public void DoubleClick(T value) { timer.Stop(); pending = null; if (Double != null) Double(value); }
+        public void Dispose() { timer.Dispose(); }
     }
 
     // Text button for the calendar's navigation row: drawn by hand so the text sits exactly in the middle.
@@ -566,6 +668,13 @@ namespace DeskStudy
             path.CloseFigure(); return path;
         }
         public event Action<Occurrence> OpenOccurrence;
+        public event Action<DeadlineMark> OpenDeadline;
+        public event Action<DeadlineMark> EditDeadline;
+        private List<DeadlineMark> marks = new List<DeadlineMark>();
+        private readonly ClickOrDouble<DeadlineMark> markClicks = new ClickOrDouble<DeadlineMark>();
+        public void SetDeadlines(List<DeadlineMark> values) { marks = values ?? new List<DeadlineMark>(); Invalidate(); }
+        // DDL marks use the DDL notebook's accent.
+        internal static Color DeadlineColor(Color canvas) { return AppearancePainter.Dark(canvas) ? Color.FromArgb(226, 164, 126) : Color.FromArgb(184, 113, 75); }
         public event Action<DateTime, int> CreateEvent;
         public event Action<DateTime> SelectDate;
         private DateTime startDate;
@@ -600,6 +709,8 @@ namespace DeskStudy
             SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
             AutoScroll = true; BackColor = Color.White;
             MouseClick += HandleClick; MouseDoubleClick += HandleDoubleClick; MouseMove += HandleMove;
+            markClicks.Single += delegate(DeadlineMark mark) { if (OpenDeadline != null) OpenDeadline(mark); };
+            markClicks.Double += delegate(DeadlineMark mark) { if (EditDeadline != null) EditDeadline(mark); };
             Scroll += delegate { Invalidate(); };
             tooltip.AutoPopDelay = 12000; tooltip.InitialDelay = 300;
         }
@@ -704,41 +815,44 @@ namespace DeskStudy
             for (int day = 0; day < days; day++)
             {
                 string date = startDate.AddDays(day).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
-                List<Occurrence> dayItems = items.Where(o => o.Date == date).OrderBy(o => o.StartTime).ThenBy(o => o.EndTime).ToList();
+                List<Slot> dayItems = items.Where(o => o.Date == date).Select(o => new Slot { Start = Minutes(o.StartTime), End = Minutes(o.EndTime), Item = o })
+                    .OrderBy(s => s.Start).ThenBy(s => s.End).ToList();
                 int cursor = 0;
                 while (cursor < dayItems.Count)
                 {
-                    List<Occurrence> cluster = new List<Occurrence>();
-                    int clusterEnd = Minutes(dayItems[cursor].EndTime);
+                    List<Slot> cluster = new List<Slot>();
+                    int clusterEnd = dayItems[cursor].End;
                     cluster.Add(dayItems[cursor++]);
-                    while (cursor < dayItems.Count && Minutes(dayItems[cursor].StartTime) < clusterEnd)
+                    while (cursor < dayItems.Count && dayItems[cursor].Start < clusterEnd)
                     {
-                        clusterEnd = Math.Max(clusterEnd, Minutes(dayItems[cursor].EndTime)); cluster.Add(dayItems[cursor++]);
+                        clusterEnd = Math.Max(clusterEnd, dayItems[cursor].End); cluster.Add(dayItems[cursor++]);
                     }
                     List<int> laneEnds = new List<int>(); List<int> lanes = new List<int>();
-                    foreach (Occurrence item in cluster)
+                    foreach (Slot item in cluster)
                     {
-                        int lane = laneEnds.FindIndex(end => end <= Minutes(item.StartTime));
+                        int lane = laneEnds.FindIndex(end => end <= item.Start);
                         if (lane < 0) { lane = laneEnds.Count; laneEnds.Add(0); }
-                        laneEnds[lane] = Minutes(item.EndTime); lanes.Add(lane);
+                        laneEnds[lane] = item.End; lanes.Add(lane);
                     }
                     float laneWidth = (col - S(6)) / laneEnds.Count;
                     for (int i = 0; i < cluster.Count; i++)
                     {
-                        Occurrence item = cluster[i];
-                        int top = Minutes(item.StartTime) * HourHeight / 60;
-                        int height = Math.Max(S(18), (Minutes(item.EndTime) - Minutes(item.StartTime)) * HourHeight / 60 - S(3));
-                        Rectangle rect = new Rectangle(TimeGutter + S(3) + (int)(day * col + lanes[i] * laneWidth), top + S(2), Math.Max(S(8), (int)laneWidth - S(2)), height);
-                        DrawEvent(graphics, item, rect, false); hits.Add(new CalendarHit(rect, item));
+                        Slot item = cluster[i];
+                        int left = TimeGutter + S(3) + (int)(day * col + lanes[i] * laneWidth), laneW = Math.Max(S(8), (int)laneWidth - S(2));
+                        int topY = item.Start * HourHeight / 60;
+                        int height = Math.Max(S(18), (item.End - item.Start) * HourHeight / 60 - S(3));
+                        Rectangle rect = new Rectangle(left, topY + S(2), laneW, height);
+                        DrawEvent(graphics, item.Item, rect, false); hits.Add(new CalendarHit(rect, item.Item));
                     }
                 }
             }
+            DrawWeekDeadlines(graphics, col);
             if (DateTime.Today >= startDate && DateTime.Today < startDate.AddDays(days))
             {
                 int day = (DateTime.Today - startDate).Days; int y = (int)(DateTime.Now.TimeOfDay.TotalMinutes * HourHeight / 60);
                 using (Pen now = new Pen(Color.FromArgb(193, 103, 94), S(2))) graphics.DrawLine(now, TimeGutter + day * col, y, TimeGutter + (day + 1) * col, y);
             }
-            if (items.Count == 0)
+            if (items.Count == 0 && marks.Count == 0)
                 using (Font font = new Font("Microsoft YaHei UI", 10F * fontScale))
                     TextRenderer.DrawText(graphics, Lang.T("本周还没有日程 · 双击时间格开始安排"), font, new Rectangle(TimeGutter + S(8), 9 * HourHeight + S(15), Math.Max(S(100), width - TimeGutter - S(16)), T(28)), secondary, TextFormatFlags.HorizontalCenter | ScrolledText);
         }
@@ -770,13 +884,14 @@ namespace DeskStudy
                     }
                     else
                         TextRenderer.DrawText(graphics, date.Day.ToString() + (!reference && date == DateTime.Today ? Lang.T(" 今天") : ""), dateFont, new Rectangle(x + S(6), y + S(5), (int)col - S(10), T(24)), date.Month == focusDate.Month ? foreground : secondary, TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine | ScrolledText);
-                    List<Occurrence> dayItems = items.Where(o => o.Date == date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)).OrderBy(o => o.StartTime).ToList();
+                    List<Slot> dayItems = DaySlots(date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
                     int capacity = Math.Max(1, ((int)row - T(37)) / T(25));
                     int shown = dayItems.Count > capacity ? Math.Max(0, capacity - 1) : dayItems.Count;
                     for (int j = 0; j < shown; j++)
                     {
                         Rectangle rect = new Rectangle(x + S(3), y + T(32) + j * T(25), (int)col - S(6), T(22));
-                        DrawEvent(graphics, dayItems[j], rect, true); hits.Add(new CalendarHit(rect, dayItems[j]));
+                        if (dayItems[j].Mark != null) { DrawDeadline(graphics, dayItems[j].Mark, rect, true); hits.Add(new CalendarHit(rect, dayItems[j].Mark)); }
+                        else { DrawEvent(graphics, dayItems[j].Item, rect, true); hits.Add(new CalendarHit(rect, dayItems[j].Item)); }
                     }
                     if (shown < dayItems.Count)
                     {
@@ -786,6 +901,88 @@ namespace DeskStudy
                     }
                 }
             }
+        }
+
+        private sealed class Slot { public int Start, End; public Occurrence Item; public DeadlineMark Mark; }
+
+        // Courses and deadlines of one day in time order; a date-only deadline counts as the end of the day.
+        private List<Slot> DaySlots(string date)
+        {
+            return items.Where(o => o.Date == date).Select(o => new Slot { Start = Minutes(o.StartTime), End = Minutes(o.EndTime), Item = o })
+                .Concat(marks.Where(m => m.Date == date).Select(m => new Slot { Start = m.Minutes, End = m.Minutes, Mark = m }))
+                .OrderBy(s => s.Start).ThenBy(s => s.Mark == null ? 0 : 1).ToList();
+        }
+
+        // Timed deadlines lie on top of the courses as one-line tags whose bottom edge is the due time.
+        // Courses keep their full width; only tags that would touch each other share the column.
+        private void DrawWeekDeadlines(Graphics graphics, float col)
+        {
+            int tagHeight;
+            using (Font font = new Font("Microsoft YaHei UI", 8.5F * fontScale, FontStyle.Bold)) tagHeight = Math.Max(S(20), font.Height + S(8));
+            for (int day = 0; day < days; day++)
+            {
+                string date = startDate.AddDays(day).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+                var dayMarks = marks.Where(m => m.Date == date && !m.DateOnly).OrderBy(m => m.Minutes).ToList();
+                int cursor = 0;
+                while (cursor < dayMarks.Count)
+                {
+                    var group = new List<DeadlineMark> { dayMarks[cursor++] };
+                    while (cursor < dayMarks.Count && dayMarks[cursor].Minutes * HourHeight / 60 - tagHeight < group[group.Count - 1].Minutes * HourHeight / 60) group.Add(dayMarks[cursor++]);
+                    float laneWidth = (col - S(6)) / group.Count;
+                    for (int i = 0; i < group.Count; i++)
+                    {
+                        int bottom = Math.Max(tagHeight, group[i].Minutes * HourHeight / 60);
+                        Rectangle tag = new Rectangle(TimeGutter + S(3) + (int)(day * col + i * laneWidth), bottom - tagHeight, Math.Max(S(8), (int)laneWidth - S(2)), tagHeight);
+                        DrawDeadline(graphics, group[i], tag, false); hits.Add(new CalendarHit(tag, group[i]));
+                    }
+                }
+            }
+        }
+
+        internal static string DeadlineCaption(DeadlineMark mark, bool withTime) { return (withTime && !mark.DateOnly ? mark.Time + " " : "") + mark.Text; }
+
+        // A deadline tag: outlined in the DDL color with ⚑ in front; in the week view a firmer bottom edge marks the due time.
+        internal void DrawDeadline(Graphics graphics, DeadlineMark mark, Rectangle rect, bool compact)
+        {
+            PaintDeadline(graphics, mark, rect, compact, canvas, foreground, reference, dpiScale, fontScale, ScrolledText);
+        }
+        internal static void PaintDeadline(Graphics graphics, DeadlineMark mark, Rectangle rect, bool compact, Color canvas, Color foreground, bool rounded, float dpi, float fontScale, TextFormatFlags extra)
+        {
+            Func<int, int> s = v => (int)Math.Round(v * dpi, MidpointRounding.AwayFromZero);
+            Color line = DeadlineColor(canvas), fill = Blend(canvas, line, AppearancePainter.Dark(canvas) ? .2F : .09F);
+            var smoothing = graphics.SmoothingMode; graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            Rectangle box = new Rectangle(rect.X, rect.Y, Math.Max(1, rect.Width - 1), Math.Max(1, rect.Height - 1));
+            using (var path = Rounded(box, rounded ? s(4) : s(2)))
+            using (Brush brush = new SolidBrush(fill))
+            using (Pen pen = new Pen(Blend(canvas, line, .7F)))
+            {
+                graphics.FillPath(brush, path); graphics.DrawPath(pen, path);
+                if (!compact)
+                {
+                    var clip = graphics.Clip; graphics.SetClip(path, System.Drawing.Drawing2D.CombineMode.Intersect);
+                    using (Brush edge = new SolidBrush(line)) graphics.FillRectangle(edge, rect.X, rect.Bottom - s(2), rect.Width, s(2));
+                    graphics.Clip = clip;
+                }
+            }
+            graphics.SmoothingMode = smoothing;
+            using (Font font = new Font("Microsoft YaHei UI", (compact ? 8F : 8.5F) * fontScale, FontStyle.Bold))
+            {
+                TextFormatFlags flags = TextFormatFlags.SingleLine | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding | extra;
+                Rectangle inner = new Rectangle(rect.X + s(5), rect.Y, Math.Max(1, rect.Width - s(8)), rect.Height - (compact ? 0 : s(2)));
+                int flag = TextRenderer.MeasureText(graphics, "⚑", font, Size.Empty, flags).Width + s(3);
+                TextRenderer.DrawText(graphics, "⚑", font, new Rectangle(inner.X, inner.Y, flag, inner.Height), line, flags);
+                TextRenderer.DrawText(graphics, DeadlineCaption(mark, compact), font, new Rectangle(inner.X + flag, inner.Y, Math.Max(1, inner.Width - flag), inner.Height), foreground, flags | TextFormatFlags.EndEllipsis);
+            }
+        }
+
+        // Hover text for a deadline: what, when, and which page it is on.
+        internal static string DeadlineTip(DeadlineMark mark)
+        {
+            DateTime date = TimeUtil.ParseDate(mark.Date);
+            string when = Lang.MonthDay(date) + " " + Lang.Weekday(date.DayOfWeek) + (mark.DateOnly ? "" : " " + mark.Time);
+            string page = String.IsNullOrWhiteSpace(mark.PageTitle) ? Lang.T("未命名页") : mark.PageTitle;
+            return mark.Text + "\n" + Lang.T("截止：{0}", when) + "\n" + Lang.T("页面：{0}", page) + (mark.Archived ? Lang.T("（已归档）") : "")
+                + "\n" + (mark.Archived ? Lang.T("单击或双击：编辑任务") : Lang.T("单击：在 DDL 便签中查看 · 双击：编辑"));
         }
 
         private void DrawEvent(Graphics graphics, Occurrence item, Rectangle rect, bool compact)
@@ -841,7 +1038,8 @@ namespace DeskStudy
             Point point = ContentPoint(e.Location); CalendarHit hit = hits.LastOrDefault(h => h.Bounds.Contains(point));
             if (hit != null)
             {
-                if (hit.Item != null && OpenOccurrence != null) OpenOccurrence(hit.Item);
+                if (hit.Mark != null) markClicks.Click(hit.Mark);
+                else if (hit.Item != null && OpenOccurrence != null) OpenOccurrence(hit.Item);
                 else if (hit.Item == null) ShowDay(hit.Date);
                 return;
             }
@@ -850,8 +1048,8 @@ namespace DeskStudy
 
         private void HandleDoubleClick(object sender, MouseEventArgs e)
         {
-            Point point = ContentPoint(e.Location);
-            if (hits.Any(h => h.Bounds.Contains(point))) return;
+            Point point = ContentPoint(e.Location); CalendarHit hit = hits.LastOrDefault(h => h.Bounds.Contains(point));
+            if (hit != null) { if (hit.Mark != null) markClicks.DoubleClick(hit.Mark); return; }
             if (CreateEvent != null) CreateEvent(DateAt(point), monthView ? 9 : Math.Max(0, Math.Min(22, point.Y / HourHeight)));
         }
 
@@ -859,7 +1057,7 @@ namespace DeskStudy
         {
             Point point = ContentPoint(e.Location); CalendarHit hit = hits.LastOrDefault(h => h.Bounds.Contains(point));
             Cursor = hit == null ? Cursors.Default : Cursors.Hand;
-            string next = hit == null || hit.Item == null ? "" : hit.Item.Title + "\n" + hit.Item.Date + "  " + hit.Item.StartTime + "–" + hit.Item.EndTime + (String.IsNullOrWhiteSpace(hit.Item.Location) ? "" : "\n" + hit.Item.Location) + (String.IsNullOrWhiteSpace(hit.Item.Notes) ? "" : "\n" + hit.Item.Notes);
+            string next = hit != null && hit.Mark != null ? DeadlineTip(hit.Mark) : hit == null || hit.Item == null ? "" : hit.Item.Title + "\n" + hit.Item.Date + "  " + hit.Item.StartTime + "–" + hit.Item.EndTime + (String.IsNullOrWhiteSpace(hit.Item.Location) ? "" : "\n" + hit.Item.Location) + (String.IsNullOrWhiteSpace(hit.Item.Notes) ? "" : "\n" + hit.Item.Notes);
             if (next != tip) { tip = next; tooltip.SetToolTip(this, tip); }
         }
 
@@ -881,15 +1079,24 @@ namespace DeskStudy
                     button.Click += delegate { dialog.Close(); if (OpenOccurrence != null) OpenOccurrence(captured); };
                     list.Controls.Add(button);
                 }
+                foreach (DeadlineMark mark in marks.Where(m => m.Date == date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)))
+                {
+                    DeadlineMark captured = mark; Button button = new Button(); button.Text = "⚑ " + (mark.DateOnly ? Lang.T("当天截止") : Lang.T("{0} 截止", mark.Time)) + "\n" + mark.Text;
+                    button.Size = new Size(345, 65); button.TextAlign = ContentAlignment.MiddleLeft; button.UseMnemonic = false;
+                    button.FlatStyle = FlatStyle.Flat; button.BackColor = Blend(Color.White, DeadlineColor(Color.White), .12F); button.FlatAppearance.BorderSize = 0;
+                    button.Click += delegate { dialog.Close(); if (OpenDeadline != null) OpenDeadline(captured); };
+                    list.Controls.Add(button);
+                }
                 dialog.ResumeLayout(true);
                 dialog.ShowDialog(FindForm());
             }
         }
 
-        protected override void Dispose(bool disposing) { if (disposing) tooltip.Dispose(); base.Dispose(disposing); }
+        protected override void Dispose(bool disposing) { if (disposing) { tooltip.Dispose(); markClicks.Dispose(); } base.Dispose(disposing); }
         private sealed class CalendarHit
         {
-            public Rectangle Bounds; public Occurrence Item; public DateTime Date;
+            public Rectangle Bounds; public Occurrence Item; public DateTime Date; public DeadlineMark Mark;
+            public CalendarHit(Rectangle bounds, DeadlineMark mark) { Bounds = bounds; Mark = mark; }
             public CalendarHit(Rectangle bounds, Occurrence item) { Bounds = bounds; Item = item; }
             public CalendarHit(Rectangle bounds, DateTime date) { Bounds = bounds; Date = date; }
         }
