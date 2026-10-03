@@ -40,6 +40,7 @@
 ## 验证策略
 
 - 核心测试覆盖循环日期与例外、时区、任务完成与提醒去重、数据完整性、旧版迁移、设置校验和备份恢复。
+- 绘制规则：数据改动（任务、页面、日程）只刷新组件内容，不重新上样式；只有外观相关设置变化（`AppController.LookSignature`）才整体重排。刷新内容放在 `RedrawPause` 里，一次画出。`tests/run-layouts.ps1 -PageTurn check` 会检查翻页、双击编辑、打勾、添加时没有重排、一次画出。
 - Outlook 日历：`src/Ics.cs` 解析 ICS（折行、转义、VTIMEZONE、RRULE 的 DAILY/WEEKLY/MONTHLY/YEARLY、BYDAY 序号、BYMONTHDAY、BYSETPOS、COUNT/UNTIL、EXDATE、RECURRENCE-ID 改期与取消、全天与 DURATION），`src/Outlook.cs` 是设置、缓存、颜色和提醒的纯逻辑，`src/OutlookSync.cs` 负责后台下载、`outlook-cache.json` 和定时刷新；测试用 `AppController.OutlookDownload` 替换下载，不联网。核心测试覆盖解析与提醒；`tests/run-layouts.ps1 -Outlook` 走完整流程并截图。
 - DDL 排序与日历显示：`DeadlineLogic`（`src/Core.cs`）是纯逻辑，排序与日历取数由核心测试覆盖（跨时区、只选日期、无截止、已完成、旧文件缺省值）；`tests/run-layouts.ps1 -Deadline` 用真实组件检查便签行顺序、日历标签与角标、单击跳转与高亮、归档页与双击编辑、两个设置开关，并截图到 `ddl` 目录。
 - 桌面集成测试使用真实 WinForms 控件与消息循环，在隔离目录创建、编辑和保存数据，随后启动第二个进程验证恢复。

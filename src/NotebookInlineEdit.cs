@@ -84,20 +84,25 @@ namespace DeskStudy
         private void EndInlineEdit(bool save)
         {
             if (_inlineRow == null || _inlineClosing) return;
+            using (new RedrawPause(Body)) EndInlineEditNow(save);
+        }
+        private void EndInlineEditNow(bool save)
+        {
             _inlineClosing = true;
             TaskRow row = _inlineRow; CompositionTextBox box = _inlineEditor;
             string edited = box == null ? _inlineOriginal : box.Text.Replace("\r\n", "\n").Trim();
             string taskId = row.Task.Id, original = _inlineOriginal;
+            // An emptied task keeps its old text; deleting stays in the ⋯ menu.
+            bool changed = save && edited.Length > 0 && edited != original.Replace("\r\n", "\n");
             _inlineRow = null; _inlineEditor = null;
             Deactivate -= InlineEditorDeactivated;
             try
             {
                 if (box != null && !box.IsDisposed) { if (!row.Card.IsDisposed) row.Card.Controls.Remove(box); box.Dispose(); }
-                if (!row.Title.IsDisposed) { row.Title.Text = original; row.Title.Visible = true; }
+                // The row shows the text it will keep, never the old one first.
+                if (!row.Title.IsDisposed) { row.Title.Text = changed ? edited : original; row.Title.Visible = true; }
             }
             finally { _inlineClosing = false; }
-            // An emptied task keeps its old text; deleting stays in the ⋯ menu.
-            bool changed = save && edited.Length > 0 && edited != original.Replace("\r\n", "\n");
             if (changed)
             {
                 NotePage page = FindPage(_displayedPageId);

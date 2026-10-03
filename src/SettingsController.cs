@@ -91,6 +91,14 @@ namespace DeskStudy
         private bool publishing;
         public event Action StateChanged;
         public void NotifyWindowStateChanged() { if (!Exiting && StateChanged != null) StateChanged(); }
+        private string appliedLook;
+        // Everything in the settings that changes how widgets look. Tasks, pages, events and the calendar's
+        // current view are not in it: those refresh a widget's content without restyling it.
+        private string LookSignature()
+        {
+            var s = Data.Settings; var json = new System.Web.Script.Serialization.JavaScriptSerializer();
+            return json.Serialize(new object[] { s.GlobalAppearance, s.AppearanceOverrides, s.NotebookLayout, s.WidgetMode, s.WidgetCorners, s.Language });
+        }
         private void PublishChanges()
         {
             if (publishing || Exiting) return;
@@ -98,7 +106,9 @@ namespace DeskStudy
             try
             {
                 if (DataChanged != null) DataChanged();
-                foreach (var w in Widgets) w.ApplyAppearance();
+                // Restyling repaints whole widgets; it is only needed when the look itself changed.
+                string look = LookSignature();
+                if (look != appliedLook) { appliedLook = look; foreach (var w in Widgets) w.ApplyAppearance(); }
                 NotifyWindowStateChanged();
             }
             finally { publishing = false; }

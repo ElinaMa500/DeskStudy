@@ -136,9 +136,12 @@ namespace DeskStudy
             if (IsDisposed || App.Data.Settings == null) return;
             AppearancePainter.Apply(root, SettingsLogic.EffectiveAppearance(App.Data, WidgetKey), appearanceBaselines);
         }
+        // How many full restyles have run (the tests check that editing tasks causes none).
+        internal static int Restyles;
         public void ApplyAppearance()
         {
             if (applyingAppearance || IsDisposed || App.Data.Settings == null) return;
+            Restyles++;
             if (!CanApplyAppearance()) return;
             applyingAppearance = true;
             try

@@ -360,7 +360,12 @@ namespace DeskStudy
             return book.Pages.FindAll(delegate(NotePage page) { return !page.Archived; });
         }
 
+        // Rows, statuses and navigation change together; they are drawn once, when all are in place.
         private void RefreshFromData()
+        {
+            using (new RedrawPause(Body)) RefreshFromDataNow();
+        }
+        private void RefreshFromDataNow()
         {
             Notebook book = FindBook();
             if (book == null) return;
@@ -456,7 +461,7 @@ namespace DeskStudy
             _saving = true;
             try { App.SavePageTurn(); }
             finally { _saving = false; }
-            using (new RedrawPause(Body)) RefreshFromData();
+            RefreshFromData();
         }
 
         private void AddPage()

@@ -221,20 +221,28 @@ namespace DeskStudy
     // A panel that lets the owning widget's resize edges show through where it touches the window border.
     // Holds a control's drawing while it is rebuilt, then repaints it and its children in one pass,
     // instead of letting each child window repaint on its own as it changes.
+    // Nested pauses on the same control count; drawing resumes when the outermost one ends.
     internal sealed class RedrawPause : IDisposable
     {
         [System.Runtime.InteropServices.DllImport("user32.dll")] static extern IntPtr SendMessage(IntPtr hwnd, int msg, IntPtr wparam, IntPtr lparam);
         [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool RedrawWindow(IntPtr hwnd, IntPtr rect, IntPtr region, uint flags);
+        private static readonly System.Collections.Generic.Dictionary<Control, int> depth = new System.Collections.Generic.Dictionary<Control, int>();
         private readonly Control control; private readonly bool paused;
         public RedrawPause(Control control)
         {
             this.control = control;
-            paused = control != null && control.IsHandleCreated && control.Visible;
-            if (paused) SendMessage(control.Handle, 0x000B, IntPtr.Zero, IntPtr.Zero);
+            paused = control != null && control.IsHandleCreated && control.Visible && !control.IsDisposed;
+            if (!paused) return;
+            int level; depth.TryGetValue(control, out level); depth[control] = level + 1;
+            if (level == 0) SendMessage(control.Handle, 0x000B, IntPtr.Zero, IntPtr.Zero);
         }
         public void Dispose()
         {
-            if (!paused || control.IsDisposed) return;
+            if (!paused) return;
+            int level; depth.TryGetValue(control, out level);
+            if (level > 1) { depth[control] = level - 1; return; }
+            depth.Remove(control);
+            if (control.IsDisposed || !control.IsHandleCreated) return;
             SendMessage(control.Handle, 0x000B, new IntPtr(1), IntPtr.Zero);
             // RDW_ERASE | RDW_FRAME | RDW_INVALIDATE | RDW_ALLCHILDREN | RDW_UPDATENOW
             RedrawWindow(control.Handle, IntPtr.Zero, IntPtr.Zero, 0x4 | 0x400 | 0x1 | 0x80 | 0x100);

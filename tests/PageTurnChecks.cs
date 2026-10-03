@@ -79,5 +79,60 @@ public static class PageTurnChecks
         var box = All(ddl).OfType<CheckBox>().First(c => c.Name == "task-checkbox-" + second.Tasks[0].Id);
         box.Checked = true; Pump(200);
         Assert(second.Tasks[0].Completed && !book.Pages[0].Tasks[0].Completed, "ticking a task on a reused row completes that page's task, not the one the row showed before");
+        Edits(app);
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")] static extern IntPtr SendMessage(IntPtr hwnd, int msg, IntPtr wparam, IntPtr lparam);
+    // Runs one change and reports how long it took, how many paint messages followed and whether any widget was restyled.
+    static void Change(string what, Action act, int maxPaints)
+    {
+        int restyles = WidgetForm.Restyles;
+        var counter = new PaintCounter(); Application.AddMessageFilter(counter);
+        var clock = Stopwatch.StartNew(); act(); double ms = clock.Elapsed.TotalMilliseconds;
+        Pump(250); Application.RemoveMessageFilter(counter);
+        Console.WriteLine(String.Format("   {0}: {1:0} ms, {2} paints, {3} restyles", what, ms, counter.Paints, WidgetForm.Restyles - restyles));
+        Assert(WidgetForm.Restyles == restyles, what + ": no widget is restyled");
+        Assert(counter.Paints <= maxPaints && ms < 250, what + ": drawn in one pass (" + counter.Paints + " paints, " + ms.ToString("0") + " ms)");
+    }
+
+    // Editing tasks: double-click edit, tick, add. None of them restyles a widget or repaints piece by piece.
+    static void Edits(AppController app)
+    {
+        var todo = (NotebookForm)app.Widgets.First(w => w.WidgetKey == "todo");
+        var book = app.Data.Books.First(b => b.Id == "todo");
+        var page = book.Pages.First(p => p.Id == book.CurrentPageId);
+        page.Tasks.Clear();
+        for (int i = 0; i < 6; i++) page.Tasks.Add(new TaskItem { Text = "要做的事 " + (i + 1) });
+        app.Save(); Pump(300);
+        foreach (string layout in new[] { "Journal", "Clean", "Original" })
+        {
+            app.Data.Settings.NotebookLayout = layout; app.SettingsChanged(); Pump(400);
+            string before = page.Tasks[2].Text, after = before + " 改";
+            var title = All(todo).OfType<Label>().First(l => l.Text == before && l.Visible);
+            typeof(Control).GetMethod("OnMouseDoubleClick", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).Invoke(title, new object[] { new MouseEventArgs(MouseButtons.Left, 2, 4, title.Height / 2, 0) });
+            Pump(100);
+            var editor = All(todo).OfType<TextBox>().First(t => t.Name == "task-inline-editor");
+            editor.Text = after;
+            var seen = new List<string>();
+            EventHandler watch = delegate { seen.Add(title.Text); };
+            title.TextChanged += watch;
+            Change(layout + " double-click edit saved", delegate { SendMessage(editor.Handle, 0x0100, new IntPtr((int)Keys.Enter), IntPtr.Zero); }, 40);
+            title.TextChanged -= watch;
+            Assert(page.Tasks[2].Text == after && All(todo).OfType<Label>().Any(l => l.Text == after && l.Visible) && !seen.Contains(before), layout + ": the row goes straight to the new text, never back to the old one first");
+            var box = All(todo).OfType<CheckBox>().First(c => c.Name == "task-checkbox-" + page.Tasks[0].Id);
+            Change(layout + " task ticked", delegate { box.Checked = !box.Checked; }, 40);
+            if (layout != "Original")
+            {
+                var quick = All(todo).OfType<TextBox>().First(t => t.Name == "quick-task");
+                quick.Text = "新任务 " + layout;
+                Change(layout + " task added", delegate { SendMessage(quick.Handle, 0x0100, new IntPtr((int)Keys.Enter), IntPtr.Zero); }, 40);
+                Assert(page.Tasks.Any(t => t.Text == "新任务 " + layout), layout + ": the quick entry adds the task");
+            }
+        }
+        // Settings that change the look still restyle.
+        int restyles = WidgetForm.Restyles;
+        app.Data.Settings.GlobalAppearance.FontSize = 10; app.SettingsChanged(); Pump(300);
+        Assert(WidgetForm.Restyles > restyles, "changing the font size still restyles the widgets");
+        app.Data.Settings.GlobalAppearance.FontSize = 9; app.SettingsChanged(); Pump(300);
     }
 }

@@ -227,6 +227,10 @@ namespace DeskStudy
         public void RefreshData()
         {
             if (IsDisposed || surface == null) return;
+            using (new RedrawPause(Body)) RefreshDataNow();
+        }
+        private void RefreshDataNow()
+        {
             string defaultView = App.Data.Settings.Calendar.DefaultView + (App.Data.Settings.Calendar.WorkWeek ? "|work" : "");
             if (lastDefaultView != defaultView) { monthView = App.Data.Settings.Calendar.DefaultView == "Month"; workWeek = !monthView && App.Data.Settings.Calendar.WorkWeek; lastDefaultView = defaultView; }
             DateTime start = monthView ? WeekStart(new DateTime(focusDate.Year, focusDate.Month, 1)) : ViewStart();
@@ -247,9 +251,12 @@ namespace DeskStudy
             refMeta.Text = monthView ? (teachingWeek > 0 ? Lang.T("教学第 {0} 周", teachingWeek) : "") : focusDate.Year + (teachingWeek > 0 ? " · " + Lang.T("教学第 {0} 周", teachingWeek) : "");
             ArrangeReferenceBar();
             surface.SetData(start, focusDate, monthView, occurrences, ViewDays);
-            ApplyAppearance();
+            // The view buttons and the day row's height depend on the view; restyle only when that changed.
+            string chrome = monthView + "|" + workWeek + "|" + Math.Min(AllDayRows, AllDayLayout().Count);
+            if (chrome != appliedChrome) { appliedChrome = chrome; ApplyAppearance(); }
             dayHeader.Invalidate();
         }
+        private string appliedChrome;
 
         private static string StyleFor(string notebookLayout)
         {
