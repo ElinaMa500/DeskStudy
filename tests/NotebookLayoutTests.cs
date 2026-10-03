@@ -429,6 +429,8 @@ public static class NotebookLayoutTests
                 else if (mode == "english") EnglishChecks.Run(app, path);
                 else if (mode == "ddl") DeadlineChecks.Run(app, path);
                 else if (mode == "taskbar") TaskbarChecks.Run(app, path);
+                else if (mode == "outlook") OutlookChecks.Run(app, path);
+                else if (mode == "outlookread") OutlookChecks.Read(app);
                 else if (mode == "taskbarread") TaskbarChecks.Read(app);
                 else if (mode == "titlegap") TitleGapShot.Run(app, path, args[2]);
                 else if (mode == "langfresh") LangChecks.FreshEnglish(app);

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
@@ -30,7 +30,8 @@ namespace DeskStudy
         private ComboBox appearanceTarget, theme, defaultView, weekStart, bookChoice, desktopPage, saveDelay, widgetMode, widgetCorners;
         private TextBox hotkeyBox;
         private Label hotkeyStatus;
-        private NumericUpDown opacity, fontSize, leadMinutes;
+        private NumericUpDown opacity, fontSize, leadMinutes, outlookLead;
+        private TextBox outlookUrl; private Label outlookStatus; private FlowLayoutPanel outlookCategories; private string outlookCategorySignature = ""; private CheckBox outlookShow, outlookRemind; private ComboBox outlookRefresh;
         private CheckBox followingGlobal, quietEnabled, soundEnabled, startup, showDeadlines, sortDeadlines, taskbarIcon;
         private Button backgroundColor;
         private readonly List<NotebookLayoutPreview> notebookLayouts = new List<NotebookLayoutPreview>();
@@ -415,10 +416,79 @@ namespace DeskStudy
             defaultView.SelectedIndexChanged += delegate { ChangeSetting(delegate { string view = SelectedId(defaultView); app.Data.Settings.Calendar.DefaultView = view == "Month" ? "Month" : "Week"; app.Data.Settings.Calendar.WorkWeek = view == "WorkWeek"; }); };
             weekStart.SelectedIndexChanged += delegate { ChangeSetting(delegate { app.Data.Settings.Calendar.WeekStartDay = Int32.Parse(SelectedId(weekStart), CultureInfo.InvariantCulture); }); };
             semesterStart.ValueChanged += delegate { SaveCalendarDates(); }; semesterEnd.ValueChanged += delegate { SaveCalendarDates(); }; teachingWeekOne.ValueChanged += delegate { SaveCalendarDates(); };
+            BuildOutlookCard(page);
             var series = Card(page, Lang.T("课程与循环系列")); courses = List("calendar-series", 195, Lang.T("课程名称"), Lang.T("日期 / 周期"), Lang.T("时间")); Add(series, courses);
             Add(series, Buttons(ActionButton("new-calendar-series", Lang.T("添加课程"), delegate { app.EditCalendarSeries(null); }), ActionButton("edit-calendar-series", Lang.T("编辑整个系列"), delegate { string id = SelectedTag(courses); if (id != "") app.EditCalendarSeries(id); }), ActionButton("delete-calendar-series", Lang.T("删除整个系列"), DeleteSeries)));
             courses.DoubleClick += delegate { string id = SelectedTag(courses); if (id != "") Run(delegate { app.EditCalendarSeries(id); }); };
         }
+        // Outlook (read-only): the published ICS link, refresh interval and reminders.
+        private void BuildOutlookCard(Panel page)
+        {
+            var card = Card(page, Lang.T("Outlook 日历（只读）"));
+            outlookUrl = new TextBox { Name = "outlook-url", Width = 300, MaxLength = 2000, Margin = new Padding(0, 6, 6, 0) };
+            Field(card, Lang.T("ICS 链接"), Buttons(outlookUrl, ActionButton("outlook-save", Lang.T("保存并同步"), delegate
+            {
+                string url = outlookUrl.Text.Trim();
+                if (url != "" && !OutlookLogic.IsCalendarLink(url)) throw new InvalidOperationException(Lang.T("Outlook 日历链接应以 https:// 开头，或是 webcal:// 链接。"));
+                app.Data.Settings.Calendar.Outlook.Url = url; app.SettingsChanged(); app.SyncOutlook(); RefreshData();
+            })));
+            outlookStatus = Ui.Label("", 8.5F, Ui.Muted); outlookStatus.Name = "outlook-status"; Add(card, outlookStatus);
+            outlookCategories = new FlowLayoutPanel { Name = "outlook-categories", AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, WrapContents = true, Margin = new Padding(0, 4, 0, 0), MaximumSize = new Size(560, 0) };
+            Field(card, Lang.T("类别颜色"), outlookCategories);
+            outlookShow = Check("outlook-show", Lang.T("在日历上显示 Outlook 日程")); Field(card, Lang.T("显示"), outlookShow);
+            outlookRefresh = Combo("outlook-refresh", OutlookOptions.RefreshChoices.Select(m => new Choice(m.ToString(CultureInfo.InvariantCulture), Lang.T("每 {0} 分钟", m))).ToArray()); Field(card, Lang.T("自动刷新"), outlookRefresh);
+            outlookRemind = Check("outlook-remind", Lang.T("日程开始前提醒")); outlookLead = Number("outlook-lead", 0, 1440, 5);
+            var leadUnit = Ui.Label(Lang.T("分钟前"), 9F, Ui.Text); leadUnit.Margin = new Padding(2, 10, 0, 0);
+            Field(card, Lang.T("提醒"), Buttons(outlookRemind, outlookLead, leadUnit));
+            Add(card, Ui.Label(Lang.T("获取链接：在 Outlook 网页版打开 设置 → 日历 → 共享日历 →「发布日历」，选择日历和「可查看所有详细信息」，点「发布」后复制 ICS 链接。拿到这个链接的人都能看到你的日程，请勿外传。"), 8.5F, Ui.Muted));
+            outlookShow.CheckedChanged += delegate { ChangeSetting(delegate { app.Data.Settings.Calendar.Outlook.Show = outlookShow.Checked; }); };
+            outlookRefresh.SelectedIndexChanged += delegate { ChangeSetting(delegate { app.Data.Settings.Calendar.Outlook.RefreshMinutes = Int32.Parse(SelectedId(outlookRefresh), CultureInfo.InvariantCulture); }); };
+            outlookRemind.CheckedChanged += delegate { outlookLead.Enabled = outlookRemind.Checked; ChangeSetting(delegate { app.Data.Settings.Calendar.Outlook.Remind = outlookRemind.Checked; }); };
+            outlookLead.ValueChanged += delegate { ChangeSetting(delegate { app.Data.Settings.Calendar.Outlook.LeadMinutes = (int)outlookLead.Value; }); };
+        }
+        // One swatch per category seen in the calendar. Outlook's preset categories already have their colors;
+        // categories named by the user start with a palette color and can be matched to Outlook here.
+        private void RefreshOutlookCategories()
+        {
+            OutlookOptions o = app.Data.Settings.Calendar.Outlook; var categories = app.Outlook.Categories;
+            string signature = String.Join("|", categories.Select(c => c + "=" + OutlookLogic.ColorFor(o, c)));
+            if (signature == outlookCategorySignature) return;
+            outlookCategorySignature = signature;
+            foreach (Control old in outlookCategories.Controls.Cast<Control>().ToList()) old.Dispose();
+            outlookCategories.Controls.Clear();
+            if (categories.Count == 0) outlookCategories.Controls.Add(Ui.Label(Lang.T("同步后，这里会列出日历里用到的 Outlook 类别。"), 8.5F, Ui.Muted));
+            foreach (string category in categories)
+            {
+                string name = category; Color color = ColorTranslator.FromHtml(OutlookLogic.ColorFor(o, name));
+                var swatch = new Button { Text = "■  " + name, AutoSize = true, FlatStyle = FlatStyle.Flat, ForeColor = color, BackColor = Color.White, Margin = new Padding(0, 0, 6, 6), UseMnemonic = false, Name = "outlook-category-" + outlookCategories.Controls.Count, AccessibleName = Lang.T("类别颜色：{0}", name) };
+                swatch.FlatAppearance.BorderColor = Ui.Border;
+                swatch.Click += delegate
+                {
+                    using (var dialog = new ColorDialog { Color = color, FullOpen = true })
+                    {
+                        if (dialog.ShowDialog(this) != DialogResult.OK) return;
+                        string hex = "#" + dialog.Color.R.ToString("X2") + dialog.Color.G.ToString("X2") + dialog.Color.B.ToString("X2");
+                        Run(delegate { app.Data.Settings.Calendar.Outlook.CategoryColors[name] = hex; app.SettingsChanged(); });
+                        RefreshData();
+                    }
+                };
+                outlookCategories.Controls.Add(swatch);
+            }
+        }
+
+        private void RefreshOutlookCard()
+        {
+            OutlookOptions o = app.Data.Settings.Calendar.Outlook; OutlookCache cache = app.Outlook;
+            if (!outlookUrl.Focused) outlookUrl.Text = o.Url;
+            outlookShow.Checked = o.Show; SelectId(outlookRefresh, o.RefreshMinutes.ToString(CultureInfo.InvariantCulture));
+            outlookRemind.Checked = o.Remind; SetNumber(outlookLead, o.LeadMinutes); outlookLead.Enabled = o.Remind;
+            RefreshOutlookCategories();
+            outlookStatus.Text = app.OutlookSyncing ? Lang.T("正在同步…") : o.Url == "" ? Lang.T("尚未订阅。粘贴链接后点「保存并同步」。")
+                : cache.LastError != "" ? Lang.T("同步失败：{0}", cache.LastError) + (cache.LastSyncUtc != "" ? Environment.NewLine + Lang.T("仍显示上次同步的内容（{0}）。", LocalStamp(cache.LastSyncUtc)) : "")
+                : cache.LastSyncUtc == "" ? Lang.T("正在等待第一次同步…")
+                : Lang.T("上次同步：{0} · 共 {1} 个日程", LocalStamp(cache.LastSyncUtc), cache.Events.Count);
+        }
+
         private void SaveCalendarDates()
         {
             if (syncing) return;
@@ -504,7 +574,7 @@ namespace DeskStudy
 
         private void BuildData()
         {
-            var page = NewPage(Lang.T("数据与应用"), Lang.T("所有数据仅保存在本机。导入与恢复备份前，会先保留当前内容，便于回退。"));
+            var page = NewPage(Lang.T("数据与应用"), Lang.T("所有数据仅保存在本机；只有填写了 Outlook 链接时，才会联网下载那一个日历。导入与恢复备份前，会先保留当前内容，便于回退。"));
             var card = Card(page, Lang.T("本地保存"));
             saveDelay = Combo("autosave-delay", new Choice("450", Lang.T("即时 · 编辑后约 0.45 秒")), new Choice("1000", Lang.T("编辑后 1 秒")), new Choice("2500", Lang.T("编辑后 2.5 秒"))); Field(card, Lang.T("自动保存"), saveDelay);
             Add(card, Ui.Label(Lang.T("自动保存始终启用；退出时立即保存。"), 8.5F, Ui.Muted));
@@ -551,7 +621,7 @@ namespace DeskStudy
                 SelectId(defaultView, app.Data.Settings.Calendar.WorkWeek && app.Data.Settings.Calendar.DefaultView == "Week" ? "WorkWeek" : app.Data.Settings.Calendar.DefaultView); SelectId(weekStart, app.Data.Settings.Calendar.WeekStartDay.ToString(CultureInfo.InvariantCulture));
                 if (!calendarDatesPending) { SetDate(semesterStart, app.Data.Settings.Calendar.SemesterStart); SetDate(semesterEnd, app.Data.Settings.Calendar.SemesterEnd); SetDate(teachingWeekOne, app.Data.Settings.Calendar.TeachingWeekOne); }
                 showDeadlines.Checked = app.Data.Settings.Calendar.ShowDeadlines; sortDeadlines.Checked = app.Data.Settings.SortDeadlines;
-                RefreshCourses(); RefreshBooks();
+                RefreshOutlookCard(); RefreshCourses(); RefreshBooks();
                 SetNumber(leadMinutes, app.Data.Settings.Reminders.DefaultLeadMinutes); quietEnabled.Checked = app.Data.Settings.Reminders.QuietHoursEnabled;
                 quietStart.Enabled = quietEnabled.Checked; quietEnd.Enabled = quietEnabled.Checked;
                 SetTime(quietStart, app.Data.Settings.Reminders.QuietStart); SetTime(quietEnd, app.Data.Settings.Reminders.QuietEnd); SetTime(dateOnlyReminder, app.Data.Settings.Reminders.DateOnlyReminderTime); soundEnabled.Checked = app.Data.Settings.Reminders.SoundEnabled;

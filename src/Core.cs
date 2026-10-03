@@ -143,6 +143,8 @@ namespace DeskStudy
         public string Location { get; set; }
         public string Notes { get; set; }
         public string Color { get; set; }
+        // Set for an Outlook occurrence: read-only, not part of any series here.
+        [System.Web.Script.Serialization.ScriptIgnore] public OutlookEvent External { get; set; }
     }
     public sealed class ReminderRecord
     {

@@ -123,6 +123,7 @@ namespace DeskStudy
             if (UsesSystemStartup) { try { StartupRegistration.Refresh(); } catch (Exception) { } }
             RegisterShowHotkey();
             UpdateTaskbarButton();
+            StartOutlook();
             if (Data.Settings.WidgetMode != "Desktop") return;
             if (!quiet) { if (UsesSystemStartup) RaiseWidgets(); return; }
             SinkAll();

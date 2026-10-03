@@ -392,10 +392,11 @@ namespace DeskStudy
         {
             if (Exiting) return;
             pendingDelivery.AddRange(ReminderEngine.Scan(Data, utcNow));
+            if (!SettingsLogic.IsQuietHours(Data.Settings, utcNow.ToLocalTime())) pendingDelivery.AddRange(OutlookReminders(utcNow));
             // Persist both delivery keys and last scan, including while every window is hidden.
             dirty = true; if (!Flush()) return;
             var liveTasks = Data.Books.SelectMany(b => b.Pages).SelectMany(p => p.Tasks).Where(t => !t.Completed).Select(t => t.Id).ToList();
-            var batch = pendingDelivery.Where(r => liveTasks.Contains(r.TaskId)).ToList();
+            var batch = pendingDelivery.Where(r => liveTasks.Contains(r.TaskId) || r.TaskId.StartsWith("outlook:", StringComparison.Ordinal)).ToList();
             if (SettingsLogic.IsQuietHours(Data.Settings, utcNow.ToLocalTime())) return;
             pendingDelivery.Clear();
             if (batch.Count == 0) return;
@@ -471,6 +472,7 @@ namespace DeskStudy
             tray.Visible = false;
             ReleaseShowHotkey();
             if (taskbarButton != null) { taskbarButton.Dispose(); taskbarButton = null; }
+            StopOutlook();
             foreach (var w in Widgets) w.Dispose();
             if (center != null) center.Dispose();
             if (settingsCenter != null) settingsCenter.Dispose();

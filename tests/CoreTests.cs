@@ -220,6 +220,75 @@ internal static class CoreTests
                 AppSettings off = json.Deserialize<AppSettings>(json.Serialize(new AppSettings { SortDeadlines = false, Calendar = new CalendarOptions { ShowDeadlines = false } }));
                 Assert(!off.SortDeadlines && !off.Calendar.ShowDeadlines, "Switched-off options survive a save and load.");
             });
+            Run("Outlook ICS: recurring series, exceptions, moves, cancellations, all-day, categories, zones", delegate
+            {
+                string ics = String.Join("\r\n", new[] {
+                    "BEGIN:VCALENDAR", "METHOD:PUBLISH", "PRODID:Microsoft Exchange Server 2010", "VERSION:2.0",
+                    "BEGIN:VTIMEZONE", "TZID:GMT Standard Time",
+                    "BEGIN:STANDARD", "DTSTART:16010101T020000", "TZOFFSETFROM:+0100", "TZOFFSETTO:+0000", "RRULE:FREQ=YEARLY;INTERVAL=1;BYDAY=-1SU;BYMONTH=10", "END:STANDARD",
+                    "BEGIN:DAYLIGHT", "DTSTART:16010101T010000", "TZOFFSETFROM:+0000", "TZOFFSETTO:+0100", "RRULE:FREQ=YEARLY;INTERVAL=1;BYDAY=-1SU;BYMONTH=3", "END:DAYLIGHT", "END:VTIMEZONE",
+                    "BEGIN:VTIMEZONE", "TZID:Customized Time Zone",
+                    "BEGIN:STANDARD", "DTSTART:16010101T030000", "TZOFFSETFROM:+0900", "TZOFFSETTO:+0800", "RRULE:FREQ=YEARLY;BYDAY=1SU;BYMONTH=11", "END:STANDARD",
+                    "BEGIN:DAYLIGHT", "DTSTART:16010101T020000", "TZOFFSETFROM:+0800", "TZOFFSETTO:+0900", "RRULE:FREQ=YEARLY;BYDAY=2SU;BYMONTH=3", "END:DAYLIGHT", "END:VTIMEZONE",
+                    // Weekly lecture Tue/Thu 09:00–11:00 London, ten times; one week off, one moved, one change cancelled.
+                    "BEGIN:VEVENT", "UID:lecture", "SUMMARY:Analysis lecture", "LOCATION:67/1033", "CATEGORIES:Lectures,Maths",
+                    "DTSTART;TZID=GMT Standard Time:20261006T090000", "DTEND;TZID=GMT Standard Time:20261006T110000",
+                    "RRULE:FREQ=WEEKLY;COUNT=10;BYDAY=TU,TH;WKST=MO", "EXDATE;TZID=GMT Standard Time:20261013T090000", "DESCRIPTION:Bring the\\nproblem sheet\\, please", "END:VEVENT",
+                    "BEGIN:VEVENT", "UID:lecture", "RECURRENCE-ID;TZID=GMT Standard Time:20261015T090000", "SUMMARY:Analysis lecture (moved)", "LOCATION:2/1089",
+                    "DTSTART;TZID=GMT Standard Time:20261016T140000", "DTEND;TZID=GMT Standard Time:20261016T150000", "END:VEVENT",
+                    "BEGIN:VEVENT", "UID:lecture", "RECURRENCE-ID;TZID=GMT Standard Time:20261020T090000", "STATUS:CANCELLED", "SUMMARY:Canceled: Analysis lecture",
+                    "DTSTART;TZID=GMT Standard Time:20261020T090000", "DTEND;TZID=GMT Standard Time:20261020T110000", "END:VEVENT",
+                    // Monthly on the last Friday, in a zone Windows does not know.
+                    "BEGIN:VEVENT", "UID:review", "SUMMARY:Monthly review", "CATEGORIES:Red category",
+                    "DTSTART;TZID=Customized Time Zone:20261030T100000", "DTEND;TZID=Customized Time Zone:20261030T103000",
+                    "RRULE:FREQ=MONTHLY;BYDAY=FR;BYSETPOS=-1;UNTIL=20261231T000000Z", "END:VEVENT",
+                    // All-day across a week, and Outlook's own all-day marker; a UTC event; a cancelled one.
+                    "BEGIN:VEVENT", "UID:reading", "SUMMARY:Reading week", "DTSTART;VALUE=DATE:20261102", "DTEND;VALUE=DATE:20261107", "END:VEVENT",
+                    "BEGIN:VEVENT", "UID:open", "SUMMARY:Open day", "X-MICROSOFT-CDO-ALLDAYEVENT:TRUE", "DTSTART;VALUE=DATE:20261104", "DTEND;VALUE=DATE:20261105", "END:VEVENT",
+                    "BEGIN:VEVENT", "UID:utc", "SUMMARY:Call with a very long", "  title folded", "DTSTART:20261105T150000Z", "DURATION:PT45M", "END:VEVENT",
+                    "BEGIN:VEVENT", "UID:gone", "SUMMARY:Gone", "STATUS:CANCELLED", "DTSTART:20261105T150000Z", "DTEND:20261105T160000Z", "END:VEVENT",
+                    "END:VCALENDAR" });
+                List<OutlookEvent> events = IcsParser.Parse(ics, D("2026-10-01"), D("2026-12-31"));
+                Func<string, string, string> local = delegate(string utc, string unused) { return TimeZoneInfo.ConvertTimeFromUtc(U(utc), TimeZoneInfo.Local).ToString(TimeUtil.LocalFormat, CultureInfo.InvariantCulture); };
+                var lectures = events.Where(e => e.Uid == "lecture").ToList();
+                // 10 starts (Oct 6 … Nov 5), minus the cancelled week and the cancelled change.
+                Assert(lectures.Count == 8 && lectures.All(e => e.Recurring), "Expected 8 lectures, got " + lectures.Count);
+                Assert(lectures[0].Start == local("2026-10-06T08:00:00Z", null) && lectures[0].End == local("2026-10-06T10:00:00Z", null), "London summer time 09:00 is 08:00 UTC.");
+                Assert(!lectures.Any(e => e.Start == local("2026-10-13T08:00:00Z", null)), "EXDATE removes that week.");
+                var moved = lectures.Single(e => e.Title == "Analysis lecture (moved)");
+                Assert(moved.Start == local("2026-10-16T13:00:00Z", null) && moved.Location == "2/1089", "RECURRENCE-ID moves one lecture.");
+                Assert(!lectures.Any(e => e.Title.StartsWith("Canceled")) && !lectures.Any(e => e.Start == local("2026-10-20T08:00:00Z", null)), "A cancelled occurrence is left out.");
+                Assert(lectures.Any(e => e.Start == local("2026-10-27T09:00:00Z", null)), "After the clocks change the lecture is 09:00 GMT.");
+                Assert(lectures[0].Category == "Lectures" && lectures[0].Notes == "Bring the\nproblem sheet, please", "First category; escaped text.");
+                var reviews = events.Where(e => e.Uid == "review").ToList();
+                Assert(reviews.Count == 3 && reviews[0].Start == local("2026-10-30T01:00:00Z", null) && reviews[1].Start == local("2026-11-27T02:00:00Z", null) && reviews[2].Start == local("2026-12-25T02:00:00Z", null), "Last Friday monthly, in a zone built from the file (+9 then +8): " + String.Join(", ", reviews.Select(r => r.Start)) + " expected " + local("2026-10-30T01:00:00Z", null));
+                var reading = events.Single(e => e.Uid == "reading");
+                Assert(reading.AllDay && reading.Start == "2026-11-02T00:00:00" && reading.End == "2026-11-07T00:00:00", "All-day keeps its days.");
+                Assert(events.Single(e => e.Uid == "open").AllDay, "Outlook's all-day marker.");
+                var call = events.Single(e => e.Uid == "utc");
+                Assert(call.Title == "Call with a very long title folded" && call.Start == local("2026-11-05T15:00:00Z", null) && call.End == local("2026-11-05T15:45:00Z", null), "UTC time, DURATION, folded line.");
+                Assert(!events.Any(e => e.Uid == "gone"), "A cancelled event is left out.");
+                Assert(IcsParser.Parse(ics, D("2026-11-01"), D("2026-11-03")).All(e => e.EndLocal > D("2026-11-01") && e.StartLocal < D("2026-11-04")), "Only occurrences in the window are kept.");
+            });
+            Run("Outlook: reminders once per occurrence, category colors, links", delegate
+            {
+                var options = new OutlookOptions { Url = "https://example.invalid/calendar.ics", LeadMinutes = 15 };
+                DateTime startLocal = DateTime.Now.AddMinutes(10); startLocal = startLocal.AddTicks(-(startLocal.Ticks % TimeSpan.TicksPerMinute));
+                var cache = new OutlookCache();
+                cache.Events.Add(new OutlookEvent { Uid = "meeting", Title = "Tutor meeting", Start = startLocal.ToString(TimeUtil.LocalFormat, CultureInfo.InvariantCulture), End = startLocal.AddMinutes(30).ToString(TimeUtil.LocalFormat, CultureInfo.InvariantCulture), Location = "Teams" });
+                cache.Events.Add(new OutlookEvent { Uid = "later", Title = "Later", Start = startLocal.AddHours(3).ToString(TimeUtil.LocalFormat, CultureInfo.InvariantCulture), End = startLocal.AddHours(4).ToString(TimeUtil.LocalFormat, CultureInfo.InvariantCulture) });
+                cache.Events.Add(new OutlookEvent { Uid = "day", Title = "Holiday", AllDay = true, Start = DateTime.Today.ToString(TimeUtil.LocalFormat, CultureInfo.InvariantCulture), End = DateTime.Today.AddDays(1).ToString(TimeUtil.LocalFormat, CultureInfo.InvariantCulture) });
+                var first = OutlookLogic.Reminders(cache, options, DateTime.UtcNow);
+                Assert(first.Count == 1 && first[0].Title == "Tutor meeting" && first[0].TaskId.StartsWith("outlook:") && first[0].TaskId.Length <= 100 && first[0].Kind == "advance", "One reminder inside the lead time; none for later or all-day events.");
+                Assert(OutlookLogic.Reminders(cache, options, DateTime.UtcNow).Count == 0, "Not repeated.");
+                Assert(OutlookLogic.Reminders(cache, new OutlookOptions { Url = options.Url, Remind = false }, DateTime.UtcNow.AddHours(3).AddMinutes(-5)).Count == 0, "Switched off: no reminders.");
+                Assert(OutlookLogic.Reminders(cache, options, DateTime.UtcNow.AddMinutes(30)).Count == 0, "Not after the start.");
+                Assert(OutlookLogic.ColorFor(options, "Red category") == "#D13438" && OutlookLogic.ColorFor(options, "红色类别") == "#D13438" && OutlookLogic.ColorFor(options, "") == OutlookLogic.Color, "Preset categories and no category.");
+                string auto = OutlookLogic.ColorFor(options, "Lectures"); options.CategoryColors["Lectures"] = "#123456";
+                Assert(auto.StartsWith("#") && OutlookLogic.ColorFor(options, "Lectures") == "#123456", "A named category starts with a palette color and can be set.");
+                Assert(OutlookLogic.IsCalendarLink("https://outlook.office365.com/x/calendar.ics") && OutlookLogic.IsCalendarLink("webcal://x/y.ics") && !OutlookLogic.IsCalendarLink("http://x/y.ics") && !OutlookLogic.IsCalendarLink("file:///c:/x.ics"), "Only https and webcal links.");
+                Assert(OutlookLogic.DownloadAddress("webcal://x/y.ics") == "https://x/y.ics", "webcal is fetched over https.");
+            });
             Run("Invalid/future import: reject without mutating live data or on-disk data", delegate
             {
                 AppStore store = NewStore("invalid-import"); store.Data.Books[0].Pages[0].Text = "Do not change"; store.Save();
