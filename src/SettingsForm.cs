@@ -31,7 +31,7 @@ namespace DeskStudy
         private TextBox hotkeyBox;
         private Label hotkeyStatus;
         private NumericUpDown opacity, fontSize, leadMinutes;
-        private CheckBox followingGlobal, quietEnabled, soundEnabled, startup, showDeadlines, sortDeadlines;
+        private CheckBox followingGlobal, quietEnabled, soundEnabled, startup, showDeadlines, sortDeadlines, taskbarIcon;
         private Button backgroundColor;
         private readonly List<NotebookLayoutPreview> notebookLayouts = new List<NotebookLayoutPreview>();
         private DateTimePicker semesterStart, semesterEnd, teachingWeekOne, quietStart, quietEnd, dateOnlyReminder;
@@ -290,7 +290,7 @@ namespace DeskStudy
             widgetCorners = Combo("widget-corners", new Choice("Round", Lang.T("圆角")), new Choice("Square", Lang.T("直角"))); Field(mode, Lang.T("组件四角"), widgetCorners);
             widgetCorners.SelectedIndexChanged += delegate { if (!syncing) Run(delegate { app.SetWidgetCorners(SelectedId(widgetCorners)); }); };
             Add(mode, Ui.Label(Lang.T("桌面组件模式下生效。平时没有阴影；拖动或调整大小时显示系统阴影（Windows 11 上此时为系统圆角）。"), 8.5F, Ui.Muted));
-            Add(mode, Ui.Label(Lang.T("桌面组件模式：没有标题栏，不出现在任务栏和 Alt+Tab 里。拖动顶栏移动，拖动边缘调整大小。"), 8.5F, Ui.Muted));
+            Add(mode, Ui.Label(Lang.T("桌面组件模式：组件没有标题栏，各自不占任务栏。拖动顶栏移动，拖动边缘调整大小。"), 8.5F, Ui.Muted));
             Add(mode, Ui.Label(Lang.T("点击组件时它浮到前面；切到别的程序后，它自动回到其他窗口下面。勾选「始终置顶」的组件不受影响。"), 8.5F, Ui.Muted));
             hotkeyBox = new TextBox { Name = "show-hotkey", Width = 220, ReadOnly = true, BackColor = Color.White, Margin = new Padding(0, 4, 8, 5), ShortcutsEnabled = false, AccessibleName = Lang.T("显示或收起全部组件的快捷键，点击后按下新的组合键") };
             hotkeyBox.KeyDown += delegate(object sender, KeyEventArgs e)
@@ -304,6 +304,9 @@ namespace DeskStudy
             hotkeyStatus = Ui.Label("", 8.5F, Ui.Muted); hotkeyStatus.Name = "hotkey-status"; Add(mode, hotkeyStatus);
             Add(mode, Ui.Label(Lang.T("点一下输入框，再按下新的组合键即可修改。按一次把组件浮到前面，再按一次收回去。"), 8.5F, Ui.Muted));
             Add(mode, Ui.Label(Lang.T("单击托盘图标也能把组件浮到前面。"), 8.5F, Ui.Muted));
+            taskbarIcon = Check("taskbar-icon", Lang.T("在任务栏显示「桌面课笺」图标")); Field(mode, Lang.T("任务栏"), taskbarIcon);
+            taskbarIcon.CheckedChanged += delegate { if (!syncing) Run(delegate { app.SetTaskbarIcon(taskbarIcon.Checked); }); };
+            Add(mode, Ui.Label(Lang.T("桌面组件模式下生效：单击任务栏图标把组件浮到前面，再单击一次收回去。右键图标选「固定到任务栏」，没运行时点它也能打开。"), 8.5F, Ui.Muted));
             var operations = Card(page, Lang.T("布局管理"));
             Add(operations, Buttons(ActionButton("save-layout", Lang.T("保存当前布局"), app.SaveLayout), ActionButton("restore-saved-layout", Lang.T("恢复已保存布局"), app.RestoreSavedLayout), ActionButton("reset-layout", Lang.T("恢复默认布局"), app.ResetLayout), ActionButton("rescue-windows", Lang.T("将组件找回当前屏幕"), app.RescueWindows)));
             layoutSaved = Ui.Label("", 8.5F, Ui.Muted); layoutSaved.Margin = new Padding(0, 8, 0, 0); Add(operations, layoutSaved);
@@ -531,7 +534,7 @@ namespace DeskStudy
                     var editor = layoutEditors[key]; SetNumber(editor.X, w.X); SetNumber(editor.Y, w.Y); SetNumber(editor.Width, w.Width); SetNumber(editor.Height, w.Height); editor.Pin.Checked = w.TopMost; editor.Locked.Checked = w.PositionLocked;
                 }
                 SelectId(uiLanguage, app.Data.Settings.Language); UpdateLanguageNote();
-                SelectId(widgetMode, app.Data.Settings.WidgetMode); SelectId(widgetCorners, app.Data.Settings.WidgetCorners);
+                SelectId(widgetMode, app.Data.Settings.WidgetMode); SelectId(widgetCorners, app.Data.Settings.WidgetCorners); taskbarIcon.Checked = app.Data.Settings.ShowTaskbarIcon;
                 hotkeyBox.Text = app.Data.Settings.ShowHotkey == "" ? Lang.T("已停用") : app.Data.Settings.ShowHotkey;
                 hotkeyStatus.Text = app.HotkeyStatus ?? "";
                 layoutSaved.Text = String.IsNullOrEmpty(app.Data.Settings.SavedLayoutUtc) ? Lang.T("尚未保存自定义布局。重置与找回不会影响内容。") : Lang.T("已保存布局：{0}。重置与找回不会影响内容。", LocalStamp(app.Data.Settings.SavedLayoutUtc));

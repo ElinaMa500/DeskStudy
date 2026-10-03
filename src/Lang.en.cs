@@ -330,7 +330,7 @@ namespace DeskStudy
             { "直角", "Square" },
             { "组件四角", "Corners" },
             { "桌面组件模式下生效。平时没有阴影；拖动或调整大小时显示系统阴影（Windows 11 上此时为系统圆角）。", "Applies to desktop widgets. No shadow at rest; the system shadow shows while dragging or resizing (with the system's rounded corners on Windows 11)." },
-            { "桌面组件模式：没有标题栏，不出现在任务栏和 Alt+Tab 里。拖动顶栏移动，拖动边缘调整大小。", "Desktop widgets have no title bar and stay out of the taskbar and Alt+Tab. Drag the header to move, drag an edge to resize." },
+            { "桌面组件模式：组件没有标题栏，各自不占任务栏。拖动顶栏移动，拖动边缘调整大小。", "Desktop widgets have no title bar and no taskbar buttons of their own. Drag the header to move, drag an edge to resize." },
             { "点击组件时它浮到前面；切到别的程序后，它自动回到其他窗口下面。勾选「始终置顶」的组件不受影响。", "Clicking a widget brings it to the front; switching to another program sends it back behind. Widgets set to \"Always on top\" stay on top." },
             { "显示或收起全部组件的快捷键，点击后按下新的组合键", "Shortcut to bring all widgets forward or send them back; click, then press a new combination" },
             { "显示 / 收起快捷键", "Show / hide shortcut" },
@@ -546,6 +546,11 @@ namespace DeskStudy
             { "DDL", "Deadlines" },
             { "DDL 按截止时间排序", "Sort deadlines by due time" },
             { "DDL 排序", "Deadline order" },
+            { "{0} 项截止", "{0} due" },
+            // Taskbar button.
+            { "在任务栏显示「桌面课笺」图标", "Show a DeskStudy button on the taskbar" },
+            { "任务栏", "Taskbar" },
+            { "桌面组件模式下生效：单击任务栏图标把组件浮到前面，再单击一次收回去。右键图标选「固定到任务栏」，没运行时点它也能打开。", "In desktop mode: click the taskbar button to bring the widgets forward, click again to send them back. Right-click it and choose Pin to taskbar to start DeskStudy from there too." },
         };
     }
 }

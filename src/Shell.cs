@@ -470,6 +470,7 @@ namespace DeskStudy
             SystemEvents.PowerModeChanged -= powerHandler; SystemEvents.SessionEnding -= sessionHandler; UnwatchDisplays();
             tray.Visible = false;
             ReleaseShowHotkey();
+            if (taskbarButton != null) { taskbarButton.Dispose(); taskbarButton = null; }
             foreach (var w in Widgets) w.Dispose();
             if (center != null) center.Dispose();
             if (settingsCenter != null) settingsCenter.Dispose();

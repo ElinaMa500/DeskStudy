@@ -23,13 +23,13 @@ namespace DeskStudy
         private readonly Timer clockTimer = new Timer();
         private DateTime lastToday = DateTime.Today;
         private List<Occurrence> occurrences = new List<Occurrence>();
-        // DDL deadlines in view; the date-only ones of a week view show as a ⚑ badge beside their date.
+        // DDL deadlines in view; in a week view every day with deadlines shows a ⚑ badge beside its date.
         private List<DeadlineMark> deadlines = new List<DeadlineMark>();
         private readonly List<KeyValuePair<Rectangle, List<DeadlineMark>>> badgeHits = new List<KeyValuePair<Rectangle, List<DeadlineMark>>>();
         private readonly ClickOrDouble<List<DeadlineMark>> badgeClicks = new ClickOrDouble<List<DeadlineMark>>();
         private readonly ToolTip badgeTip = new ToolTip { AutoPopDelay = 12000, InitialDelay = 300 };
         private string badgeTipText = "";
-        private List<DeadlineMark> DayDeadlines { get { return monthView ? new List<DeadlineMark>() : deadlines.Where(m => m.DateOnly).ToList(); } }
+        private List<DeadlineMark> DayDeadlines { get { return monthView ? new List<DeadlineMark>() : deadlines; } }
         private readonly Color ink = Color.FromArgb(38, 49, 65);
         private readonly Color muted = Color.FromArgb(119, 128, 141);
         // Reference styles follow the notebook layout: 清爽 for 轻量卡片 / 清爽卡片, 纸页 for 纸页本 / 手账纸页.
@@ -152,7 +152,7 @@ namespace DeskStudy
             dayHeader.MouseMove += delegate(object sender, MouseEventArgs e)
             {
                 var hit = BadgeHit(e.Location); dayHeader.Cursor = hit == null ? Cursors.Default : Cursors.Hand;
-                string text = hit == null ? "" : hit.Count == 1 ? CalendarSurface.DeadlineTip(hit[0]) : String.Join("\n", hit.Select(m => "⚑ " + m.Text)) + "\n" + Lang.T("单击选择要查看的任务");
+                string text = hit == null ? "" : hit.Count == 1 ? CalendarSurface.DeadlineTip(hit[0]) : CalendarSurface.DeadlineList(hit);
                 if (text != badgeTipText) { badgeTipText = text; badgeTip.SetToolTip(dayHeader, text); }
             };
             badgeClicks.Single += OpenBadge;
@@ -162,6 +162,7 @@ namespace DeskStudy
             surface.OpenOccurrence += EditEvent;
             surface.OpenDeadline += delegate(DeadlineMark mark) { App.ShowDeadline(this, mark.PageId, mark.TaskId); };
             surface.EditDeadline += delegate(DeadlineMark mark) { App.EditDeadline(this, mark.PageId, mark.TaskId); };
+            surface.ChooseDeadline += delegate(List<DeadlineMark> group) { OpenBadge(group); };
             surface.CreateEvent += AddEvent;
             surface.SelectDate += delegate(DateTime date) { focusDate = date; };
             surface.SizeChanged += delegate { dayHeader.Invalidate(); };
@@ -481,7 +482,7 @@ namespace DeskStudy
             foreach (DeadlineMark mark in hit)
             {
                 DeadlineMark captured = mark;
-                var item = menu.Items.Add("⚑ " + mark.Text + (mark.Archived ? Lang.T("（已归档）") : ""), null, delegate { App.ShowDeadline(this, captured.PageId, captured.TaskId); });
+                var item = menu.Items.Add("⚑ " + CalendarSurface.DeadlineCaption(mark, true) + (mark.Archived ? Lang.T("（已归档）") : ""), null, delegate { App.ShowDeadline(this, captured.PageId, captured.TaskId); });
                 item.ToolTipText = CalendarSurface.DeadlineTip(mark);
             }
             menu.Closed += delegate { BeginInvoke(new Action(menu.Dispose)); };
@@ -670,6 +671,7 @@ namespace DeskStudy
         public event Action<Occurrence> OpenOccurrence;
         public event Action<DeadlineMark> OpenDeadline;
         public event Action<DeadlineMark> EditDeadline;
+        public event Action<List<DeadlineMark>> ChooseDeadline;
         private List<DeadlineMark> marks = new List<DeadlineMark>();
         private readonly ClickOrDouble<DeadlineMark> markClicks = new ClickOrDouble<DeadlineMark>();
         public void SetDeadlines(List<DeadlineMark> values) { marks = values ?? new List<DeadlineMark>(); Invalidate(); }
@@ -928,15 +930,20 @@ namespace DeskStudy
                 {
                     var group = new List<DeadlineMark> { dayMarks[cursor++] };
                     while (cursor < dayMarks.Count && dayMarks[cursor].Minutes * HourHeight / 60 - tagHeight < group[group.Count - 1].Minutes * HourHeight / 60) group.Add(dayMarks[cursor++]);
-                    float laneWidth = (col - S(6)) / group.Count;
-                    for (int i = 0; i < group.Count; i++)
-                    {
-                        int bottom = Math.Max(tagHeight, group[i].Minutes * HourHeight / 60);
-                        Rectangle tag = new Rectangle(TimeGutter + S(3) + (int)(day * col + i * laneWidth), bottom - tagHeight, Math.Max(S(8), (int)laneWidth - S(2)), tagHeight);
-                        DrawDeadline(graphics, group[i], tag, false); hits.Add(new CalendarHit(tag, group[i]));
-                    }
+                    // Tags that would touch become one "⚑ 3 项截止" tag at the earliest due time; a click lists them.
+                    int bottom = Math.Max(tagHeight, group[0].Minutes * HourHeight / 60);
+                    Rectangle tag = new Rectangle(TimeGutter + S(3) + (int)(day * col), bottom - tagHeight, Math.Max(S(8), (int)col - S(8)), tagHeight);
+                    if (group.Count == 1) { DrawDeadline(graphics, group[0], tag, false); hits.Add(new CalendarHit(tag, group[0])); continue; }
+                    DrawDeadline(graphics, new DeadlineMark { Text = Lang.T("{0} 项截止", group.Count), Date = date, Time = group[0].Time }, tag, false);
+                    hits.Add(new CalendarHit(tag, group));
                 }
             }
+        }
+
+        // Hover text for several deadlines at once.
+        internal static string DeadlineList(List<DeadlineMark> group)
+        {
+            return String.Join("\n", group.Select(m => "⚑ " + DeadlineCaption(m, true) + (m.Archived ? Lang.T("（已归档）") : ""))) + "\n" + Lang.T("单击选择要查看的任务");
         }
 
         internal static string DeadlineCaption(DeadlineMark mark, bool withTime) { return (withTime && !mark.DateOnly ? mark.Time + " " : "") + mark.Text; }
@@ -1038,7 +1045,8 @@ namespace DeskStudy
             Point point = ContentPoint(e.Location); CalendarHit hit = hits.LastOrDefault(h => h.Bounds.Contains(point));
             if (hit != null)
             {
-                if (hit.Mark != null) markClicks.Click(hit.Mark);
+                if (hit.Group != null) { if (ChooseDeadline != null) ChooseDeadline(hit.Group); }
+                else if (hit.Mark != null) markClicks.Click(hit.Mark);
                 else if (hit.Item != null && OpenOccurrence != null) OpenOccurrence(hit.Item);
                 else if (hit.Item == null) ShowDay(hit.Date);
                 return;
@@ -1057,7 +1065,7 @@ namespace DeskStudy
         {
             Point point = ContentPoint(e.Location); CalendarHit hit = hits.LastOrDefault(h => h.Bounds.Contains(point));
             Cursor = hit == null ? Cursors.Default : Cursors.Hand;
-            string next = hit != null && hit.Mark != null ? DeadlineTip(hit.Mark) : hit == null || hit.Item == null ? "" : hit.Item.Title + "\n" + hit.Item.Date + "  " + hit.Item.StartTime + "–" + hit.Item.EndTime + (String.IsNullOrWhiteSpace(hit.Item.Location) ? "" : "\n" + hit.Item.Location) + (String.IsNullOrWhiteSpace(hit.Item.Notes) ? "" : "\n" + hit.Item.Notes);
+            string next = hit != null && hit.Group != null ? DeadlineList(hit.Group) : hit != null && hit.Mark != null ? DeadlineTip(hit.Mark) : hit == null || hit.Item == null ? "" : hit.Item.Title + "\n" + hit.Item.Date + "  " + hit.Item.StartTime + "–" + hit.Item.EndTime + (String.IsNullOrWhiteSpace(hit.Item.Location) ? "" : "\n" + hit.Item.Location) + (String.IsNullOrWhiteSpace(hit.Item.Notes) ? "" : "\n" + hit.Item.Notes);
             if (next != tip) { tip = next; tooltip.SetToolTip(this, tip); }
         }
 
@@ -1096,7 +1104,9 @@ namespace DeskStudy
         private sealed class CalendarHit
         {
             public Rectangle Bounds; public Occurrence Item; public DateTime Date; public DeadlineMark Mark;
+            public List<DeadlineMark> Group;
             public CalendarHit(Rectangle bounds, DeadlineMark mark) { Bounds = bounds; Mark = mark; }
+            public CalendarHit(Rectangle bounds, List<DeadlineMark> group) { Bounds = bounds; Group = group; }
             public CalendarHit(Rectangle bounds, Occurrence item) { Bounds = bounds; Item = item; }
             public CalendarHit(Rectangle bounds, DateTime date) { Bounds = bounds; Date = date; }
         }

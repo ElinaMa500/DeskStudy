@@ -26,13 +26,15 @@ namespace DeskStudy
         public string Language { get; set; }
         // DDL book: list tasks by deadline instead of the order they were arranged in. The stored order is kept.
         public bool SortDeadlines { get; set; }
+        // Desktop mode: one taskbar button that brings the widgets forward or sends them back.
+        public bool ShowTaskbarIcon { get; set; }
         // Global shortcut that raises or lowers all widgets, e.g. "Ctrl+Alt+Shift+D". Empty disables it.
         public string ShowHotkey { get; set; }
         // Set when the file predates WidgetMode: its window bounds still include the system frame.
         [System.Web.Script.Serialization.ScriptIgnore] public bool FramedWindowBounds { get; set; }
         public AppSettings()
         {
-            WidgetMode = "Desktop"; ShowHotkey = HotkeySpec.Default; WidgetCorners = "Round"; Language = "zh-CN"; SortDeadlines = true;
+            WidgetMode = "Desktop"; ShowHotkey = HotkeySpec.Default; WidgetCorners = "Round"; Language = "zh-CN"; SortDeadlines = true; ShowTaskbarIcon = true;
             NotebookLayout = "Card";
             GlobalAppearance = new AppearanceOptions();
             AppearanceOverrides = new Dictionary<string, AppearanceOptions>();

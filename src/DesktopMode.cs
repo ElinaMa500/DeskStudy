@@ -59,6 +59,7 @@ namespace DeskStudy
             Data.Settings.WidgetMode = mode;
             ShiftAllFrames(mode == "Desktop");
             foreach (var w in Widgets) w.ApplyWidgetMode();
+            UpdateTaskbarButton();
             // Title bars take extra room, so neighbouring widgets may now touch.
             ArrangeWidgets();
             foreach (var w in Widgets) w.Remember();
@@ -121,6 +122,7 @@ namespace DeskStudy
         {
             if (UsesSystemStartup) { try { StartupRegistration.Refresh(); } catch (Exception) { } }
             RegisterShowHotkey();
+            UpdateTaskbarButton();
             if (Data.Settings.WidgetMode != "Desktop") return;
             if (!quiet) { if (UsesSystemStartup) RaiseWidgets(); return; }
             SinkAll();
@@ -139,7 +141,7 @@ namespace DeskStudy
         {
             bool inFront = Data.Settings.WidgetMode == "Desktop" && Form.ActiveForm is WidgetForm && Widgets.Any(w => w.Visible);
             if (!inFront) { RaiseWidgets(); return; }
-            SinkAll(); ActivateNextWindow();
+            SendWidgetsBack();
         }
         // Hands focus to the topmost ordinary window of another program.
         private static void ActivateNextWindow()

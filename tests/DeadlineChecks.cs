@@ -119,7 +119,8 @@ public static class DeadlineChecks
             Task("小测复习", Day(monday, 1) + " 14:00", false, true), Task("物理实验报告", Day(monday, 2) + " 11:30", false, false),
             Task("英语作文", Day(monday, 3), true, false), Task("组会汇报材料", Day(monday, 3) + " 10:00", false, false) });
         var internship = new NotePage { Title = "实习申请" };
-        internship.Tasks.AddRange(new[] { Task("简历投递", Day(monday, 6) + " 12:00", false, false), Task("网申测评", Day(monday, 8) + " 18:00", false, false) });
+        internship.Tasks.AddRange(new[] { Task("简历投递", Day(monday, 6) + " 12:00", false, false), Task("网申测评", Day(monday, 8) + " 18:00", false, false),
+            Task("笔试报名", Day(monday, 5) + " 11:30", false, false), Task("面试材料", Day(monday, 5) + " 11:45", false, false), Task("补交成绩单", Day(monday, 5) + " 12:00", false, false) });
         var archived = new NotePage { Title = "上学期", Archived = true };
         archived.Tasks.Add(Task("图书馆还书", Day(monday, 5), true, false));
         book.Pages = new List<NotePage> { homework, internship, archived }; book.CurrentPageId = homework.Id;
@@ -137,7 +138,7 @@ public static class DeadlineChecks
         Assert(String.Join("|", order) == "物理实验报告|组会汇报材料|课程论文初稿|英语作文|高数习题 3.2|读书笔记|小测复习", "the DDL page is listed by deadline: " + String.Join(" → ", order));
         Assert(homework.Tasks[0].Text == "读书笔记", "the stored order is left as it was");
         var marks = DeadlineLogic.Marks(app.Data, monday, monday.AddDays(6));
-        Assert(marks.Count == 7 && !marks.Any(m => m.Text == "小测复习") && marks.Any(m => m.Text == "图书馆还书" && m.Archived), "the calendar gets every unfinished deadline this week, archived page included");
+        Assert(marks.Count == 10 && !marks.Any(m => m.Text == "小测复习") && marks.Any(m => m.Text == "图书馆还书" && m.Archived), "the calendar gets every unfinished deadline this week, archived page included");
         Shot("1-week-sorted", ddl, todo, calendar);
 
         // From the calendar: the DDL book turns to the task's page and tints it.
@@ -152,14 +153,16 @@ public static class DeadlineChecks
         // Date-only deadlines: a ⚑ badge beside the date, the day row keeps its height.
         calendar.Refresh(); Pump(100);
         var badges = Badges(calendar);
-        Assert(badges.Count == 2 && badges.Any(b => b.Count == 2) && badges.Any(b => b.Count == 1 && b[0].Text == "图书馆还书"), "week view: one badge for the two date-only deadlines on Thursday, one for Saturday");
+        Assert(badges.Count == 5 && badges.Any(b => b.Count == 3 && b.Count(m => m.DateOnly) == 2) && badges.Any(b => b.Count == 4 && b.Any(m => m.Text == "图书馆还书")), "week view: every day with deadlines has a badge beside its date, timed and date-only alike");
+        var merged = Hits(surface).Where(h => Get(h, "Group") != null).Select(h => (List<DeadlineMark>)Get(h, "Group")).ToList();
+        Assert(merged.Count == 1 && merged[0].Count == 3 && merged[0][0].Text == "笔试报名", "three deadlines close together on Saturday share one tag instead of three slivers");
         var dayHeader = All(calendar).First(c => c.Name == "calendar-day-header");
         int withBadges = dayHeader.Height;
 
         // A deadline on an archived page has no page to turn to: its editor opens instead.
         bool archivedEditor = false;
         WhenEditor(delegate(TaskEditorDialog dialog) { archivedEditor = dialog.TaskText == "图书馆还书"; dialog.DialogResult = DialogResult.Cancel; });
-        typeof(CalendarForm).GetMethod("OpenBadge", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(calendar, new object[] { badges.First(b => b.Count == 1) });
+        typeof(CalendarForm).GetMethod("OpenBadge", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(calendar, new object[] { badges.SelectMany(b => b).Where(m => m.Text == "图书馆还书").ToList() });
         Pump(150);
         Assert(archivedEditor && book.CurrentPageId == homework.Id && archived.Archived, "clicking an archived deadline opens its editor and leaves the page archived");
 
@@ -176,7 +179,7 @@ public static class DeadlineChecks
         app.Data.Settings.Calendar.ShowDeadlines = false; app.SettingsChanged(); Pump(300); calendar.Refresh(); Pump(100);
         Assert(Marks(surface).Count == 0 && Badges(calendar).Count == 0 && dayHeader.Height == withBadges, "with deadlines hidden the calendar shows none, and the day row is as tall as with badges");
         app.Data.Settings.Calendar.ShowDeadlines = true; app.SettingsChanged(); Pump(300);
-        Assert(Marks(surface).Count == 7, "turned back on, the deadlines return");
+        Assert(Marks(surface).Count == 10, "turned back on, the deadlines return");
         Assert(RowOrder(ddl).SequenceEqual(DeadlineLogic.Ordered(homework.Tasks).Select(t => t.Id)), "the DDL notebook lists the page by deadline");
         app.Data.Settings.SortDeadlines = false; app.SettingsChanged(); Pump(300);
         Assert(RowOrder(ddl).SequenceEqual(homework.Tasks.Select(t => t.Id)), "with sorting off the DDL notebook shows the order the tasks were arranged in");
