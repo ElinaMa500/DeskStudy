@@ -39,6 +39,8 @@
 
 ## 验证策略
 
+- 一键回归：`powershell -File tests\run-all.ps1`。脚本逐个运行全部测试套件（桌面类测试会打开真实窗口，所以不并行），每个套件一行结果。套件是否失败，以脚本是否抛错、测试程序是否返回非零为准，不看输出里的文字。单个套件超时（默认 600 秒）会被停止并记为失败。超时只会结束 `artifacts` 下的测试进程，不会动到正在使用的程序。有失败时退出码为 1，完整日志写入 `artifacts\run-all-时间.log`。`-Only core,outlook` 只跑指定套件，`-Packaged` 会另外打包，并跑打包版冒烟测试。
+
 - 核心测试覆盖循环日期与例外、时区、任务完成与提醒去重、数据完整性、旧版迁移、设置校验和备份恢复。
 - 绘制规则：数据改动（任务、页面、日程）只刷新组件内容，不重新上样式；只有外观相关设置变化（`AppController.LookSignature`）才整体重排。刷新内容放在 `RedrawPause` 里，一次画出。`tests/run-layouts.ps1 -PageTurn check` 会检查翻页、双击编辑、打勾、添加时没有重排、一次画出。
 - Outlook 日历：`src/Ics.cs` 解析 ICS（折行、转义、VTIMEZONE、RRULE 的 DAILY/WEEKLY/MONTHLY/YEARLY、BYDAY 序号、BYMONTHDAY、BYSETPOS、COUNT/UNTIL、EXDATE、RECURRENCE-ID 改期与取消、全天与 DURATION），`src/Outlook.cs` 是设置、缓存、颜色和提醒的纯逻辑，`src/OutlookSync.cs` 负责后台下载、`outlook-cache.json` 和定时刷新；测试用 `AppController.OutlookDownload` 替换下载，不联网。核心测试覆盖解析与提醒；`tests/run-layouts.ps1 -Outlook` 走完整流程并截图。
