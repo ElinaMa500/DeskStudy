@@ -26,8 +26,10 @@ namespace DeskStudy
         // DDL deadlines in view; in a week view every day with deadlines shows a ⚑ badge beside its date.
         private List<DeadlineMark> deadlines = new List<DeadlineMark>();
         // Outlook all-day events in view; a week view lists them in a row under the day header.
-        private List<OutlookEvent> allDay = new List<OutlookEvent>();
-        private readonly List<KeyValuePair<Rectangle, OutlookEvent>> allDayHits = new List<KeyValuePair<Rectangle, OutlookEvent>>();
+        private List<Occurrence> allDay = new List<Occurrence>();
+        private readonly List<KeyValuePair<Rectangle, Occurrence>> allDayHits = new List<KeyValuePair<Rectangle, Occurrence>>();
+        internal static DateTime FirstDay(Occurrence o) { return TimeUtil.ParseDate(o.Date); }
+        internal static DateTime AfterLastDay(Occurrence o) { return TimeUtil.ParseDate(o.Date).AddDays(Math.Max(1, o.Days)); }
         private readonly List<KeyValuePair<Rectangle, List<DeadlineMark>>> badgeHits = new List<KeyValuePair<Rectangle, List<DeadlineMark>>>();
         private readonly ClickOrDouble<List<DeadlineMark>> badgeClicks = new ClickOrDouble<List<DeadlineMark>>();
         private readonly ToolTip badgeTip = new ToolTip { AutoPopDelay = 12000, InitialDelay = 300 };
@@ -152,15 +154,20 @@ namespace DeskStudy
             dayHeader.Name = "calendar-day-header";
             dayHeader.MouseClick += delegate(object sender, MouseEventArgs e)
             {
-                var outlook = AllDayHit(e.Location); if (outlook != null) { ShowOutlookEvent(outlook); return; }
+                var whole = AllDayHit(e.Location); if (whole != null) { EditEvent(whole); return; }
                 var hit = BadgeHit(e.Location); if (hit != null) badgeClicks.Click(hit);
             };
-            dayHeader.MouseDoubleClick += delegate(object sender, MouseEventArgs e) { var hit = BadgeHit(e.Location); if (hit != null) badgeClicks.DoubleClick(hit); };
+            dayHeader.MouseDoubleClick += delegate(object sender, MouseEventArgs e)
+            {
+                var hit = BadgeHit(e.Location); if (hit != null) { badgeClicks.DoubleClick(hit); return; }
+                // Double-click a date (or the empty all-day row under it): a new all-day event on that day.
+                if (!monthView && AllDayHit(e.Location) == null && e.X >= surface.TimeGutter) AddAllDayEvent(HeaderDate(e.X));
+            };
             dayHeader.MouseMove += delegate(object sender, MouseEventArgs e)
             {
-                var hit = BadgeHit(e.Location); var outlook = AllDayHit(e.Location);
-                dayHeader.Cursor = hit == null && outlook == null ? Cursors.Default : Cursors.Hand;
-                string text = outlook != null ? CalendarSurface.OutlookTip(outlook) : hit == null ? "" : hit.Count == 1 ? CalendarSurface.DeadlineTip(hit[0]) : CalendarSurface.DeadlineList(hit);
+                var hit = BadgeHit(e.Location); var whole = AllDayHit(e.Location);
+                dayHeader.Cursor = hit == null && whole == null ? Cursors.Default : Cursors.Hand;
+                string text = whole != null ? CalendarSurface.OccurrenceTip(whole) : hit == null ? "" : hit.Count == 1 ? CalendarSurface.DeadlineTip(hit[0]) : CalendarSurface.DeadlineList(hit);
                 if (text != badgeTipText) { badgeTipText = text; badgeTip.SetToolTip(dayHeader, text); }
             };
             badgeClicks.Single += OpenBadge;
@@ -239,8 +246,15 @@ namespace DeskStudy
             deadlines = App.Data.Settings.Calendar.ShowDeadlines ? DeadlineLogic.Marks(App.Data, start, end) : new List<DeadlineMark>();
             bool outlook = App.Data.Settings.Calendar.Outlook.Show;
             if (outlook) occurrences.AddRange(OutlookLogic.Timed(App.Outlook, App.Data.Settings.Calendar.Outlook, start, end));
-            allDay = outlook ? OutlookLogic.AllDay(App.Outlook, start, end) : new List<OutlookEvent>();
-            surface.SetAllDay(allDay, App.Data.Settings.Calendar.Outlook);
+            // All-day events (own and Outlook's) go in the row under the dates, not in the hour grid.
+            allDay = occurrences.Where(o => o.AllDay).ToList();
+            if (outlook) allDay.AddRange(OutlookLogic.AllDay(App.Outlook, start, end).Select(e => new Occurrence {
+                External = e, Date = e.StartLocal.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), KeyDate = e.StartLocal.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                StartTime = "", EndTime = "", Title = e.Title, Location = e.Location, Notes = e.Notes, AllDay = true, Days = Math.Max(1, (e.EndLocal.Date - e.StartLocal.Date).Days),
+                Color = OutlookLogic.ColorFor(App.Data.Settings.Calendar.Outlook, e) }));
+            allDay = allDay.OrderBy(o => o.Date, StringComparer.Ordinal).ThenByDescending(o => o.Days).ThenBy(o => o.Title, StringComparer.Ordinal).ToList();
+            occurrences = occurrences.Where(o => !o.AllDay).ToList();
+            surface.SetAllDay(allDay);
             surface.SetDeadlines(deadlines);
             periodFull = monthView ? Lang.MonthTitle(focusDate) : start.ToString("M.d") + " – " + end.ToString("M.d") + "  ·  " + focusDate.Year;
             periodShort = monthView ? periodFull : start.ToString("M.d") + " – " + end.ToString("M.d");
@@ -463,20 +477,27 @@ namespace DeskStudy
             using (Pen rule = new Pen(p.Rule)) graphics.DrawLine(rule, 0, dayHeader.ClientSize.Height - 1, dayHeader.Width, dayHeader.ClientSize.Height - 1);
         }
 
-        // Outlook all-day events: one bar per event across the days it covers, at most three rows.
+        // All-day events: one bar per event across the days it covers, at most three rows.
         private const int AllDayRows = 3;
-        private List<List<OutlookEvent>> AllDayLayout()
+        private List<List<Occurrence>> AllDayLayout()
         {
-            var rows = new List<List<OutlookEvent>>();
+            var rows = new List<List<Occurrence>>();
             if (monthView) return rows;
             DateTime first = ViewStart(), last = first.AddDays(ViewDays);
-            foreach (OutlookEvent e in allDay.Where(x => x.StartLocal.Date < last && x.EndLocal.Date > first))
+            foreach (Occurrence e in allDay.Where(x => FirstDay(x) < last && AfterLastDay(x) > first))
             {
-                var row = rows.FirstOrDefault(r => r.All(o => o.EndLocal.Date <= e.StartLocal.Date || o.StartLocal.Date >= e.EndLocal.Date));
-                if (row == null) { row = new List<OutlookEvent>(); rows.Add(row); }
+                var row = rows.FirstOrDefault(r => r.All(o => AfterLastDay(o) <= FirstDay(e) || FirstDay(o) >= AfterLastDay(e)));
+                if (row == null) { row = new List<Occurrence>(); rows.Add(row); }
                 row.Add(e);
             }
             return rows;
+        }
+        // The date under a point of the day row (week views).
+        private DateTime HeaderDate(int x)
+        {
+            float width = (surface.GridWidth - surface.TimeGutter) / (float)ViewDays;
+            int index = Math.Max(0, Math.Min(ViewDays - 1, (int)((x - surface.TimeGutter) / width)));
+            return ViewStart().AddDays(index);
         }
         private int AllDayRowHeight { get { using (Font font = AllDayFont()) return Math.Max(Px(20), font.Height + Px(7)); } }
         private int AllDayHeight { get { int rows = Math.Min(AllDayRows, AllDayLayout().Count); return rows == 0 ? 0 : rows * AllDayRowHeight + Px(6); } }
@@ -493,10 +514,10 @@ namespace DeskStudy
             {
                 TextRenderer.DrawText(graphics, Lang.T("全天") + (hidden > 0 ? " +" + hidden : ""), font, new Rectangle(0, top, left - Px(6), rowHeight), sub, TextFormatFlags.Right | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine);
                 for (int r = 0; r < Math.Min(AllDayRows, rows.Count); r++)
-                    foreach (OutlookEvent e in rows[r])
+                    foreach (Occurrence e in rows[r])
                     {
-                        Color blue = ColorTranslator.FromHtml(OutlookLogic.ColorFor(App.Data.Settings.Calendar.Outlook, e.Category));
-                        int a = Math.Max(0, (e.StartLocal.Date - first).Days), b = Math.Min(ViewDays, (e.EndLocal.Date - first).Days);
+                        Color blue; try { blue = ColorTranslator.FromHtml(e.Color); } catch { blue = ColorTranslator.FromHtml(OutlookLogic.Color); }
+                        int a = Math.Max(0, (FirstDay(e) - first).Days), b = Math.Min(ViewDays, (AfterLastDay(e) - first).Days);
                         Rectangle bar = new Rectangle(left + (int)(a * width) + Px(3), top + r * rowHeight + Px(1), Math.Max(Px(10), (int)((b - a) * width) - Px(6)), rowHeight - Px(3));
                         var smoothing = graphics.SmoothingMode; graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
                         using (var path = CalendarSurface.Rounded(bar, rounded ? Px(4) : Px(2)))
@@ -504,11 +525,11 @@ namespace DeskStudy
                         using (Brush stripe = new SolidBrush(blue)) graphics.FillRectangle(stripe, bar.X, bar.Y + Px(2), Px(3), bar.Height - Px(4));
                         graphics.SmoothingMode = smoothing;
                         TextRenderer.DrawText(graphics, e.Title, font, new Rectangle(bar.X + Px(7), bar.Y, bar.Width - Px(9), bar.Height), ink, TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
-                        allDayHits.Add(new KeyValuePair<Rectangle, OutlookEvent>(bar, e));
+                        allDayHits.Add(new KeyValuePair<Rectangle, Occurrence>(bar, e));
                     }
             }
         }
-        private OutlookEvent AllDayHit(Point point)
+        private Occurrence AllDayHit(Point point)
         {
             foreach (var hit in allDayHits) if (hit.Key.Contains(point)) return hit.Value;
             return null;
@@ -566,7 +587,9 @@ namespace DeskStudy
             return Color.FromArgb((int)(background.R * (1F - amount) + color.R * amount), (int)(background.G * (1F - amount) + color.G * amount), (int)(background.B * (1F - amount) + color.B * amount));
         }
 
-        private void AddEvent(DateTime date, int hour)
+        private void AddAllDayEvent(DateTime date) { AddEvent(date, 0, true); }
+        private void AddEvent(DateTime date, int hour) { AddEvent(date, hour, false); }
+        private void AddEvent(DateTime date, int hour, bool allDayEvent)
         {
             CalendarEvent item = new CalendarEvent();
             item.Id = Guid.NewGuid().ToString("N"); item.Title = ""; item.Date = date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
@@ -580,6 +603,7 @@ namespace DeskStudy
             item.RecurrenceAnchorDate = App.Data.Settings.Calendar.TeachingWeekOne;
             item.WeekDays = new List<int> { (int)date.DayOfWeek };
             item.ExcludedDates = new List<string>(); item.Overrides = new List<EventOverride>();
+            if (allDayEvent) { item.AllDay = true; item.Days = 1; item.StartTime = "00:00"; item.EndTime = "23:59"; item.WeekDays = new List<int> { (int)date.DayOfWeek }; }
             using (CalendarEditor editor = new CalendarEditor(item, true, false))
             {
                 if (editor.ShowDialog(this) != DialogResult.OK) return;
@@ -587,9 +611,28 @@ namespace DeskStudy
             }
         }
 
+        // Details of an Outlook event (read-only), and the color for every event of that name.
         private void ShowOutlookEvent(OutlookEvent e)
         {
-            MessageBox.Show(this, CalendarSurface.OutlookTip(e), Lang.T("Outlook 日程（只读）"), MessageBoxButtons.OK, MessageBoxIcon.Information);
+            using (var dialog = new Form { Text = Lang.T("Outlook 日程（只读）"), FormBorderStyle = FormBorderStyle.FixedDialog, MaximizeBox = false, MinimizeBox = false, StartPosition = FormStartPosition.CenterParent, ShowInTaskbar = false, AutoScaleMode = AutoScaleMode.Dpi, AutoScaleDimensions = new SizeF(96F, 96F), Font = new Font("Microsoft YaHei UI", 9.5F), BackColor = Color.FromArgb(250, 250, 247), ClientSize = new Size(400, 230) })
+            {
+                Color current = ColorTranslator.FromHtml(OutlookLogic.ColorFor(App.Data.Settings.Calendar.Outlook, e));
+                var text = new Label { Text = CalendarSurface.OutlookTip(e), Location = new Point(18, 16), Size = new Size(364, 150), UseMnemonic = false, Name = "outlook-details" };
+                var swatch = new Panel { BackColor = current, Location = new Point(18, 182), Size = new Size(18, 18) };
+                var color = new Button { Text = Lang.T("更改这个日程的颜色…"), Name = "outlook-title-color", Location = new Point(44, 176), Size = new Size(200, 32), FlatStyle = FlatStyle.Flat };
+                var close = new Button { Text = Lang.T("关闭"), Location = new Point(292, 176), Size = new Size(90, 32), DialogResult = DialogResult.Cancel };
+                color.Click += delegate
+                {
+                    using (var picker = new ColorDialog { Color = current, FullOpen = true })
+                    {
+                        if (picker.ShowDialog(dialog) != DialogResult.OK) return;
+                        App.SetOutlookTitleColor(e.Title, "#" + picker.Color.R.ToString("X2") + picker.Color.G.ToString("X2") + picker.Color.B.ToString("X2"));
+                        current = picker.Color; swatch.BackColor = current;
+                    }
+                };
+                dialog.Controls.AddRange(new Control[] { text, swatch, color, close }); dialog.CancelButton = close;
+                dialog.ShowDialog(this);
+            }
         }
 
         private void EditEvent(Occurrence occurrence)
@@ -637,7 +680,7 @@ namespace DeskStudy
                 Id = item.Series.Id, Title = item.Title, Date = item.Date, StartTime = item.StartTime,
                 EndTime = item.EndTime, Location = item.Location, Notes = item.Notes, Color = item.Color,
                 TimeZoneId = item.Series.TimeZoneId, RepeatWeeks = 0, RepeatEndDate = item.Date, RecurrenceAnchorDate = item.Series.RecurrenceAnchorDate,
-                WeekDays = new List<int>(), ExcludedDates = new List<string>(), Overrides = new List<EventOverride>()
+                WeekDays = new List<int>(), ExcludedDates = new List<string>(), Overrides = new List<EventOverride>(), AllDay = item.Series.AllDay, Days = item.Series.Days
             };
         }
     }
@@ -752,9 +795,17 @@ namespace DeskStudy
         public event Action<List<DeadlineMark>> ChooseDeadline;
         private List<DeadlineMark> marks = new List<DeadlineMark>();
         private readonly ClickOrDouble<DeadlineMark> markClicks = new ClickOrDouble<DeadlineMark>();
-        private List<OutlookEvent> allDayEvents = new List<OutlookEvent>();
-        private OutlookOptions outlookOptions = new OutlookOptions();
-        public void SetAllDay(List<OutlookEvent> values, OutlookOptions options) { allDayEvents = values ?? new List<OutlookEvent>(); outlookOptions = options ?? new OutlookOptions(); Invalidate(); }
+        private List<Occurrence> allDayEvents = new List<Occurrence>();
+        public void SetAllDay(List<Occurrence> values) { allDayEvents = values ?? new List<Occurrence>(); Invalidate(); }
+
+        // Hover text for any occurrence: Outlook's own, an all-day one, or a timed one.
+        internal static string OccurrenceTip(Occurrence o)
+        {
+            if (o.External != null) return OutlookTip(o.External);
+            DateTime first = TimeUtil.ParseDate(o.Date), last = first.AddDays(Math.Max(1, o.Days) - 1);
+            string when = o.AllDay ? Lang.MonthDay(first) + (last > first ? " – " + Lang.MonthDay(last) : "") + " · " + Lang.T("全天") : o.Date + "  " + o.StartTime + "–" + o.EndTime;
+            return o.Title + "\n" + when + (String.IsNullOrWhiteSpace(o.Location) ? "" : "\n" + o.Location) + (String.IsNullOrWhiteSpace(o.Notes) ? "" : "\n" + o.Notes);
+        }
 
         // Hover and details text for an Outlook event.
         internal static string OutlookTip(OutlookEvent e)
@@ -946,7 +997,7 @@ namespace DeskStudy
                 int day = (DateTime.Today - startDate).Days; int y = (int)(DateTime.Now.TimeOfDay.TotalMinutes * HourHeight / 60);
                 using (Pen now = new Pen(Color.FromArgb(193, 103, 94), S(2))) graphics.DrawLine(now, TimeGutter + day * col, y, TimeGutter + (day + 1) * col, y);
             }
-            if (items.Count == 0 && marks.Count == 0)
+            if (items.Count == 0 && marks.Count == 0 && allDayEvents.Count == 0)
                 using (Font font = new Font("Microsoft YaHei UI", 10F * fontScale))
                     TextRenderer.DrawText(graphics, Lang.T("本周还没有日程 · 双击时间格开始安排"), font, new Rectangle(TimeGutter + S(8), 9 * HourHeight + S(15), Math.Max(S(100), width - TimeGutter - S(16)), T(28)), secondary, TextFormatFlags.HorizontalCenter | ScrolledText);
         }
@@ -1003,8 +1054,8 @@ namespace DeskStudy
         private List<Slot> DaySlots(string date)
         {
             DateTime day = TimeUtil.ParseDate(date);
-            return allDayEvents.Where(e => e.StartLocal.Date <= day && e.EndLocal.Date > day)
-                .Select(e => new Slot { Start = -1, End = -1, Item = new Occurrence { External = e, Date = date, KeyDate = date, StartTime = "", EndTime = "", Title = e.Title, Location = e.Location, Notes = e.Notes, Color = OutlookLogic.ColorFor(outlookOptions, e.Category) } })
+            return allDayEvents.Where(e => CalendarForm.FirstDay(e) <= day && CalendarForm.AfterLastDay(e) > day)
+                .Select(e => new Slot { Start = -1, End = -1, Item = e })
                 .Concat(items.Where(o => o.Date == date).Select(o => new Slot { Start = Minutes(o.StartTime), End = Minutes(o.EndTime), Item = o }))
                 .Concat(marks.Where(m => m.Date == date).Select(m => new Slot { Start = m.Minutes, End = m.Minutes, Mark = m }))
                 .OrderBy(s => s.Start).ThenBy(s => s.Mark == null ? 0 : 1).ToList();
@@ -1112,12 +1163,34 @@ namespace DeskStudy
             using (Font titleFont = new Font("Microsoft YaHei UI", (compact ? 8F : 9F) * fontScale, FontStyle.Bold))
             using (Font detailFont = new Font("Microsoft YaHei UI", 8F * fontScale))
             {
-                string title = compact && item.StartTime != "" ? item.StartTime + " " + item.Title : item.Title;
-                TextRenderer.DrawText(graphics, title, titleFont, inner, foreground, TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine | ScrolledText);
-                if (!compact && rect.Height >= T(41))
-                    TextRenderer.DrawText(graphics, item.StartTime + "–" + item.EndTime, detailFont, new Rectangle(inner.X, inner.Y + T(20), inner.Width, T(18)), foreground, TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine | ScrolledText);
-                if (!compact && rect.Height >= T(64) && !String.IsNullOrWhiteSpace(item.Location))
-                    TextRenderer.DrawText(graphics, item.Location, detailFont, new Rectangle(inner.X, inner.Y + T(40), inner.Width, T(19)), foreground, TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine | ScrolledText);
+                string title = compact && !item.AllDay && item.StartTime != "" ? item.StartTime + " " + item.Title : item.Title;
+                if (compact)
+                {
+                    TextRenderer.DrawText(graphics, title, titleFont, inner, foreground, TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine | ScrolledText);
+                    return;
+                }
+                // Week view: the whole title, wrapped over as many lines as it needs (long words break too),
+                // then the time and the place underneath while there is room. Nothing is cut to "…";
+                // text stops at the last whole line that fits the block. The time is shown only on one line.
+                const TextFormatFlags wrap = TextFormatFlags.WordBreak | TextFormatFlags.TextBoxControl | TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding | ScrolledText;
+                const TextFormatFlags line = TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding | ScrolledText;
+                int y = inner.Y;
+                string time = item.StartTime + "–" + item.EndTime;
+                foreach (var part in new[] { new KeyValuePair<string, Font>(item.Title, titleFont), new KeyValuePair<string, Font>(time, detailFont), new KeyValuePair<string, Font>(item.Location ?? "", detailFont) })
+                {
+                    if (String.IsNullOrWhiteSpace(part.Key)) continue;
+                    int lineHeight = part.Value.Height, room = (inner.Bottom - y) / lineHeight * lineHeight;
+                    if (room <= 0) break;
+                    if (part.Key == time)
+                    {
+                        if (TextRenderer.MeasureText(graphics, time, part.Value, Size.Empty, line).Width > inner.Width) continue;
+                        TextRenderer.DrawText(graphics, time, part.Value, new Rectangle(inner.X, y, inner.Width, lineHeight), foreground, line);
+                        y += lineHeight + S(2); continue;
+                    }
+                    int height = Math.Min(room, TextRenderer.MeasureText(graphics, part.Key, part.Value, new Size(inner.Width, Int32.MaxValue), wrap).Height);
+                    TextRenderer.DrawText(graphics, part.Key, part.Value, new Rectangle(inner.X, y, inner.Width, height), foreground, wrap);
+                    y += height + S(2);
+                }
             }
         }
 
@@ -1160,7 +1233,7 @@ namespace DeskStudy
         {
             Point point = ContentPoint(e.Location); CalendarHit hit = hits.LastOrDefault(h => h.Bounds.Contains(point));
             Cursor = hit == null ? Cursors.Default : Cursors.Hand;
-            string next = hit != null && hit.Item != null && hit.Item.External != null ? OutlookTip(hit.Item.External) : hit != null && hit.Group != null ? DeadlineList(hit.Group) : hit != null && hit.Mark != null ? DeadlineTip(hit.Mark) : hit == null || hit.Item == null ? "" : hit.Item.Title + "\n" + hit.Item.Date + "  " + hit.Item.StartTime + "–" + hit.Item.EndTime + (String.IsNullOrWhiteSpace(hit.Item.Location) ? "" : "\n" + hit.Item.Location) + (String.IsNullOrWhiteSpace(hit.Item.Notes) ? "" : "\n" + hit.Item.Notes);
+            string next = hit != null && hit.Group != null ? DeadlineList(hit.Group) : hit != null && hit.Mark != null ? DeadlineTip(hit.Mark) : hit == null || hit.Item == null ? "" : OccurrenceTip(hit.Item);
             if (next != tip) { tip = next; tooltip.SetToolTip(this, tip); }
         }
 
@@ -1239,8 +1312,10 @@ namespace DeskStudy
         private DateTimePicker datePicker, startPicker, endPicker, untilPicker, anchorPicker;
         private ComboBox repeatBox, colorBox;
         private CheckedListBox weekdays;
+        private CheckBox allDayBox; private NumericUpDown daysBox; private Label daysUnit, toLabel; private Panel timeRow;
         private Label error;
         private readonly string[] palette = { "#6C9385", "#7196B1", "#A68EB5", "#C49472", "#BB818B", "#939C63" };
+        private string keptColor;
 
         public CalendarEditor(CalendarEvent item, bool allowSeries, bool existing)
         {
@@ -1279,11 +1354,20 @@ namespace DeskStudy
             titleBox = new TextBox(); titleBox.MaxLength = 180; AddRow(table, Lang.T("名称"), titleBox, 42);
             datePicker = new DateTimePicker { Format = DateTimePickerFormat.Custom, CustomFormat = Lang.T("yyyy 年 MM 月 dd 日") };
             AddRow(table, Lang.T("日期 / 起日"), datePicker, 42);
-            FlowLayoutPanel times = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false };
-            startPicker = new DateTimePicker { Format = DateTimePickerFormat.Custom, CustomFormat = "HH:mm", ShowUpDown = true, Width = 115 };
-            endPicker = new DateTimePicker { Format = DateTimePickerFormat.Custom, CustomFormat = "HH:mm", ShowUpDown = true, Width = 115 };
-            times.Controls.Add(startPicker); times.Controls.Add(new Label { Text = Lang.T("至"), Width = 28, Height = 26, TextAlign = ContentAlignment.MiddleCenter }); times.Controls.Add(endPicker);
-            AddRow(table, Lang.T("上课时间"), times, 42);
+            // 全天: the times give way to a number of days. The row places its controls itself (left to right,
+            // vertically centred) so switching between the two always lays them out again.
+            timeRow = new Panel { Dock = DockStyle.Fill };
+            Panel times = timeRow;
+            allDayBox = new CheckBox { Name = "event-all-day", Text = Lang.T("全天"), AutoSize = true, Margin = new Padding(0, 4, 12, 0) };
+            startPicker = new DateTimePicker { Format = DateTimePickerFormat.Custom, CustomFormat = "HH:mm", ShowUpDown = true, Width = 100 };
+            endPicker = new DateTimePicker { Format = DateTimePickerFormat.Custom, CustomFormat = "HH:mm", ShowUpDown = true, Width = 100 };
+            toLabel = new Label { Text = Lang.T("至"), Width = 28, Height = 26, TextAlign = ContentAlignment.MiddleCenter };
+            daysBox = new NumericUpDown { Name = "event-days", Minimum = 1, Maximum = 366, Value = 1, Width = 70 };
+            daysUnit = new Label { Text = Lang.T("天"), AutoSize = true, Margin = new Padding(4, 6, 0, 0) };
+            times.Controls.Add(allDayBox); times.Controls.Add(startPicker); times.Controls.Add(toLabel); times.Controls.Add(endPicker); times.Controls.Add(daysBox); times.Controls.Add(daysUnit);
+            allDayBox.CheckedChanged += delegate { ShowAllDay(); };
+            timeRow.Resize += delegate { ArrangeTimeRow(); };
+            AddRow(table, Lang.T("时间"), times, 42);
             times.Margin = Padding.Empty;
             locationBox = new TextBox(); locationBox.MaxLength = 300; AddRow(table, Lang.T("地点"), locationBox, 42);
             notesBox = new TextBox { Multiline = true, ScrollBars = ScrollBars.Vertical, MaxLength = 10000 }; AddRow(table, Lang.T("备注"), notesBox, 78);
@@ -1323,6 +1407,34 @@ namespace DeskStudy
             footer.Controls.Add(buttons, 0, 1);
         }
 
+        private void ShowAllDay()
+        {
+            bool whole = allDayBox.Checked;
+            startPicker.Visible = toLabel.Visible = endPicker.Visible = !whole;
+            daysBox.Visible = daysUnit.Visible = whole;
+            // A single changed occurrence keeps the series' length.
+            daysBox.Enabled = seriesMode;
+            ArrangeTimeRow();
+        }
+        private void ArrangeTimeRow()
+        {
+            if (timeRow == null) return;
+            float scale = DeviceScale();
+            int x = 0, gap = (int)Math.Round(6 * scale), field = startPicker.PreferredSize.Height;
+            // Sizes are set here, from the screen scale, so they are never scaled twice.
+            var sizes = new Dictionary<Control, Size> {
+                { allDayBox, allDayBox.PreferredSize }, { startPicker, new Size((int)(100 * scale), field) }, { endPicker, new Size((int)(100 * scale), field) },
+                { toLabel, new Size((int)(26 * scale), field) }, { daysBox, new Size((int)(64 * scale), daysBox.PreferredSize.Height) }, { daysUnit, daysUnit.PreferredSize } };
+            // Which controls show follows the checkbox (Visible reads false until the window is on screen).
+            foreach (Control c in allDayBox.Checked ? new Control[] { allDayBox, daysBox, daysUnit } : new Control[] { allDayBox, startPicker, toLabel, endPicker })
+            {
+                Size size = sizes[c];
+                c.SetBounds(x, Math.Max(0, (timeRow.ClientSize.Height - size.Height) / 2), size.Width, size.Height);
+                x += size.Width + gap;
+            }
+        }
+        private float DeviceScale() { using (var g = CreateGraphics()) return g.DpiX / 96F; }
+
         private static string TimeZoneLabel(string id)
         {
             try
@@ -1357,7 +1469,10 @@ namespace DeskStudy
             TimeSpan start; if (!TimeSpan.TryParse(source.StartTime, out start)) start = TimeSpan.FromHours(9);
             TimeSpan end; if (!TimeSpan.TryParse(source.EndTime, out end)) end = TimeSpan.FromHours(10);
             startPicker.Value = date.Date.Add(start); endPicker.Value = date.Date.Add(end);
-            colorBox.SelectedIndex = Math.Max(0, Array.IndexOf(palette, source.Color));
+            allDayBox.Checked = source.AllDay; daysBox.Value = Math.Max(1, Math.Min(366, source.Days)); ShowAllDay();
+            int known = Array.IndexOf(palette, source.Color);
+            if (known < 0 && !String.IsNullOrEmpty(source.Color)) { colorBox.Items.Add(Lang.T("原来的颜色")); keptColor = source.Color; known = colorBox.Items.Count - 1; }
+            colorBox.SelectedIndex = Math.Max(0, known);
             repeatBox.SelectedIndex = Math.Max(0, Math.Min(2, source.RepeatWeeks));
             for (int i = 0; i < 7; i++) weekdays.SetItemChecked(i, source.WeekDays != null && source.WeekDays.Contains((i + 1) % 7));
             if (weekdays.CheckedItems.Count == 0) weekdays.SetItemChecked(((int)date.DayOfWeek + 6) % 7, true);
@@ -1368,7 +1483,8 @@ namespace DeskStudy
             if (String.IsNullOrWhiteSpace(titleBox.Text)) { error.Text = Lang.T("请填写日程名称。"); titleBox.Focus(); return; }
             TimeSpan start = new TimeSpan(startPicker.Value.Hour, startPicker.Value.Minute, 0);
             TimeSpan end = new TimeSpan(endPicker.Value.Hour, endPicker.Value.Minute, 0);
-            if (end <= start) { error.Text = Lang.T("结束时间须晚于开始时间；跨天日程请分成两条。"); return; }
+            bool whole = allDayBox.Checked;
+            if (!whole && end <= start) { error.Text = Lang.T("结束时间须晚于开始时间；跨天日程请分成两条，或勾选「全天」。"); return; }
             int repeat = seriesMode ? repeatBox.SelectedIndex : 0;
             if (repeat > 0 && untilPicker.Value.Date < datePicker.Value.Date) { error.Text = Lang.T("循环截止日期不能早于开始日期。"); return; }
             if (repeat > 0 && (untilPicker.Value.Date - datePicker.Value.Date).TotalDays > 36600) { error.Text = Lang.T("循环跨度不能超过 100 年。"); return; }
@@ -1376,8 +1492,9 @@ namespace DeskStudy
             List<int> days = new List<int>(); foreach (int index in weekdays.CheckedIndices) days.Add((index + 1) % 7);
             Result = new CalendarEvent {
                 Id = source.Id, Title = titleBox.Text.Trim(), Date = datePicker.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-                StartTime = startPicker.Value.ToString("HH:mm", CultureInfo.InvariantCulture), EndTime = endPicker.Value.ToString("HH:mm", CultureInfo.InvariantCulture),
-                Location = locationBox.Text.Trim(), Notes = notesBox.Text, Color = palette[Math.Max(0, colorBox.SelectedIndex)],
+                StartTime = whole ? "00:00" : startPicker.Value.ToString("HH:mm", CultureInfo.InvariantCulture), EndTime = whole ? "23:59" : endPicker.Value.ToString("HH:mm", CultureInfo.InvariantCulture),
+                AllDay = whole, Days = whole ? (int)daysBox.Value : 1,
+                Location = locationBox.Text.Trim(), Notes = notesBox.Text, Color = colorBox.SelectedIndex >= palette.Length && keptColor != null ? keptColor : palette[Math.Max(0, Math.Min(palette.Length - 1, colorBox.SelectedIndex))],
                 TimeZoneId = String.IsNullOrWhiteSpace(source.TimeZoneId) ? TimeZoneInfo.Local.Id : source.TimeZoneId,
                 RepeatWeeks = repeat, RepeatEndDate = untilPicker.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), WeekDays = days,
                 RecurrenceAnchorDate = repeat > 0 && anchorPicker.Checked ? anchorPicker.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",

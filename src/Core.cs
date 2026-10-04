@@ -112,8 +112,13 @@ namespace DeskStudy
         public List<int> WeekDays { get; set; }
         public List<string> ExcludedDates { get; set; }
         public List<EventOverride> Overrides { get; set; }
+        // An all-day event covers whole days instead of a time; Days is how many, from Date on. Older versions
+        // read it as an ordinary 00:00–23:59 event, which is why those times are still stored.
+        public bool AllDay { get; set; }
+        public int Days { get; set; }
         public CalendarEvent()
         {
+            Days = 1;
             Id = Guid.NewGuid().ToString("N"); Title = Lang.T("新日程");
             Date = DateTime.Today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture); StartTime = "09:00"; EndTime = "10:00";
             Location = ""; Notes = ""; Color = "#6A85B6"; TimeZoneId = TimeZoneInfo.Local.Id;
@@ -143,6 +148,8 @@ namespace DeskStudy
         public string Location { get; set; }
         public string Notes { get; set; }
         public string Color { get; set; }
+        public bool AllDay { get; set; }
+        public int Days { get; set; }
         // Set for an Outlook occurrence: read-only, not part of any series here.
         [System.Web.Script.Serialization.ScriptIgnore] public OutlookEvent External { get; set; }
     }
@@ -275,21 +282,24 @@ namespace DeskStudy
             {
                 DateTime start = TimeUtil.ParseDate(e.Date);
                 DateTime end = e.RepeatWeeks == 0 ? start : TimeUtil.ParseDate(e.RepeatEndDate);
-                DateTime first = from > start ? from : start;
+                // An all-day event that began a few days earlier can still reach into the window.
+                int span = e.AllDay ? Math.Max(1, e.Days) : 1;
+                DateTime reach = from.AddDays(1 - span);
+                DateTime first = reach > start ? reach : start;
                 DateTime last = to < end ? to : end;
                 for (DateTime day = first; day <= last; day = day.AddDays(1))
                 {
                     string key = day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
                     if (!IsScheduled(e, day) || e.ExcludedDates.Contains(key) || e.Overrides.Any(o => o.OriginalDate == key)) continue;
-                    result.Add(new Occurrence { Series = e, KeyDate = key, Date = key, StartTime = e.StartTime, EndTime = e.EndTime, Title = e.Title, Location = e.Location, Notes = e.Notes, Color = e.Color });
+                    result.Add(new Occurrence { Series = e, KeyDate = key, Date = key, StartTime = e.StartTime, EndTime = e.EndTime, Title = e.Title, Location = e.Location, Notes = e.Notes, Color = e.Color, AllDay = e.AllDay, Days = span });
                 }
                 // Overrides may move into the requested window from another week/month.
                 foreach (EventOverride o in e.Overrides)
                 {
                     DateTime original = TimeUtil.ParseDate(o.OriginalDate);
                     DateTime date = TimeUtil.ParseDate(o.Date);
-                    if (date < from || date > to || !IsScheduled(e, original) || e.ExcludedDates.Contains(o.OriginalDate)) continue;
-                    result.Add(new Occurrence { Series = e, KeyDate = o.OriginalDate, Date = o.Date, StartTime = o.StartTime, EndTime = o.EndTime, Title = o.Title, Location = o.Location, Notes = o.Notes, Color = o.Color });
+                    if (date < reach || date > to || !IsScheduled(e, original) || e.ExcludedDates.Contains(o.OriginalDate)) continue;
+                    result.Add(new Occurrence { Series = e, KeyDate = o.OriginalDate, Date = o.Date, StartTime = o.StartTime, EndTime = o.EndTime, Title = o.Title, Location = o.Location, Notes = o.Notes, Color = o.Color, AllDay = e.AllDay, Days = span });
                 }
             }
             return result.OrderBy(o => o.Date, StringComparer.Ordinal).ThenBy(o => o.StartTime, StringComparer.Ordinal).ThenBy(o => o.Title, StringComparer.Ordinal).ToList();
@@ -664,6 +674,7 @@ namespace DeskStudy
                 Require(e != null, Lang.T("日程不能为空。")); Id(e.Id, ids); Text(e.Title, 1000, Lang.T("日程名称"), true); Date(e.Date); Times(e.StartTime, e.EndTime);
                 Text(e.Location, 4000, Lang.T("地点"), false); Text(e.Notes, 100000, Lang.T("备注"), false); Color(e.Color); Zone(e.TimeZoneId);
                 Require(e.RepeatWeeks == 0 || e.RepeatWeeks == 1 || e.RepeatWeeks == 2, Lang.T("循环周期无效。"));
+                Require(e.Days >= 1 && e.Days <= 366, Lang.T("全天日程的天数应在 1 到 366 之间。"));
                 Text(e.RecurrenceAnchorDate, 10, Lang.T("循环教学周起点"), false);
                 if (e.RecurrenceAnchorDate.Length > 0) Date(e.RecurrenceAnchorDate);
                 Require(e.WeekDays != null && e.WeekDays.Count <= 7 && e.WeekDays.All(d => d >= 0 && d <= 6) && e.WeekDays.Distinct().Count() == e.WeekDays.Count, Lang.T("循环星期设置无效。"));

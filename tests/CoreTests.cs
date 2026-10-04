@@ -289,6 +289,49 @@ internal static class CoreTests
                 Assert(OutlookLogic.IsCalendarLink("https://outlook.office365.com/x/calendar.ics") && OutlookLogic.IsCalendarLink("webcal://x/y.ics") && !OutlookLogic.IsCalendarLink("http://x/y.ics") && !OutlookLogic.IsCalendarLink("file:///c:/x.ics"), "Only https and webcal links.");
                 Assert(OutlookLogic.DownloadAddress("webcal://x/y.ics") == "https://x/y.ics", "webcal is fetched over https.");
             });
+            Run("Outlook to local: weekly and two-weekly courses, gaps, moves, irregular, all-day, midnight; same occurrences", delegate
+            {
+                var cache = new OutlookCache();
+                Action<string, string, string, string, string, string> add = delegate(string uid, string title, string date, string start, string end, string place)
+                { cache.Events.Add(new OutlookEvent { Uid = uid, Title = title, Start = date + "T" + start + ":00", End = (end.Length > 5 ? end : date + "T" + end) + (end.Length > 5 ? "" : ":00"), Location = place }); };
+                // Tue and Thu lectures for six weeks, one week off; one Thursday moved to the Friday afternoon.
+                DateTime monday = D("2026-10-05");
+                for (int w = 0; w < 6; w++)
+                    foreach (int d in new[] { 1, 3 })
+                    {
+                        if (w == 2) continue;
+                        string date = monday.AddDays(7 * w + d).ToString("yyyy-MM-dd");
+                        if (w == 4 && d == 3) { add("lecture", "Analysis", monday.AddDays(7 * w + 4).ToString("yyyy-MM-dd"), "14:00", "15:00", "67/1033"); continue; }
+                        add("lecture", "Analysis", date, "09:00", "11:00", "67/1033");
+                    }
+                // Every second Monday.
+                for (int w = 0; w < 8; w += 2) add("lab", "Lab", monday.AddDays(7 * w).ToString("yyyy-MM-dd"), "13:00", "16:00", "B59");
+                // Irregular dates.
+                foreach (string date in new[] { "2026-10-07", "2026-10-19", "2026-11-03" }) add("office", "Office hour", date, "12:00", "12:30", "");
+                // Across midnight.
+                add("night", "Observatory", "2026-10-09", "22:00", "2026-10-10T01:00:00", "Roof");
+                cache.Events.Add(new OutlookEvent { Uid = "reading", Title = "Reading week", AllDay = true, Start = "2026-11-02T00:00:00", End = "2026-11-07T00:00:00" });
+                for (int w = 0; w < 4; w++) cache.Events.Add(new OutlookEvent { Uid = "gym", Title = "Sports day", AllDay = true, Start = monday.AddDays(7 * w + 2).ToString("yyyy-MM-dd") + "T00:00:00", End = monday.AddDays(7 * w + 3).ToString("yyyy-MM-dd") + "T00:00:00" });
+                var options = new OutlookOptions(); options.TitleColors["Lab"] = "#123456";
+                List<CalendarEvent> local = OutlookLogic.ToLocal(cache, options);
+                var lecture = local.Single(e => e.Title == "Analysis" && e.RepeatWeeks > 0);
+                Assert(lecture.RepeatWeeks == 1 && lecture.WeekDays.SequenceEqual(new[] { 2, 4 }) && lecture.StartTime == "09:00" && lecture.EndTime == "11:00"
+                    && lecture.ExcludedDates.Contains("2026-10-20") && lecture.ExcludedDates.Contains("2026-10-22") && lecture.ExcludedDates.Contains("2026-11-05"), "Tue/Thu course with the week off and the moved Thursday excluded: " + String.Join(",", lecture.ExcludedDates));
+                Assert(local.Any(e => e.Title == "Analysis" && e.RepeatWeeks == 0 && e.Date == "2026-11-06" && e.StartTime == "14:00"), "The moved lecture is its own event.");
+                var lab = local.Single(e => e.Title == "Lab");
+                Assert(lab.RepeatWeeks == 2 && lab.ExcludedDates.Count == 0 && lab.RecurrenceAnchorDate == "2026-10-05" && lab.Color == "#123456", "Every second Monday, with the chosen color.");
+                Assert(local.Count(e => e.Title == "Office hour" && e.RepeatWeeks == 0) == 3, "Irregular dates stay single events.");
+                Assert(local.Any(e => e.Title == "Observatory" && e.Date == "2026-10-09" && e.StartTime == "22:00" && e.EndTime == "23:59") && local.Any(e => e.Title == "Observatory" && e.Date == "2026-10-10" && e.StartTime == "00:00" && e.EndTime == "01:00"), "An event across midnight becomes one piece per day.");
+                Assert(local.Any(e => e.Title == "Reading week" && e.AllDay && e.Days == 5 && e.RepeatWeeks == 0), "A five-day all-day event.");
+                Assert(local.Any(e => e.Title == "Sports day" && e.AllDay && e.RepeatWeeks == 1 && e.WeekDays.SequenceEqual(new[] { 3 })), "A weekly all-day event becomes a weekly all-day course.");
+                // The local calendar then shows exactly what Outlook showed.
+                var data = new AppData(); data.Events.AddRange(local);
+                Assert(local.All(e => { try { var copy = new AppData(); copy.Events.Add(e); Validation.Check(copy); return true; } catch (Exception) { return false; } }), "Every copied event is valid data.");
+                var expected = OutlookLogic.Timed(cache, options, D("2026-09-01"), D("2027-01-31")).Select(o => o.Date + " " + o.StartTime + "-" + o.EndTime + " " + o.Title).OrderBy(s => s).ToList();
+                var actual = CalendarEngine.GetOccurrences(data, D("2026-09-01"), D("2027-01-31")).Where(o => !o.AllDay).Select(o => o.Date + " " + o.StartTime + "-" + o.EndTime + " " + o.Title).OrderBy(s => s).ToList();
+                Assert(expected.SequenceEqual(actual), "Copied courses produce the same timed occurrences as Outlook: missing " + String.Join("; ", expected.Except(actual)) + " extra " + String.Join("; ", actual.Except(expected)));
+                Assert(OutlookLogic.ColorFor(options, new OutlookEvent { Title = "Analysis" }) == OutlookLogic.ColorFor(options, new OutlookEvent { Title = "Analysis", Uid = "other" }), "Events of the same name share a color.");
+            });
             Run("Invalid/future import: reject without mutating live data or on-disk data", delegate
             {
                 AppStore store = NewStore("invalid-import"); store.Data.Books[0].Pages[0].Text = "Do not change"; store.Save();

@@ -586,6 +586,25 @@ namespace DeskStudy
             { "上次同步：{0} · 共 {1} 个日程", "Last sync: {0} · {1} events" },
             { "Outlook 日历设置无效。", "Invalid Outlook calendar settings." },
             { "Outlook 类别颜色无效。", "Invalid Outlook category colors." },
+            // All-day events, Outlook colors and copying.
+            { "更改这个日程的颜色…", "Change this event's color…" },
+            { "关闭", "Close" },
+            { "天", "days" },
+            { "原来的颜色", "Original color" },
+            { "结束时间须晚于开始时间；跨天日程请分成两条，或勾选「全天」。", "The end must be after the start; split an event across midnight in two, or tick All day." },
+            { "全天日程的天数应在 1 到 366 之间。", "An all-day event lasts 1 to 366 days." },
+            { "（无标题）", "(No title)" },
+            { "日程颜色", "Event colors" },
+            { "复制到本地并停止同步", "Copy to my calendar and stop syncing" },
+            { "同步后，这里会列出日历里的每个日程，可以分别设颜色。", "After a sync, each event in the calendar is listed here and can have its own color." },
+            { "日程颜色：{0}", "Event color: {0}" },
+            { "还没有同步到 Outlook 日程，没有可复制的内容。", "No Outlook events have been synced yet, so there is nothing to copy." },
+            { "复制到本地", "Copy to my calendar" },
+            { "将把 Outlook 日历复制为本地日程：{0} 个循环课程、{1} 个单次日程，颜色保持不变。", "The Outlook calendar will be copied into your own calendar: {0} recurring and {1} single events, in the same colors." },
+            { "之后停止同步，也不再显示 Outlook 日历；复制来的日程可以像自己的课程一样修改。复制前会自动备份，可在「数据与应用」中恢复。", "Syncing then stops and the Outlook calendar is no longer shown; the copies can be edited like your own events. A backup is made first; restore it under Data and app if needed." },
+            { "只复制已同步的范围（今天前 {0} 天到今后 {1} 天）。", "Only the synced range is copied ({0} days back to {1} days ahead)." },
+            { "已复制 {0} 个日程到本地日历，Outlook 同步已停止。", "{0} events copied into your calendar. Outlook syncing has stopped." },
+            { "Outlook 日程颜色无效。", "Invalid Outlook event colors." },
         };
     }
 }

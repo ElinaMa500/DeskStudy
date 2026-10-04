@@ -4,6 +4,7 @@ using System.Net;
 using System.Text;
 using System.Threading;
 using System.Web.Script.Serialization;
+using System.Collections.Generic;
 using System.Windows.Forms;
 
 namespace DeskStudy
@@ -132,6 +133,28 @@ namespace DeskStudy
                 if (File.Exists(OutlookCachePath)) File.Replace(temp, OutlookCachePath, null); else File.Move(temp, OutlookCachePath);
             }
             catch (Exception) { }
+        }
+
+        public void SetOutlookTitleColor(string title, string hex)
+        {
+            Data.Settings.Calendar.Outlook.TitleColors[title ?? ""] = hex; SettingsChanged();
+        }
+
+        // Copies the Outlook calendar into the local calendar and stops the subscription. A backup is made first,
+        // so the step can be undone from 数据与应用 → 恢复备份.
+        public List<CalendarEvent> PlanOutlookImport() { return OutlookLogic.ToLocal(outlook, Data.Settings.Calendar.Outlook); }
+        public int ImportOutlook()
+        {
+            var events = PlanOutlookImport();
+            foreach (var w in Widgets) w.Remember();
+            Flush(); Store.CreateBackup();
+            Data.Events.AddRange(events);
+            OutlookOptions o = Data.Settings.Calendar.Outlook;
+            o.Url = ""; o.Show = false;
+            outlook = new OutlookCache();
+            try { if (File.Exists(OutlookCachePath)) File.Delete(OutlookCachePath); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+            SettingsChanged();
+            return events.Count;
         }
 
         // Outlook reminders, added to the ones from the notebooks.

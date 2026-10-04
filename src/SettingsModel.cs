@@ -225,6 +225,7 @@ namespace DeskStudy
             Require(o != null && o.Url != null && o.Url.Length <= 2000 && OutlookOptions.RefreshChoices.Contains(o.RefreshMinutes) && o.LeadMinutes >= 0 && o.LeadMinutes <= 1440, Lang.T("Outlook 日历设置无效。"));
             Require(o.Url == "" || OutlookLogic.IsCalendarLink(o.Url), Lang.T("Outlook 日历链接应以 https:// 开头，或是 webcal:// 链接。"));
             Require(o.CategoryColors != null && o.CategoryColors.Count <= 500 && o.CategoryColors.All(p => p.Key != null && p.Key.Length <= 255 && p.Value != null && p.Value.Length == 7 && p.Value[0] == '#' && p.Value.Skip(1).All(Uri.IsHexDigit)), Lang.T("Outlook 类别颜色无效。"));
+            Require(o.TitleColors != null && o.TitleColors.Count <= 2000 && o.TitleColors.All(p => p.Key != null && p.Key.Length <= 1000 && p.Value != null && p.Value.Length == 7 && p.Value[0] == '#' && p.Value.Skip(1).All(Uri.IsHexDigit)), Lang.T("Outlook 日程颜色无效。"));
             DateTime start = TimeUtil.ParseDate(c.SemesterStart), end = TimeUtil.ParseDate(c.SemesterEnd);
             Require(end >= start && (end - start).TotalDays <= 36600, Lang.T("学期日期范围无效。")); TimeUtil.ParseDate(c.TeachingWeekOne);
             ReminderOptions r = settings.Reminders;

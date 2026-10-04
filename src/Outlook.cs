@@ -18,7 +18,10 @@ namespace DeskStudy
         public int LeadMinutes { get; set; }
         // Colors for categories named by the user. The ICS link carries a category's name but not its color.
         public Dictionary<string, string> CategoryColors { get; set; }
-        public OutlookOptions() { Url = ""; Show = true; RefreshMinutes = 30; Remind = true; LeadMinutes = 15; CategoryColors = new Dictionary<string, string>(); }
+        // Colors chosen per event name. Outlook's published links usually carry no categories at all,
+        // so events are told apart by name: each name gets a color of its own, which can be changed.
+        public Dictionary<string, string> TitleColors { get; set; }
+        public OutlookOptions() { Url = ""; Show = true; RefreshMinutes = 30; Remind = true; LeadMinutes = 15; CategoryColors = new Dictionary<string, string>(); TitleColors = new Dictionary<string, string>(); }
         public static readonly int[] RefreshChoices = { 15, 30, 60, 120 };
     }
 
@@ -83,6 +86,20 @@ namespace DeskStudy
             int hash = 0; foreach (char c in category) hash = unchecked(hash * 31 + c);
             return Palette[(hash & 0x7FFFFFFF) % Palette.Length];
         }
+        // An event's color: one chosen for its name, else its category's, else a color of its own by name.
+        public static string ColorFor(OutlookOptions options, OutlookEvent e)
+        {
+            string chosen;
+            if (options != null && options.TitleColors != null && options.TitleColors.TryGetValue(e.Title ?? "", out chosen)) return chosen;
+            if (!String.IsNullOrEmpty(e.Category)) return ColorFor(options, e.Category);
+            return Palette[(Mix(e.Title ?? "") & 0x7FFFFFFF) % Palette.Length];
+        }
+        static int Mix(string text) { int hash = 0; foreach (char c in text) hash = unchecked(hash * 31 + c); return hash; }
+        // The distinct names in the calendar, for the color list in settings.
+        public static List<string> Titles(OutlookCache cache)
+        {
+            return cache == null ? new List<string>() : cache.Events.Select(e => e.Title ?? "").Where(t => t != "").Distinct().OrderBy(t => t, StringComparer.CurrentCulture).ToList();
+        }
         public static string ColorFor(OutlookOptions options, string category)
         {
             string chosen;
@@ -121,7 +138,7 @@ namespace DeskStudy
                     list.Add(new Occurrence {
                         External = e, KeyDate = day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), Date = day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
                         StartTime = s.ToString("HH:mm", CultureInfo.InvariantCulture), EndTime = f.ToString("HH:mm", CultureInfo.InvariantCulture),
-                        Title = e.Title, Location = e.Location, Notes = e.Notes, Color = ColorFor(options, e.Category)
+                        Title = e.Title, Location = e.Location, Notes = e.Notes, Color = ColorFor(options, e)
                     });
                 }
             }
@@ -160,6 +177,94 @@ namespace DeskStudy
             var live = new HashSet<string>(cache.Events.Select(x => Hash(x.Key)));
             cache.Reminded.RemoveAll(k => !live.Contains(k));
             return result;
+        }
+
+        // ---- copying the Outlook calendar into the local calendar
+
+        sealed class Piece
+        {
+            public DateTime Date; public bool AllDay; public int Days = 1; public string Start = "00:00", End = "23:59";
+            public string Title, Location, Notes, Color;
+            public string Pattern { get { return (AllDay ? "D" + Days : Start + "-" + End) + "|" + Title + "|" + Location; } }
+        }
+
+        // Turns the downloaded occurrences into local events: each Outlook series whose occurrences keep one
+        // time, name and place on fixed weekdays becomes a weekly (or two-weekly) course, its missing weeks
+        // excluded; everything else (changed single occurrences, other rhythms) becomes single events.
+        public static List<CalendarEvent> ToLocal(OutlookCache cache, OutlookOptions options)
+        {
+            var result = new List<CalendarEvent>();
+            if (cache == null) return result;
+            foreach (var series in cache.Events.GroupBy(e => e.Uid ?? ""))
+            {
+                var pieces = new List<Piece>();
+                foreach (OutlookEvent e in series.OrderBy(x => x.Start, StringComparer.Ordinal))
+                {
+                    string title = String.IsNullOrWhiteSpace(e.Title) ? Lang.T("（无标题）") : Clip(e.Title.Trim(), 1000);
+                    var common = new Piece { Title = title, Location = Clip(e.Location ?? "", 4000), Notes = Clip(e.Notes ?? "", 100000), Color = ColorFor(options, e) };
+                    DateTime start = e.StartLocal, end = e.EndLocal;
+                    if (e.AllDay) { pieces.Add(Copy(common, start.Date, true, Math.Max(1, Math.Min(366, (end.Date - start.Date).Days)), "00:00", "23:59")); continue; }
+                    if (end <= start) end = start.AddMinutes(30);
+                    // Local events do not cross midnight: one piece per day.
+                    for (DateTime day = start.Date; day < end; day = day.AddDays(1))
+                    {
+                        DateTime s = start > day ? start : day, f = end < day.AddDays(1) ? end : day.AddDays(1).AddMinutes(-1);
+                        if (f <= s) continue;
+                        pieces.Add(Copy(common, day, false, 1, s.ToString("HH:mm", CultureInfo.InvariantCulture), f.ToString("HH:mm", CultureInfo.InvariantCulture)));
+                    }
+                }
+                foreach (var same in pieces.GroupBy(p => p.Pattern))
+                {
+                    var list = same.OrderBy(p => p.Date).ToList();
+                    CalendarEvent course = list.Count >= 2 ? Course(list) : null;
+                    if (course != null) { result.Add(course); continue; }
+                    foreach (Piece p in list) result.Add(Single(p));
+                }
+            }
+            return result.OrderBy(e => e.Date, StringComparer.Ordinal).ThenBy(e => e.StartTime, StringComparer.Ordinal).ToList();
+        }
+
+        static Piece Copy(Piece p, DateTime date, bool allDay, int days, string start, string end)
+        {
+            return new Piece { Date = date, AllDay = allDay, Days = days, Start = start, End = end, Title = p.Title, Location = p.Location, Notes = p.Notes, Color = p.Color };
+        }
+        static string Clip(string text, int length) { return text.Length <= length ? text : text.Substring(0, length); }
+        static CalendarEvent Base(Piece p)
+        {
+            return new CalendarEvent {
+                Title = p.Title, Location = p.Location, Notes = p.Notes, Color = p.Color, Date = p.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                StartTime = p.Start, EndTime = p.End, AllDay = p.AllDay, Days = p.Days, TimeZoneId = TimeZoneInfo.Local.Id,
+                RepeatWeeks = 0, RepeatEndDate = p.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), RecurrenceAnchorDate = "",
+                WeekDays = new List<int> { (int)p.Date.DayOfWeek }, ExcludedDates = new List<string>(), Overrides = new List<EventOverride>()
+            };
+        }
+        static CalendarEvent Single(Piece p) { return Base(p); }
+
+        // Same weekdays every week (or every second week) from the first to the last date; gaps become exclusions.
+        static CalendarEvent Course(List<Piece> list)
+        {
+            var dates = new HashSet<DateTime>(list.Select(p => p.Date));
+            var weekdays = new HashSet<DayOfWeek>(list.Select(p => p.Date.DayOfWeek));
+            DateTime first = list[0].Date, last = list[list.Count - 1].Date;
+            DateTime monday = first.AddDays(-(((int)first.DayOfWeek + 6) % 7));
+            CalendarEvent best = null; int bestGaps = Int32.MaxValue;
+            foreach (int every in new[] { 1, 2 })
+            {
+                var expected = new List<DateTime>();
+                for (DateTime d = first; d <= last; d = d.AddDays(1))
+                    if (weekdays.Contains(d.DayOfWeek) && ((int)((d - monday).TotalDays / 7)) % every == 0) expected.Add(d);
+                if (!dates.All(d => expected.Contains(d))) continue;
+                var gaps = expected.Where(d => !dates.Contains(d)).ToList();
+                // A rhythm needs far fewer cancelled dates than real ones; otherwise they are just separate events.
+                if (gaps.Count * 2 > dates.Count || gaps.Count >= bestGaps) continue;
+                var course = Base(list[0]);
+                course.RepeatWeeks = every; course.RepeatEndDate = last.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+                course.WeekDays = weekdays.Select(w => (int)w).OrderBy(w => w).ToList();
+                course.RecurrenceAnchorDate = every == 2 ? first.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "";
+                course.ExcludedDates = gaps.Select(d => d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)).ToList();
+                best = course; bestGaps = gaps.Count;
+            }
+            return best;
         }
 
         public static string Hash(string value)

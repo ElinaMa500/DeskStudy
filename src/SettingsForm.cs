@@ -434,12 +434,13 @@ namespace DeskStudy
             })));
             outlookStatus = Ui.Label("", 8.5F, Ui.Muted); outlookStatus.Name = "outlook-status"; Add(card, outlookStatus);
             outlookCategories = new FlowLayoutPanel { Name = "outlook-categories", AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, WrapContents = true, Margin = new Padding(0, 4, 0, 0), MaximumSize = new Size(560, 0) };
-            Field(card, Lang.T("类别颜色"), outlookCategories);
+            Field(card, Lang.T("日程颜色"), outlookCategories);
             outlookShow = Check("outlook-show", Lang.T("在日历上显示 Outlook 日程")); Field(card, Lang.T("显示"), outlookShow);
             outlookRefresh = Combo("outlook-refresh", OutlookOptions.RefreshChoices.Select(m => new Choice(m.ToString(CultureInfo.InvariantCulture), Lang.T("每 {0} 分钟", m))).ToArray()); Field(card, Lang.T("自动刷新"), outlookRefresh);
             outlookRemind = Check("outlook-remind", Lang.T("日程开始前提醒")); outlookLead = Number("outlook-lead", 0, 1440, 5);
             var leadUnit = Ui.Label(Lang.T("分钟前"), 9F, Ui.Text); leadUnit.Margin = new Padding(2, 10, 0, 0);
             Field(card, Lang.T("提醒"), Buttons(outlookRemind, outlookLead, leadUnit));
+            Add(card, Buttons(ActionButton("outlook-import", Lang.T("复制到本地并停止同步"), ImportOutlook)));
             Add(card, Ui.Label(Lang.T("获取链接：在 Outlook 网页版打开 设置 → 日历 → 共享日历 →「发布日历」，选择日历和「可查看所有详细信息」，点「发布」后复制 ICS 链接。拿到这个链接的人都能看到你的日程，请勿外传。"), 8.5F, Ui.Muted));
             outlookShow.CheckedChanged += delegate { ChangeSetting(delegate { app.Data.Settings.Calendar.Outlook.Show = outlookShow.Checked; }); };
             outlookRefresh.SelectedIndexChanged += delegate { ChangeSetting(delegate { app.Data.Settings.Calendar.Outlook.RefreshMinutes = Int32.Parse(SelectedId(outlookRefresh), CultureInfo.InvariantCulture); }); };
@@ -450,13 +451,29 @@ namespace DeskStudy
         // categories named by the user start with a palette color and can be matched to Outlook here.
         private void RefreshOutlookCategories()
         {
-            OutlookOptions o = app.Data.Settings.Calendar.Outlook; var categories = app.Outlook.Categories;
-            string signature = String.Join("|", categories.Select(c => c + "=" + OutlookLogic.ColorFor(o, c)));
+            OutlookOptions o = app.Data.Settings.Calendar.Outlook; var categories = app.Outlook.Categories; var titles = OutlookLogic.Titles(app.Outlook);
+            string signature = String.Join("|", categories.Select(c => "c:" + c + "=" + OutlookLogic.ColorFor(o, c)).Concat(titles.Select(t => "t:" + t + "=" + OutlookLogic.ColorFor(o, new OutlookEvent { Title = t }))));
             if (signature == outlookCategorySignature) return;
             outlookCategorySignature = signature;
             foreach (Control old in outlookCategories.Controls.Cast<Control>().ToList()) old.Dispose();
             outlookCategories.Controls.Clear();
-            if (categories.Count == 0) outlookCategories.Controls.Add(Ui.Label(Lang.T("同步后，这里会列出日历里用到的 Outlook 类别。"), 8.5F, Ui.Muted));
+            if (categories.Count == 0 && titles.Count == 0) outlookCategories.Controls.Add(Ui.Label(Lang.T("同步后，这里会列出日历里的每个日程，可以分别设颜色。"), 8.5F, Ui.Muted));
+            foreach (string title in titles)
+            {
+                string name = title; Color color = ColorTranslator.FromHtml(OutlookLogic.ColorFor(o, new OutlookEvent { Title = name }));
+                var swatch = new Button { Text = "■  " + name, AutoSize = true, FlatStyle = FlatStyle.Flat, ForeColor = color, BackColor = Color.White, Margin = new Padding(0, 0, 6, 6), UseMnemonic = false, Name = "outlook-title-" + outlookCategories.Controls.Count, AccessibleName = Lang.T("日程颜色：{0}", name) };
+                swatch.FlatAppearance.BorderColor = Ui.Border;
+                swatch.Click += delegate
+                {
+                    using (var dialog = new ColorDialog { Color = color, FullOpen = true })
+                    {
+                        if (dialog.ShowDialog(this) != DialogResult.OK) return;
+                        Run(delegate { app.SetOutlookTitleColor(name, "#" + dialog.Color.R.ToString("X2") + dialog.Color.G.ToString("X2") + dialog.Color.B.ToString("X2")); });
+                        RefreshData();
+                    }
+                };
+                outlookCategories.Controls.Add(swatch);
+            }
             foreach (string category in categories)
             {
                 string name = category; Color color = ColorTranslator.FromHtml(OutlookLogic.ColorFor(o, name));
@@ -474,6 +491,20 @@ namespace DeskStudy
                 };
                 outlookCategories.Controls.Add(swatch);
             }
+        }
+
+        private void ImportOutlook()
+        {
+            var plan = app.PlanOutlookImport();
+            if (plan.Count == 0) { MessageBox.Show(this, Lang.T("还没有同步到 Outlook 日程，没有可复制的内容。"), Lang.T("复制到本地"), MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
+            int courses = plan.Count(e => e.RepeatWeeks > 0), singles = plan.Count - courses;
+            string text = Lang.T("将把 Outlook 日历复制为本地日程：{0} 个循环课程、{1} 个单次日程，颜色保持不变。", courses, singles) + "\n\n"
+                + Lang.T("之后停止同步，也不再显示 Outlook 日历；复制来的日程可以像自己的课程一样修改。复制前会自动备份，可在「数据与应用」中恢复。") + "\n\n"
+                + Lang.T("只复制已同步的范围（今天前 {0} 天到今后 {1} 天）。", OutlookLogic.DaysBack, OutlookLogic.DaysAhead);
+            if (MessageBox.Show(this, text, Lang.T("复制到本地并停止同步"), MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK) return;
+            int count = app.ImportOutlook();
+            RefreshData();
+            MessageBox.Show(this, Lang.T("已复制 {0} 个日程到本地日历，Outlook 同步已停止。", count), Lang.T("复制到本地"), MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
         private void RefreshOutlookCard()
