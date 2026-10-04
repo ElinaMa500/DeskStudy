@@ -1,17 +1,17 @@
-# 桌面课笺 1.5.1
+# 桌面课笺 1.6
 
 本地 Windows 桌面应用，包含可同时显示的日历、Todo 和 DDL 三个独立组件，以及统一设置中心。数据只保存在本机；默认不联网，只有订阅 Outlook 日历时才会访问你填写的那一个链接。
 
 ![日历、Todo 与 DDL 三个桌面组件](docs/images/overview.png)
 
 - **介绍页**：<https://elinama500.github.io/DeskStudy/>
-- **下载**：在 [Releases](https://github.com/ElinaMa500/DeskStudy/releases/latest) 页面下载 `DeskStudy-1.5.1-Windows.zip`，解压后双击 `DeskStudy.exe`。
+- **下载**：在 [Releases](https://github.com/ElinaMa500/DeskStudy/releases/latest) 页面下载 `DeskStudy-1.6-Windows.zip`，解压后双击 `DeskStudy.exe`。
 - **使用指南**：[USER_GUIDE.md](USER_GUIDE.md)（压缩包内为 `使用指南.html`）；English: [USER_GUIDE.en.md](USER_GUIDE.en.md)（压缩包内为 `User Guide.html`）。
 - **五种便签外观**：[LAYOUTS.md](LAYOUTS.md)。
 
 ## 启动与升级
 
-从源码构建时，程序输出到 `release-1.5.1` 文件夹，分发包为项目根目录的 `DeskStudy-1.5.1-Windows.zip`（由 `package.ps1` 生成）。解压后双击其中的 `DeskStudy.exe` 即可，无需安装或管理员权限。请保留程序同目录的 `DeskStudy.exe.config`。运行环境为 Windows 10/11 与 .NET Framework 4.8 或更新版本。
+从源码构建时，程序输出到 `release-1.6` 文件夹，分发包为项目根目录的 `DeskStudy-1.6-Windows.zip`（由 `package.ps1` 生成）。解压后双击其中的 `DeskStudy.exe` 即可，无需安装或管理员权限。请保留程序同目录的 `DeskStudy.exe.config`。运行环境为 Windows 10/11 与 .NET Framework 4.8 或更新版本。
 
 第一次使用是空白课表和两本各有一页的便签。应用不连接云端，也不读取 Outlook。
 

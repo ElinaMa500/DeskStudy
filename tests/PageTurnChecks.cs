@@ -80,6 +80,26 @@ public static class PageTurnChecks
         box.Checked = true; Pump(200);
         Assert(second.Tasks[0].Completed && !book.Pages[0].Tasks[0].Completed, "ticking a task on a reused row completes that page's task, not the one the row showed before");
         Edits(app);
+        NoSideways(app);
+    }
+
+    // Going from layout to layout (and size to size), the task list never keeps a horizontal scroll bar
+    // left over from the previous one.
+    static void NoSideways(AppController app)
+    {
+        var field = typeof(NotebookForm).GetField("_tasks", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        foreach (string layout in new[] { "Original", "Card", "Paper", "Clean", "Journal", "Card", "Original", "Paper", "Journal", "Clean", "Card" })
+        {
+            app.Data.Settings.NotebookLayout = layout; app.SettingsChanged(); Pump(350);
+            foreach (var notebook in app.Widgets.OfType<NotebookForm>())
+                foreach (int width in new[] { 520, 421 })
+                {
+                    notebook.Width = width; Pump(150);
+                    var list = (ScrollableControl)field.GetValue(notebook);
+                    if (list.HorizontalScroll.Visible) throw new Exception(layout + " at " + width + " px: the " + notebook.WidgetKey + " task list shows a horizontal scroll bar (content " + list.DisplayRectangle.Width + " px, room " + list.ClientSize.Width + " px)");
+                }
+        }
+        Assert(true, "switching between all five layouts and widths never leaves a horizontal scroll bar in either notebook");
     }
 
     [System.Runtime.InteropServices.DllImport("user32.dll")] static extern IntPtr SendMessage(IntPtr hwnd, int msg, IntPtr wparam, IntPtr lparam);

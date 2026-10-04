@@ -39,6 +39,7 @@
 
 ## 验证策略
 
+- 使用指南截图：`tests\run-layouts.ps1 -Guide zh` 和 `-Guide en` 用示例数据生成（不截真实屏幕），复制到 `docs\images\guide\zh|en` 后运行 `tools\shrink-png.ps1 -Path docs\images\guide`。该脚本把截图转为 256 色调色板 PNG；只有体积变小、且每个像素的颜色偏差不超过 72 时才替换，大约能小 40%。
 - 一键回归：`powershell -File tests\run-all.ps1`。脚本逐个运行全部测试套件（桌面类测试会打开真实窗口，所以不并行），每个套件一行结果。套件是否失败，以脚本是否抛错、测试程序是否返回非零为准，不看输出里的文字。单个套件超时（默认 600 秒）会被停止并记为失败。超时只会结束 `artifacts` 下的测试进程，不会动到正在使用的程序。有失败时退出码为 1，完整日志写入 `artifacts\run-all-时间.log`。`-Only core,outlook` 只跑指定套件，`-Packaged` 会另外打包，并跑打包版冒烟测试。
 
 - 核心测试覆盖循环日期与例外、时区、任务完成与提醒去重、数据完整性、旧版迁移、设置校验和备份恢复。

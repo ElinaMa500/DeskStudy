@@ -119,7 +119,10 @@ public static class GuideShots
         // The five layouts, the To-do notebook in each.
         var layouts = new[] { "Original", "Card", "Paper", "Clean", "Journal" };
         var pictures = new List<Bitmap>();
-        foreach (string layout in layouts) { app.Data.Settings.NotebookLayout = layout; app.SettingsChanged(); Pump(400); todo.Bounds = new Rectangle(1499, 0, 421, 520); Pump(250); pictures.Add(Picture(todo)); }
+        foreach (string layout in layouts)
+        {
+            app.Data.Settings.NotebookLayout = layout; app.SettingsChanged(); Pump(400); todo.Bounds = new Rectangle(1499, 0, 421, 520); Pump(250); pictures.Add(Picture(todo));
+        }
         var strip = new Bitmap(pictures.Sum(p => p.Width) + 16 * (pictures.Count + 1), pictures.Max(p => p.Height) + 32);
         using (var g = Graphics.FromImage(strip)) { g.Clear(Color.FromArgb(214, 222, 218)); int x = 16; foreach (var p in pictures) { g.DrawImage(p, x, 16); x += p.Width + 16; p.Dispose(); } }
         Save(strip, "layouts");

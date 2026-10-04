@@ -652,6 +652,9 @@ namespace DeskStudy
             _tasks.SuspendLayout();
             try { LayoutTaskCardsNow(); }
             finally { _tasks.ResumeLayout(true); }
+            // Measure the list again: it otherwise keeps the width its rows had before (another layout or a
+            // wider window) and shows a horizontal scroll bar.
+            _tasks.PerformLayout();
         }
         private void LayoutTaskCardsNow()
         {

@@ -426,7 +426,11 @@ namespace DeskStudy
             _newPageButton.SetBounds(width - newWidth, 0, newWidth, footer);
             _saveLabel.SetBounds(left + width - Px(90), _taskCount.Top, Px(90), small);
             _taskCount.Width = Math.Max(Px(65), width - Px(90));
-            UpdateSaveStatus(); LayoutTaskCards(); _modern.Invalidate();
+            UpdateSaveStatus(); LayoutTaskCards();
+            // The list remembers how wide its rows were in the previous layout or size; measure it again,
+            // or a horizontal scroll bar is left behind.
+            _tasks.PerformLayout();
+            _modern.Invalidate();
         }
         private void ArrangeOriginalNotes()
         {

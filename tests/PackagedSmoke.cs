@@ -17,7 +17,7 @@ public static class PackagedSmoke
         {
             string exe = Path.GetFullPath(args[0]);
             Assembly assembly = Assembly.LoadFrom(exe);
-            Assert(assembly.GetName().Version.ToString() == "1.5.1.0", "packaged executable has version 1.5.1.0");
+            Assert(assembly.GetName().Version.ToString() == "1.6.0.0", "packaged executable has version 1.6.0.0");
             Assert(assembly.EntryPoint != null && assembly.EntryPoint.GetCustomAttributes(typeof(STAThreadAttribute), false).Length == 1, "packaged executable contains its STA Windows application entry point");
             Type type = assembly.GetType("DeskStudy.AppController", true);
             for (int pass = 0; pass < 2; pass++)
