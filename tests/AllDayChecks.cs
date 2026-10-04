@@ -19,6 +19,7 @@ public static class AllDayChecks
     static void Pump(int ms) { var clock = Stopwatch.StartNew(); while (clock.ElapsedMilliseconds < ms) { Application.DoEvents(); Thread.Sleep(10); } }
     static IEnumerable<Control> All(Control root) { foreach (Control c in root.Controls) { yield return c; foreach (Control d in All(c)) yield return d; } }
     static string shots;
+    static bool sameColorOffered;
     static void Shot(string name, Control w)
     {
         using (var bmp = new Bitmap(w.Width, w.Height))
@@ -92,12 +93,18 @@ public static class AllDayChecks
 
         // Double-click a date: the editor opens with 全天 ticked; save a two-day event.
         var header = All(calendar).First(c => c.Name == "calendar-day-header");
-        bool ticked = false;
+        bool ticked = false; sameColorOffered = false;
         WhenOpen<CalendarEditor>(delegate(CalendarEditor f)
         {
             var box = All(f).OfType<CheckBox>().First(c => c.Name == "event-all-day"); ticked = box.Checked;
             ((NumericUpDown)All(f).First(c => c.Name == "event-days")).Value = 2;
             All(f).OfType<TextBox>().First().Text = "实习面试";
+            // The color list shows the colors other events use, by name, so the very same color can be picked.
+            var colors = (ComboBox)All(f).First(c => c.Name == "event-color");
+            var names = colors.Items.Cast<object>().Select(i => i.ToString()).ToList();
+            int same = names.FindIndex(n => n.Contains("英语写作"));
+            sameColorOffered = same >= 6 && names.Last().Contains("自定义") && colors.DrawMode == DrawMode.OwnerDrawFixed;
+            if (same >= 0) colors.SelectedIndex = same;
             Shot("editor", f);
             box.Checked = false; Pump(150); Shot("editor-timed", f);
             var timeRow = All(f).First(c => c.Name == "event-days").Parent;
@@ -110,6 +117,7 @@ public static class AllDayChecks
         Pump(300);
         var created = app.Data.Events.FirstOrDefault(e => e.Title == "实习面试");
         Assert(ticked && created != null && created.AllDay && created.Days == 2 && created.Date == day(5), "double-clicking a date opens the editor with 全天 ticked; saving makes an all-day event of that length");
+        Assert(sameColorOffered && String.Equals(created.Color, "#B08968", StringComparison.OrdinalIgnoreCase), "the color list offers the colors other events use (with swatches) and saves exactly that color: " + created.Color);
         Assert(Row(calendar).Any(o => o.Title == "实习面试"), "the new all-day event shows in the row at once");
         app.Save(); Assert(app.Flush(), "all-day events saved");
         Console.WriteLine("ALL-DAY SHOTS: " + shots);

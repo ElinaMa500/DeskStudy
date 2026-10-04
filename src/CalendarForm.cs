@@ -1315,7 +1315,15 @@ namespace DeskStudy
         private CheckBox allDayBox; private NumericUpDown daysBox; private Label daysUnit, toLabel; private Panel timeRow;
         private Label error;
         private readonly string[] palette = { "#6C9385", "#7196B1", "#A68EB5", "#C49472", "#BB818B", "#939C63" };
-        private string keptColor;
+        private static readonly string[] paletteNames = { "鼠尾草绿", "雾蓝", "浅紫", "杏茶", "玫瑰", "橄榄" };
+        // The events of the calendar, so the color list can offer the colors already in use.
+        internal static Func<IEnumerable<CalendarEvent>> Calendar = delegate { return new CalendarEvent[0]; };
+        private sealed class ColorChoice
+        {
+            public string Hex, Name; public bool Custom;
+            public override string ToString() { return Name; }
+        }
+        private int lastColorIndex;
 
         public CalendarEditor(CalendarEvent item, bool allowSeries, bool existing)
         {
@@ -1371,8 +1379,11 @@ namespace DeskStudy
             times.Margin = Padding.Empty;
             locationBox = new TextBox(); locationBox.MaxLength = 300; AddRow(table, Lang.T("地点"), locationBox, 42);
             notesBox = new TextBox { Multiline = true, ScrollBars = ScrollBars.Vertical, MaxLength = 10000 }; AddRow(table, Lang.T("备注"), notesBox, 78);
-            colorBox = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList };
-            colorBox.Items.AddRange(new object[] { Lang.T("鼠尾草绿"), Lang.T("雾蓝"), Lang.T("浅紫"), Lang.T("杏茶"), Lang.T("玫瑰"), Lang.T("橄榄") }); AddRow(table, Lang.T("颜色"), colorBox, 42);
+            // Each choice shows its color: the six presets, the colors other events already use, and a custom one.
+            colorBox = new ComboBox { Name = "event-color", DropDownStyle = ComboBoxStyle.DropDownList, DrawMode = DrawMode.OwnerDrawFixed, MaxDropDownItems = 14 };
+            colorBox.DrawItem += DrawColorChoice;
+            colorBox.SelectedIndexChanged += delegate { PickCustomColor(); };
+            AddRow(table, Lang.T("颜色"), colorBox, 42);
             repeatBox = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Enabled = seriesMode };
             repeatBox.Items.AddRange(new object[] { Lang.T("不重复"), Lang.T("每周"), Lang.T("每两周") }); AddRow(table, Lang.T("重复"), repeatBox, 42);
             weekdays = new CheckedListBox { CheckOnClick = true, MultiColumn = true, ColumnWidth = 54, Height = 47, BorderStyle = BorderStyle.None, BackColor = BackColor, IntegralHeight = false };
@@ -1405,6 +1416,56 @@ namespace DeskStudy
                 buttons.Controls.Add(delete);
             }
             footer.Controls.Add(buttons, 0, 1);
+        }
+
+        private void FillColors()
+        {
+            colorBox.Items.Clear();
+            for (int i = 0; i < palette.Length; i++) colorBox.Items.Add(new ColorChoice { Hex = palette[i], Name = Lang.T(paletteNames[i]) });
+            // Colors in use elsewhere (e.g. copied from Outlook), named after an event that has them.
+            var seen = new HashSet<string>(palette, StringComparer.OrdinalIgnoreCase);
+            foreach (CalendarEvent e in Calendar().Where(x => x != null && x.Id != source.Id).OrderBy(x => x.Title, StringComparer.CurrentCulture))
+                if (!String.IsNullOrEmpty(e.Color) && seen.Add(e.Color)) colorBox.Items.Add(new ColorChoice { Hex = e.Color.ToUpperInvariant(), Name = Lang.T("同「{0}」", e.Title) });
+            if (!String.IsNullOrEmpty(source.Color) && seen.Add(source.Color)) colorBox.Items.Add(new ColorChoice { Hex = source.Color.ToUpperInvariant(), Name = Lang.T("原来的颜色") });
+            colorBox.Items.Add(new ColorChoice { Custom = true, Name = Lang.T("自定义颜色…") });
+            int index = 0;
+            for (int i = 0; i < colorBox.Items.Count; i++) { var c = (ColorChoice)colorBox.Items[i]; if (!c.Custom && String.Equals(c.Hex, source.Color, StringComparison.OrdinalIgnoreCase)) { index = i; break; } }
+            lastColorIndex = index; colorBox.SelectedIndex = index;
+        }
+        private string SelectedColor()
+        {
+            var choice = colorBox.SelectedItem as ColorChoice;
+            return choice == null || choice.Custom ? palette[0] : choice.Hex;
+        }
+        private void PickCustomColor()
+        {
+            var choice = colorBox.SelectedItem as ColorChoice;
+            if (choice == null) return;
+            if (!choice.Custom) { lastColorIndex = colorBox.SelectedIndex; return; }
+            Color start; try { start = ColorTranslator.FromHtml(((ColorChoice)colorBox.Items[lastColorIndex]).Hex); } catch { start = Color.Gray; }
+            using (var dialog = new ColorDialog { Color = start, FullOpen = true })
+            {
+                if (dialog.ShowDialog(this) != DialogResult.OK) { colorBox.SelectedIndex = lastColorIndex; return; }
+                string hex = "#" + dialog.Color.R.ToString("X2") + dialog.Color.G.ToString("X2") + dialog.Color.B.ToString("X2");
+                int at = colorBox.Items.Count - 1;
+                colorBox.Items.Insert(at, new ColorChoice { Hex = hex, Name = Lang.T("自定义 {0}", hex) });
+                colorBox.SelectedIndex = at;
+            }
+        }
+        private void DrawColorChoice(object sender, DrawItemEventArgs e)
+        {
+            e.DrawBackground();
+            if (e.Index < 0) return;
+            var choice = (ColorChoice)colorBox.Items[e.Index];
+            int size = e.Bounds.Height - 6;
+            var swatch = new Rectangle(e.Bounds.X + 4, e.Bounds.Y + 3, size, size);
+            if (!choice.Custom)
+            {
+                Color color; try { color = ColorTranslator.FromHtml(choice.Hex); } catch { color = Color.Gray; }
+                using (Brush b = new SolidBrush(color)) e.Graphics.FillRectangle(b, swatch);
+                using (Pen p = new Pen(Color.FromArgb(70, 0, 0, 0))) e.Graphics.DrawRectangle(p, swatch);
+            }
+            TextRenderer.DrawText(e.Graphics, choice.Name, e.Font, new Rectangle(swatch.Right + 8, e.Bounds.Y, e.Bounds.Width - swatch.Right - 10, e.Bounds.Height), (e.State & DrawItemState.Selected) != 0 ? SystemColors.HighlightText : SystemColors.ControlText, TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
         }
 
         private void ShowAllDay()
@@ -1470,9 +1531,7 @@ namespace DeskStudy
             TimeSpan end; if (!TimeSpan.TryParse(source.EndTime, out end)) end = TimeSpan.FromHours(10);
             startPicker.Value = date.Date.Add(start); endPicker.Value = date.Date.Add(end);
             allDayBox.Checked = source.AllDay; daysBox.Value = Math.Max(1, Math.Min(366, source.Days)); ShowAllDay();
-            int known = Array.IndexOf(palette, source.Color);
-            if (known < 0 && !String.IsNullOrEmpty(source.Color)) { colorBox.Items.Add(Lang.T("原来的颜色")); keptColor = source.Color; known = colorBox.Items.Count - 1; }
-            colorBox.SelectedIndex = Math.Max(0, known);
+            FillColors();
             repeatBox.SelectedIndex = Math.Max(0, Math.Min(2, source.RepeatWeeks));
             for (int i = 0; i < 7; i++) weekdays.SetItemChecked(i, source.WeekDays != null && source.WeekDays.Contains((i + 1) % 7));
             if (weekdays.CheckedItems.Count == 0) weekdays.SetItemChecked(((int)date.DayOfWeek + 6) % 7, true);
@@ -1494,7 +1553,7 @@ namespace DeskStudy
                 Id = source.Id, Title = titleBox.Text.Trim(), Date = datePicker.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
                 StartTime = whole ? "00:00" : startPicker.Value.ToString("HH:mm", CultureInfo.InvariantCulture), EndTime = whole ? "23:59" : endPicker.Value.ToString("HH:mm", CultureInfo.InvariantCulture),
                 AllDay = whole, Days = whole ? (int)daysBox.Value : 1,
-                Location = locationBox.Text.Trim(), Notes = notesBox.Text, Color = colorBox.SelectedIndex >= palette.Length && keptColor != null ? keptColor : palette[Math.Max(0, Math.Min(palette.Length - 1, colorBox.SelectedIndex))],
+                Location = locationBox.Text.Trim(), Notes = notesBox.Text, Color = SelectedColor(),
                 TimeZoneId = String.IsNullOrWhiteSpace(source.TimeZoneId) ? TimeZoneInfo.Local.Id : source.TimeZoneId,
                 RepeatWeeks = repeat, RepeatEndDate = untilPicker.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), WeekDays = days,
                 RecurrenceAnchorDate = repeat > 0 && anchorPicker.Checked ? anchorPicker.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",

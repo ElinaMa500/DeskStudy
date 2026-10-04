@@ -605,6 +605,9 @@ namespace DeskStudy
             { "只复制已同步的范围（今天前 {0} 天到今后 {1} 天）。", "Only the synced range is copied ({0} days back to {1} days ahead)." },
             { "已复制 {0} 个日程到本地日历，Outlook 同步已停止。", "{0} events copied into your calendar. Outlook syncing has stopped." },
             { "Outlook 日程颜色无效。", "Invalid Outlook event colors." },
+            { "同「{0}」", "Same as \"{0}\"" },
+            { "自定义颜色…", "Custom color…" },
+            { "自定义 {0}", "Custom {0}" },
         };
     }
 }

@@ -337,6 +337,7 @@ namespace DeskStudy
         public AppController(string dataDirectory, EventWaitHandle signal, bool enableNotifications, bool quietStart)
         {
             Store = new AppStore(dataDirectory); showSignal = signal; notifications = enableNotifications;
+            CalendarEditor.Calendar = delegate { return Data.Events; };
             AppIcon = Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? SystemIcons.Application;
             saveTimer = new System.Windows.Forms.Timer { Interval = Data.Settings.AutoSaveDelayMs };
             saveTimer.Tick += delegate { saveTimer.Stop(); Flush(); };
