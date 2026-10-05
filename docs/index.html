@@ -4,14 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>桌面课笺 · 课表、待办和 DDL，一直在桌面上</title>
-<meta name="description" content="为课程、科研与教学而做的 Windows 桌面组件：周课表、待办、截止日期常驻桌面，到期提醒。支持双周组会、单次调课、教学周。开源、不联网、无账号，不到 300 KB。">
+<meta name="description" content="为课程、科研与教学而做的 Windows 桌面组件：周课表、待办、截止日期常驻桌面，到期提醒；DDL 按截止时间排序并显示在日历上，可只读同步 Outlook 日历。开源、无账号、默认不联网，中文和英文界面。">
 <meta property="og:type" content="website">
 <meta property="og:title" content="桌面课笺 · DDL 不该靠记性">
-<meta property="og:description" content="课表、待办和截止日期常驻 Windows 桌面，到期提醒。为本科生、研究生和教师的学期节奏而做。开源、不联网、无账号。">
+<meta property="og:description" content="为课程、科研与教学而做的 Windows 桌面组件：周课表、待办、截止日期常驻桌面，到期提醒；DDL 按截止时间排序并显示在日历上，可只读同步 Outlook 日历。开源、无账号、默认不联网，中文和英文界面。">
 <meta property="og:url" content="https://elinama500.github.io/DeskStudy/">
-<meta property="og:image" content="https://elinama500.github.io/DeskStudy/images/persona-research.png">
+<meta property="og:image" content="https://elinama500.github.io/DeskStudy/images/site/zh/persona-research.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#f7f5ee">
+<link rel="alternate" hreflang="zh-CN" href="https://elinama500.github.io/DeskStudy/">
+<link rel="alternate" hreflang="en" href="https://elinama500.github.io/DeskStudy/en/">
 <style>
 :root{
   --ink:#17211d; --text:#2a3531; --sub:#5a6661; --faint:#8a9590; --rule:#e2e6e0; --paper:#f7f5ee; --card:#ffffff;
@@ -189,7 +191,7 @@ footer a{color:var(--sub)}
 @media (max-width:720px){
   section{padding:64px 0}
   .hero{padding-top:44px}
-  .nav nav a:not(.btn){display:none}
+  .nav nav a:not(.btn):not(.lang){display:none}
   .grid,.uses{grid-template-columns:1fr}
   .stage{padding:8px 8px 0;border-radius:16px 16px 0 0}
   .pan{overflow-x:auto;-webkit-overflow-scrolling:touch}
@@ -198,6 +200,9 @@ footer a{color:var(--sub)}
   .btn{width:100%}
   .btn.small{width:auto}
 }
+.nav .lang{font-size:13.5px;font-weight:650;padding:5px 10px;border:1px solid var(--rule);border-radius:8px;color:var(--sub);text-decoration:none;white-space:nowrap;flex-shrink:0}
+.nav .lang:hover{border-color:var(--accent);color:var(--accent-deep)}
+.new{display:inline-block;font-size:11.5px;font-weight:700;letter-spacing:.04em;color:#fff;background:var(--warm);border-radius:6px;padding:1px 7px;margin-left:6px;vertical-align:2px;font-family:"Segoe UI","PingFang SC","Microsoft YaHei UI","Microsoft YaHei",system-ui,sans-serif;letter-spacing:0;text-transform:none}
 </style>
 </head>
 <body>
@@ -206,11 +211,9 @@ footer a{color:var(--sub)}
   <div class="wrap">
     <a class="brand" href="#top"><i></i>桌面课笺</a>
     <nav>
-      <a href="#who">典型用法</a>
-      <a href="#details">细节</a>
-      <a href="#trust">可信度</a>
-      <a href="#limits">局限</a>
-      <a class="btn primary small" href="https://github.com/ElinaMa500/DeskStudy/releases/download/v1.3/DeskStudy-1.3-Windows.zip">免费下载</a>
+      <a href="#who">典型用法</a><a href="#details">功能</a><a href="#trust">可信度</a><a href="#limits">局限</a>
+      <a class="lang" href="en/" hreflang="en">English</a>
+      <a class="btn primary small" href="https://github.com/ElinaMa500/DeskStudy/releases/download/v1.6/DeskStudy-1.6-Windows.zip">免费下载</a>
     </nav>
   </div>
 </header>
@@ -222,103 +225,48 @@ footer a{color:var(--sub)}
       <span class="eyebrow">为课程、科研与教学而做的 Windows 桌面组件</span>
       <h1>DDL 不该靠记性。</h1>
       <p class="h1-sub">课表、待办和截止日期，一直在桌面上。</p>
-      <p class="lead">桌面课笺把一周的课表、手头的待办和每一个截止时间，做成三个常驻桌面的小窗口。不用打开任何应用，抬头就能看到；快到期时，它会提醒你。</p>
+      <p class="lead">桌面课笺把一周的课表、手头的待办和每一个截止时间，做成三个常驻桌面的小组件。不用打开任何应用，抬头就能看到；DDL 按截止时间排好、标在日历上，快到期时会提醒你。</p>
       <div class="cta">
-        <a class="btn primary" href="https://github.com/ElinaMa500/DeskStudy/releases/download/v1.3/DeskStudy-1.3-Windows.zip">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="m7 11 5 5 5-5"/><path d="M5 20h14"/></svg>
-          下载 Windows 版 <small>v1.3</small>
-        </a>
-        <a class="btn ghost" href="https://github.com/ElinaMa500/DeskStudy">查看源码</a>
+        <a class="btn primary" href="https://github.com/ElinaMa500/DeskStudy/releases/download/v1.6/DeskStudy-1.6-Windows.zip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="m7 11 5 5 5-5"/><path d="M5 20h14"/></svg>下载 Windows 版 <small>v1.6</small></a>
+        <a class="btn ghost" href="https://github.com/ElinaMa500/DeskStudy/blob/main/USER_GUIDE.md">看使用指南</a>
       </div>
-      <ul class="chips">
-        <li><b>开源</b> · MIT</li>
-        <li><b>不联网</b></li>
-        <li><b>无账号</b></li>
-        <li><b>无广告</b></li>
-        <li><b>不到 300 KB</b></li>
-        <li><b>解压即用</b>，无需安装</li>
-      </ul>
+      <ul class="chips"><li><b>开源</b> · MIT</li><li><b>无账号</b></li><li><b>默认不联网</b></li><li><b>无广告</b></li><li><b>中文 · English</b></li><li><b>约 630 KB</b></li><li><b>解压即用</b>，无需安装</li></ul>
     </div>
   </div>
-  <div class="stage pan reveal"><img src="images/persona-research.png" width="1685" height="920" alt="桌面课笺的三个窗口：周课表显示组会、文献研讨和课程，Todo 便签显示本周科研任务，DDL 便签显示会议截稿和开题报告的截止时间"></div>
+  <div class="stage pan reveal"><img src="images/site/zh/persona-research.png" width="1303" height="1013" alt="桌面课笺的三个组件：DDL 便签按截止时间排列投稿和申请，Todo 便签列出论文修改任务，周课表显示组会、文献研讨、导师面谈和一个跨两天的学术会议"></div>
 </div>
 
 <section id="why" class="band">
   <div class="wrap">
-    <div class="head reveal">
-      <div class="kicker">01 / 为什么放在桌面上</div>
-      <h2>记下来不难，难的是之后还看得到</h2>
-      <p>一学期里真正误事的，往往是那几件「我以为还有几天」的事。</p>
-    </div>
-    <div class="why">
-      <div class="pain reveal">
-        <p class="q">截止时间散落在各处</p>
-        <p>课程平台、邮件、群通知、会议官网。每个 DDL 在不同的地方，全靠脑子汇总。</p>
-        <div class="a"><span>一本 DDL 便签集中记，直接显示「明天截止」「剩余 3 天」。</span></div>
-      </div>
-      <div class="pain reveal">
-        <p class="q">待办应用要打开才看得到</p>
-        <p>写进去的时候很认真，之后就再没打开过。看不到的清单，等于没有清单。</p>
-        <div class="a"><span>三个无边框的小组件常驻桌面，平时待在其他窗口下面，可置顶、可半透明。</span></div>
-      </div>
-      <div class="pain reveal">
-        <p class="q">课表和临时变动对不上</p>
-        <p>双周的组会、单次的调课、某一周的停课，普通的周课表表达不了。</p>
-        <div class="a"><span>支持每周与每两周循环，单次调整不影响其他周。</span></div>
-      </div>
-    </div>
+    <div class="head reveal"><div class="kicker">01 / 为什么放在桌面上</div><h2>记下来不难，难的是之后还看得到</h2><p>一学期里真正误事的，往往是那几件「我以为还有几天」的事。</p></div>
+    <div class="why"><div class="pain reveal"><p class="q">截止时间散落在各处</p><p>课程平台、邮件、群通知、会议官网。每个 DDL 在不同的地方，全靠脑子汇总。</p><div class="a"><span>集中记在一本 DDL 便签里，按截止时间自动排好，直接显示「明天截止」「剩余 3 天」，还会标在日历上。</span></div></div><div class="pain reveal"><p class="q">待办应用要打开才看得到</p><p>写进去的时候很认真，之后就再没打开过。看不到的清单，等于没有清单。</p><div class="a"><span>三个无边框组件常驻桌面，平时待在其他窗口下面；点一下任务栏按钮就全部浮到前面。</span></div></div><div class="pain reveal"><p class="q">课表和临时变动对不上</p><p>双周的组会、单次的调课、某一周的停课、放假几天，普通的周课表表达不了。</p><div class="a"><span>支持每周与每两周循环、单次调整、跨多天的全天日程；学校的 Outlook 日历也能同步进来。</span></div></div></div>
   </div>
 </section>
 
 <section id="who">
   <div class="wrap">
-    <div class="head reveal">
-      <div class="kicker">02 / 典型用法</div>
-      <h2>同一个工具，三种学期节奏</h2>
-      <p>下面是程序的实际界面，内容为示例数据。点击切换角色。</p>
-    </div>
-    <div class="tabs reveal" role="tablist" aria-label="使用角色" id="persona-tabs">
-      <button role="tab" aria-selected="true" data-panel="p-research">研究生 · 博士生</button>
-      <button role="tab" aria-selected="false" data-panel="p-student">本科生</button>
-      <button role="tab" aria-selected="false" data-panel="p-faculty">教师</button>
-    </div>
-
-    <div class="persona reveal" id="p-research">
-      <div class="shot pan"><img src="images/persona-research.png" width="1685" height="920" alt="研究生示例：组会、文献研讨、导师一对一的周视图，以及论文和申请的截止事项"></div>
-      <div>
-        <h3>组会、论文和助教工作放在一起看</h3>
-        <ul class="uses">
-          <li><b>双周组会设成「每两周」</b><span>不用每次手动建。某次改期，只改那一次。</span></li>
-          <li><b>每个项目一页便签</b><span>「论文修改」「开题准备」各一页，互不干扰，结束后归档。</span></li>
-          <li><b>截稿、返修、开题报告进 DDL</b><span>每项单独设置提前量，提前和到期各提醒一次。</span></li>
-          <li><b>导师面谈、答疑、课程同屏</b><span>一张周视图看清这周哪天是满的。</span></li>
-        </ul>
-      </div>
-    </div>
-
-    <div class="persona" id="p-student" hidden>
-      <div class="shot pan"><img loading="lazy" src="images/persona-student.png" width="1685" height="920" alt="本科生示例：高等数学、大学英语、物理实验等课程的周视图，以及作业和实验报告的截止事项"></div>
+    <div class="head reveal"><div class="kicker">02 / 典型用法</div><h2>同一个工具，三种学期节奏</h2><p>下面是程序的实际界面，内容为示例数据。点击切换角色。</p></div>
+    <div class="tabs reveal" role="tablist" aria-label="典型用法" id="persona-tabs"><button role="tab" aria-selected="true" data-panel="p-student">本科生</button><button role="tab" aria-selected="false" data-panel="p-research">研究生 · 博士生</button><button role="tab" aria-selected="false" data-panel="p-faculty">教师</button></div>
+    
+    <div class="persona reveal" id="p-student">
+      <div class="shot pan"><img src="images/site/zh/persona-student.png" width="1303" height="1013" alt="本科生示例：高等数学、线性代数、大学英语和物理实验的周视图，以及作业和实验报告的截止事项"></div>
       <div>
         <h3>课表录一次，作业不再漏交</h3>
-        <ul class="uses">
-          <li><b>学期初录一次课表</b><span>整个学期自动排好，并显示当前是教学第几周。</span></li>
-          <li><b>作业、实验报告、大作业进 DDL</b><span>直接看到「明天截止」「剩余 3 天」，不用自己算日子。</span></li>
-          <li><b>调课、停课只改那一次</b><span>其他周的课表不受影响。</span></li>
-          <li><b>本周任务一页，下周计划一页</b><span>做完打勾，完成的留在原处，方便回顾。</span></li>
-        </ul>
+        <ul class="uses"><li><b>学期初录一次课表</b><span>整个学期自动排好，并显示当前是教学第几周。</span></li><li><b>作业、实验报告进 DDL</b><span>直接看到「明天截止」「剩余 3 天」，最急的总在最上面。</span></li><li><b>调课、停课只改那一次</b><span>其他周的课表不受影响。</span></li><li><b>双击就能改任务</b><span>写错了直接双击修改，回车保存。</span></li></ul>
       </div>
     </div>
-
+    <div class="persona" id="p-research" hidden>
+      <div class="shot pan"><img loading="lazy" src="images/site/zh/persona-research.png" width="1303" height="1013" alt="研究生示例：课题组组会、文献研讨、导师一对一和助教习题课的周视图，跨两天的学术会议，以及投稿和申请的截止事项"></div>
+      <div>
+        <h3>组会、论文和助教工作放在一起看</h3>
+        <ul class="uses"><li><b>双周组会设成「每两周」</b><span>不用每次手动建。某次改期，只改那一次。</span></li><li><b>截稿、返修、开题进 DDL</b><span>按截止时间自动排序，每项单独设提前量，日历上也能看到。</span></li><li><b>会议、出差用全天日程</b><span>跨几天就是一条横条，放在日历最上面一行。</span></li><li><b>学校日历同步进来</b><span>Outlook 里的讲座、答疑可以只读同步，按日程名称配色。</span></li></ul>
+      </div>
+    </div>
     <div class="persona" id="p-faculty" hidden>
-      <div class="shot pan"><img loading="lazy" src="images/persona-faculty.png" width="1685" height="920" alt="教师示例：本科课、研究生课、Office Hour 和组会的周视图，以及审稿、基金申请和成绩录入的截止事项"></div>
+      <div class="shot pan"><img loading="lazy" src="images/site/zh/persona-faculty.png" width="1303" height="1013" alt="教师示例：本科课、研究生课、Office Hour 和组会的周视图，期中考试周，以及审稿、基金申请和成绩录入的截止事项"></div>
       <div>
         <h3>授课、指导和各种截止，一屏看全</h3>
-        <ul class="uses">
-          <li><b>本科课、研究生课、Office Hour、组会</b><span>都在同一张周视图里，双周的例会也能正确显示。</span></li>
-          <li><b>审稿、基金申请、成绩录入集中提醒</b><span>重要的事可以提前一天提醒，而不是到点才响。</span></li>
-          <li><b>教学、课题组、行政各一页</b><span>学期结束把旧页面归档，内容保留，随时可以翻回来。</span></li>
-          <li><b>设置免打扰时段</b><span>时段内的提醒会推迟，结束后汇总给你。</span></li>
-        </ul>
+        <ul class="uses"><li><b>本科课、研究生课、Office Hour、组会</b><span>都在同一张周视图里，双周的例会也能正确显示。</span></li><li><b>审稿、基金申请、成绩录入集中提醒</b><span>重要的事可以提前一天提醒，而不是到点才响。</span></li><li><b>考试周、假期一目了然</b><span>全天日程横跨对应的几天。</span></li><li><b>设置免打扰时段</b><span>时段内的提醒会推迟，结束后汇总给你。</span></li></ul>
       </div>
     </div>
   </div>
@@ -326,40 +274,17 @@ footer a{color:var(--sub)}
 
 <section id="details" class="band">
   <div class="wrap">
-    <div class="head reveal">
-      <div class="kicker">03 / 细节</div>
-      <h2>为学期和科研的节奏设计</h2>
-      <p>这些不是花哨的功能，是用一段时间之后才会发现少不了的东西。</p>
-    </div>
-    <div class="grid">
-      <div class="cell reveal"><div class="t">循环</div><h3>每周与每两周</h3><p>一门课可以勾选一周里的多天。双周组会、单双周课程都能表达。</p></div>
-      <div class="cell reveal"><div class="t">例外</div><h3>只改这一次</h3><p>调课、停课保存为单次例外，其他周保持原样。</p></div>
-      <div class="cell reveal"><div class="t">教学周</div><h3>现在是第几周</h3><p>填好学期起止日期，日历上直接显示当前教学周。</p></div>
-      <div class="cell reveal"><div class="t">分页</div><h3>一个项目一页</h3><p>两本便签各自有多页。用完的页面归档，内容和提醒都保留。</p></div>
-      <div class="cell reveal"><div class="t">提醒</div><h3>提前量逐项设置</h3><p>每个任务单独设置提前多久提醒，提前和截止时各提醒一次。</p></div>
-      <div class="cell reveal"><div class="t">补发</div><h3>错过的会补上</h3><p>电脑休眠或程序没开时错过的提醒，恢复运行后汇总补发。</p></div>
-      <div class="cell reveal"><div class="t">录入</div><h3>打字，回车</h3><p>在便签底部输入，回车就是一条任务，可以连续输入。</p></div>
-      <div class="cell reveal"><div class="t">常驻</div><h3>在，但不打扰</h3><p>不占任务栏。点一下浮到前面，切去别的程序后自动回到其他窗口下面；一个快捷键随时叫出来。</p></div>
-    </div>
+    <div class="head reveal"><div class="kicker">03 / 功能</div><h2>为学期和科研的节奏设计</h2><p>这些不是花哨的功能，是用一段时间之后才会发现少不了的东西。</p></div>
+    <div class="grid"><div class="cell reveal"><div class="t">循环</div><h3>每周与每两周</h3><p>一门课可以勾选一周里的多天。双周组会、单双周课程都能表达。</p></div><div class="cell reveal"><div class="t">例外</div><h3>只改这一次</h3><p>调课、停课保存为单次例外，其他周保持原样。</p></div><div class="cell reveal"><div class="t">全天 <span class=new>1.6 新增</span></div><h3>假期和考试周</h3><p>全天日程可以跨多天，显示在星期行下面，也能每周重复。</p></div><div class="cell reveal"><div class="t">DDL <span class=new>1.6 新增</span></div><h3>按截止时间排序</h3><p>最急的在最上面，完成的沉到底；新加的会自己排到该在的位置。</p></div><div class="cell reveal"><div class="t">日历 <span class=new>1.6 新增</span></div><h3>DDL 标在日历上</h3><p>有时间的 DDL 是一个 ⚑ 小标签，有 DDL 的日子旁边有角标；单击跳到那条任务。</p></div><div class="cell reveal"><div class="t">Outlook <span class=new>1.6 新增</span></div><h3>同步学校日历</h3><p>粘贴 Outlook 发布的日历链接，只读显示；也可以一次性复制成自己的课程。</p></div><div class="cell reveal"><div class="t">提醒</div><h3>提前量逐项设置</h3><p>每个任务单独设提前多久提醒，提前和截止时各提醒一次；错过的会补发。</p></div><div class="cell reveal"><div class="t">编辑 <span class=new>1.6 新增</span></div><h3>双击就改</h3><p>双击任务文字原地修改，点别处自动保存；打字回车就是一条新任务。</p></div><div class="cell reveal"><div class="t">常驻 <span class=new>1.6 新增</span></div><h3>在，但不打扰</h3><p>平时待在其他窗口下面；单击任务栏按钮或按快捷键，组件浮到前面。</p></div><div class="cell reveal"><div class="t">折叠</div><h3>暂时收起来</h3><p>组件可以折叠成一条顶栏，停在屏幕底部，需要时再展开。</p></div><div class="cell reveal"><div class="t">教学周</div><h3>现在是第几周</h3><p>填好学期起止日期，日历上直接显示当前教学周。</p></div><div class="cell reveal"><div class="t">语言 <span class=new>1.6 新增</span></div><h3>中文和 English</h3><p>界面可在中文和英文之间切换，第一次打开时跟随 Windows 语言。</p></div></div>
   </div>
 </section>
 
 <section id="looks">
   <div class="wrap">
-    <div class="head center reveal">
-      <div class="kicker">04 / 外观</div>
-      <h2>五种便签外观，点一下就换</h2>
-      <p>切换不会丢任何内容。主题、背景色、透明度和字号也都可以调。</p>
-    </div>
-    <div class="tabs center reveal" role="tablist" aria-label="便签外观" id="look-tabs">
-      <button role="tab" aria-selected="true" data-img="images/layout-clean.png" data-name="清爽卡片" data-desc="白底，大标题，任务之间只有细线，最简洁。">清爽卡片</button>
-      <button role="tab" aria-selected="false" data-img="images/layout-journal.png" data-name="手账纸页" data-desc="米色纸页，左边是窄页签，更像一本笔记本。">手账纸页</button>
-      <button role="tab" aria-selected="false" data-img="images/layout-card.png" data-name="轻量卡片" data-desc="默认外观。每个任务是一张小卡片，翻页在底部。">轻量卡片</button>
-      <button role="tab" aria-selected="false" data-img="images/layout-paper.png" data-name="纸页本" data-desc="暖色纸张，左边一列页码，点页码直接翻页。">纸页本</button>
-      <button role="tab" aria-selected="false" data-img="images/layout-original.png" data-name="原始外观" data-desc="按钮最全，翻页在顶部，每个任务下面直接有编辑、移动、删除。">原始外观</button>
-    </div>
+    <div class="head center reveal"><div class="kicker">04 / 外观</div><h2>五种便签外观，点一下就换</h2><p>日历会跟着换风格，切换不会丢任何内容。主题、背景色、透明度和字号也都可以调。</p></div>
+    <div class="tabs center reveal" role="tablist" aria-label="外观" id="look-tabs"><button role="tab" aria-selected="true" data-img="images/site/zh/layout-clean.png" data-name="清爽卡片" data-desc="白底，大标题，任务之间只有细线，最简洁。" data-alt="清爽卡片外观的 DDL 与 Todo 便签">清爽卡片</button><button role="tab" aria-selected="false" data-img="images/site/zh/layout-journal.png" data-name="手账纸页" data-desc="米色纸页，左边是窄页签，更像一本笔记本。" data-alt="手账纸页外观的 DDL 与 Todo 便签">手账纸页</button><button role="tab" aria-selected="false" data-img="images/site/zh/layout-card.png" data-name="轻量卡片" data-desc="默认外观。每个任务是一张小卡片。" data-alt="轻量卡片外观的 DDL 与 Todo 便签">轻量卡片</button><button role="tab" aria-selected="false" data-img="images/site/zh/layout-paper.png" data-name="纸页本" data-desc="暖色纸张，左边一列页码，点页码直接翻页。" data-alt="纸页本外观的 DDL 与 Todo 便签">纸页本</button><button role="tab" aria-selected="false" data-img="images/site/zh/layout-original.png" data-name="原始外观" data-desc="按钮最全，每个任务下面直接有编辑、移动、删除。" data-alt="原始外观的 DDL 与 Todo 便签">原始外观</button></div>
     <div class="viewer reveal">
-      <div class="shot"><img id="look" loading="lazy" src="images/layout-clean.png" width="855" height="660" alt="清爽卡片外观的 Todo 与 DDL 便签"></div>
+      <div class="shot"><img id="look" loading="lazy" src="images/site/zh/layout-clean.png" width="878" height="552" alt="清爽卡片外观的 DDL 与 Todo 便签"></div>
       <div class="caption" aria-live="polite"><b id="look-name">清爽卡片</b><p id="look-desc">白底，大标题，任务之间只有细线，最简洁。</p></div>
     </div>
   </div>
@@ -367,128 +292,53 @@ footer a{color:var(--sub)}
 
 <section id="trust" class="band">
   <div class="wrap">
-    <div class="head reveal">
-      <div class="kicker">05 / 可信度</div>
-      <h2>可以放心装在工作电脑上的理由</h2>
-      <p>未发表的课题、学生的成绩、审稿任务，这些不该出现在别人的服务器上。</p>
-    </div>
-    <div class="trust">
-      <div class="item reveal">
-        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></div>
-        <div><h3>数据只在本机</h3><p>程序不联网，没有账号，不上传任何内容。所有数据保存在你电脑上的一个本地文件夹里。</p></div>
-      </div>
-      <div class="item reveal">
-        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 8-4 4 4 4"/><path d="m16 8 4 4-4 4"/><path d="m13.5 5-3 14"/></svg></div>
-        <div><h3>源码公开，可以自己审</h3><p>以 MIT 许可证开源，没有第三方运行依赖。你可以阅读全部代码，也可以自己编译。<a href="https://github.com/ElinaMa500/DeskStudy">GitHub 仓库</a></p></div>
-      </div>
-      <div class="item reveal">
-        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v5h-5"/></svg></div>
-        <div><h3>自动保存，留有退路</h3><p>编辑后自动保存，并保留上一份成功保存的数据。可以一键备份、导出和恢复。</p></div>
-      </div>
-      <div class="item reveal">
-        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg></div>
-        <div><h3>每个版本附验证记录</h3><p>循环日期、提醒去重、数据迁移和备份恢复都有自动化测试，结果和未验证的部分都如实写明。<a href="https://github.com/ElinaMa500/DeskStudy/blob/main/VERIFICATION.md">查看验证记录</a></p></div>
-      </div>
-    </div>
+    <div class="head reveal"><div class="kicker">05 / 可信度</div><h2>可以放心装在工作电脑上的理由</h2><p>未发表的课题、学生的成绩、审稿任务，这些不该出现在别人的服务器上。</p></div>
+    <div class="trust"><div class="item reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></div><div><h3>数据只在本机</h3><p>没有账号，不上传任何内容，所有数据保存在你电脑上的一个文件夹里。程序默认不联网；只有你订阅 Outlook 日历时，才会去下载你给的那一个链接。</p></div></div><div class="item reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 8-4 4 4 4"/><path d="m16 8 4 4-4 4"/><path d="m13.5 5-3 14"/></svg></div><div><h3>源码公开，可以自己审</h3><p>以 MIT 许可证开源，没有第三方运行依赖。你可以阅读全部代码，也可以自己编译。<a href="https://github.com/ElinaMa500/DeskStudy">GitHub 仓库</a></p></div></div><div class="item reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v5h-5"/></svg></div><div><h3>自动保存，留有退路</h3><p>编辑后自动保存，并保留上一份成功保存的数据。导入、恢复和复制 Outlook 日历之前都会先自动备份。</p></div></div><div class="item reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg></div><div><h3>每个版本附验证记录</h3><p>1.6 共有 24 组、768 项自动化测试，覆盖循环日期、时区、提醒、Outlook 解析和界面；结果和未验证的部分都如实写明。<a href="https://github.com/ElinaMa500/DeskStudy/blob/main/VERIFICATION.md">查看验证记录</a></p></div></div></div>
   </div>
 </section>
 
 <section>
   <div class="wrap">
-    <div class="head reveal">
-      <div class="kicker">06 / 对比</div>
-      <h2>和你现在的办法比一比</h2>
-    </div>
-    <div class="table reveal">
-      <table>
-        <thead><tr><th></th><th class="us">桌面课笺</th><th>纸质便利贴</th><th>手机或网页上的待办、日历应用</th></tr></thead>
-        <tbody>
-          <tr><td>不用打开就能看到</td><td class="us yes">常驻桌面</td><td class="yes">贴在屏幕边</td><td class="no">需要主动打开</td></tr>
-          <tr><td>到期提醒</td><td class="us yes">提前与到期各一次</td><td class="no">没有</td><td class="yes">有</td></tr>
-          <tr><td>循环课表与单次调课</td><td class="us yes">每周、每两周、单次例外</td><td class="no">没有</td><td>视应用而定</td></tr>
-          <tr><td>账号与联网</td><td class="us yes">都不需要</td><td class="yes">都不需要</td><td>多数需要</td></tr>
-          <tr><td>数据存放位置</td><td class="us yes">只在本机</td><td class="yes">在你桌上</td><td>多数在云端</td></tr>
-          <tr><td>多设备同步</td><td class="us no">不支持</td><td class="no">不支持</td><td class="yes">多数支持</td></tr>
-        </tbody>
-      </table>
-    </div>
+    <div class="head reveal"><div class="kicker">06 / 对比</div><h2>和你现在的办法比一比</h2></div>
+    <div class="table reveal"><table>
+      <thead><tr><th></th><th class=us>桌面课笺</th><th>纸质便利贴</th><th>手机或网页上的待办、日历应用</th></tr></thead>
+      <tbody><tr><td>不用打开就能看到</td><td class="us yes">常驻桌面</td><td class="yes">贴在屏幕边</td><td class="no">需要主动打开</td></tr><tr><td>到期提醒</td><td class="us yes">提前与到期各一次</td><td class="no">没有</td><td class="yes">有</td></tr><tr><td>循环课表与单次调课</td><td class="us yes">每周、每两周、单次例外</td><td class="no">没有</td><td class="">视应用而定</td></tr><tr><td>Outlook 日历</td><td class="us yes">可只读同步，或复制成自己的课程</td><td class="no">没有</td><td class="">视应用而定</td></tr><tr><td>账号</td><td class="us yes">不需要</td><td class="yes">不需要</td><td class="">多数需要</td></tr><tr><td>数据存放位置</td><td class="us yes">只在本机</td><td class="yes">在你桌上</td><td class="">多数在云端</td></tr><tr><td>多设备同步</td><td class="us no">不支持</td><td class="no">不支持</td><td class="yes">多数支持</td></tr></tbody>
+    </table></div>
     <p class="fine reveal">第三列是对这类应用的一般性描述，具体以各应用为准。</p>
   </div>
 </section>
 
 <section id="limits" class="band">
   <div class="wrap limits">
-    <div class="reveal">
-      <div class="kicker">07 / 局限</div>
-      <h2>它不适合这些情况</h2>
-      <p style="color:var(--sub);margin:0">先说清楚，省得你下载之后才发现。</p>
-    </div>
-    <ul class="reveal">
-      <li><span><b>只支持 Windows 10 和 11。</b>没有 macOS、Linux 和手机版本。</span></li>
-      <li><span><b>不在多台设备间同步。</b>换电脑时可以导出一个文件再导入。</span></li>
-      <li><span><b>不与 Outlook、Google 日历等互通。</b>课表需要在程序里录入。</span></li>
-      <li><span><b>不支持多人协作。</b>它是个人用的工具。</span></li>
-      <li><span><b>没有数字签名。</b>首次运行时 Windows 会弹出安全提示，需要手动确认。</span></li>
-      <li><span><b>提醒需要程序在运行。</b>建议打开「登录 Windows 后自动启动」。</span></li>
-      <li><span><b>按 Win+D 显示桌面时，组件可能一起被收起。</b>单击托盘图标或按快捷键可以叫回来。</span></li>
-    </ul>
+    <div class="reveal"><div class="kicker">07 / 局限</div><h2>它不适合这些情况</h2><p style="color:var(--sub);margin:0">先说清楚，省得你下载之后才发现。</p></div>
+    <ul class="reveal"><li><span><b>只支持 Windows 10 和 11。</b>没有 macOS、Linux 和手机版本。</span></li><li><span><b>不在多台设备间同步。</b>换电脑时可以导出一个文件再导入。</span></li><li><span><b>Outlook 只能只读同步。</b>不能在这里改 Outlook 的日程，也不支持 Google 日历等；Outlook 发布的链接不带颜色，需要按日程名称自己设。</span></li><li><span><b>不支持多人协作。</b>它是个人用的工具。</span></li><li><span><b>没有数字签名。</b>首次运行时 Windows 会弹出安全提示，需要手动确认。</span></li><li><span><b>提醒需要程序在运行。</b>建议打开「登录 Windows 后自动启动」。</span></li><li><span><b>按 Win+D 显示桌面时，组件可能一起被收起。</b>单击任务栏按钮或按快捷键就能叫回来。</span></li></ul>
   </div>
 </section>
 
 <section id="start">
   <div class="wrap">
-    <div class="head reveal">
-      <div class="kicker">08 / 上手</div>
-      <h2>解压，双击，开始用</h2>
-      <p>不用安装，不需要管理员权限。</p>
-    </div>
-    <div class="steps">
-      <div class="step reveal"><h3>下载并解压</h3><p>下载压缩包，解压到一个固定的文件夹，比如 <code>D:\桌面课笺</code>。</p></div>
-      <div class="step reveal"><h3>双击 DeskStudy.exe</h3><p>第一次打开是空白课表和两本空便签，直接开始用。</p></div>
-      <div class="step reveal"><h3>录入课表和任务</h3><p>点「+ 添加日程」录入课表，在便签底部打字回车添加任务。</p></div>
-    </div>
-    <p class="note reveal">首次运行如果出现「Windows 已保护你的电脑」，点「更多信息」→「仍要运行」。出现这个提示是因为程序没有购买数字签名。压缩包里的「使用指南.html」有完整的图文说明。</p>
-    <p class="reveal" style="margin:26px 0 0">
-      <a class="btn primary" href="https://github.com/ElinaMa500/DeskStudy/releases/download/v1.3/DeskStudy-1.3-Windows.zip">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="m7 11 5 5 5-5"/><path d="M5 20h14"/></svg>
-        下载 Windows 版 <small>v1.3</small>
-      </a>
-    </p>
+    <div class="head reveal"><div class="kicker">08 / 上手</div><h2>解压，双击，开始用</h2><p>不用安装，不需要管理员权限。</p></div>
+    <div class="steps"><div class="step reveal"><h3>下载并解压</h3><p>下载压缩包，解压到一个固定的文件夹，比如 <code>D:\桌面课笺</code>。</p></div><div class="step reveal"><h3>双击 DeskStudy.exe</h3><p>第一次打开是空白课表和两本空便签，直接开始用。</p></div><div class="step reveal"><h3>录入课表和任务</h3><p>双击日历空白处添加课程，在便签底部打字回车添加任务；学校日历可以从 Outlook 同步进来。</p></div></div>
+    <p class="note reveal">首次运行如果出现「Windows 已保护你的电脑」，点「更多信息」→「仍要运行」。出现这个提示是因为程序没有购买数字签名。压缩包里的「使用指南.html」和「User Guide.html」有完整的图文说明。</p>
+    <p class="reveal" style="margin:26px 0 0"><a class="btn primary" href="https://github.com/ElinaMa500/DeskStudy/releases/download/v1.6/DeskStudy-1.6-Windows.zip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="m7 11 5 5 5-5"/><path d="M5 20h14"/></svg>下载 Windows 版 <small>v1.6</small></a></p>
   </div>
 </section>
 
 <section id="faq" class="band">
   <div class="wrap">
-    <div class="head center reveal">
-      <div class="kicker">09 / 常见问题</div>
-      <h2>你可能想问</h2>
-    </div>
-    <div class="faq reveal">
-      <details><summary>要钱吗？有没有广告或内购？</summary><p>都没有。桌面课笺免费，以 MIT 许可证开源。</p></details>
-      <details><summary>会不会上传我的数据？</summary><p>不会。程序不联网，所有内容只保存在你电脑上的本地数据文件夹里。源码公开，可以自己核实。</p></details>
-      <details><summary>点了窗口的 ✕，程序就关了吗？</summary><p>没有，只是把组件隐藏了，提醒照常。双击任务栏右下角托盘里的图标可以重新显示；要彻底退出，右键托盘图标选「保存并退出」。</p></details>
-      <details><summary>任务栏上为什么找不到它？</summary><p>三个组件是桌面小组件，不占任务栏，只在托盘里有一个图标。被别的窗口挡住时，单击托盘图标或按快捷键（默认 Ctrl+Alt+Shift+D）就能叫到前面。不习惯的话，可以在设置里切换成带标题栏的标准窗口。</p></details>
-      <details><summary>为什么没有收到提醒？</summary><p>提醒需要程序在运行，任务要设置了截止时间并且没有打勾。再检查一下 Windows 的通知设置和勿扰模式。</p></details>
-      <details><summary>换电脑或重装系统怎么办？</summary><p>在设置中心导出全部数据，得到一个文件，拷到新电脑后导入即可。</p></details>
-      <details><summary>卸载会留下什么？</summary><p>程序本身只有解压出来的那个文件夹，删掉即可。你的数据保存在本机用户目录下的 DeskStudy 文件夹里，不需要时可以一并删除。如果开启过「登录 Windows 后自动启动」，删除前先在设置中心把它关掉。</p></details>
-    </div>
+    <div class="head center reveal"><div class="kicker">09 / 常见问题</div><h2>你可能想问</h2></div>
+    <div class="faq reveal"><details><summary>要钱吗？有没有广告或内购？</summary><p>都没有。桌面课笺免费，以 MIT 许可证开源。</p></details><details><summary>会不会上传我的数据？</summary><p>不会。你的课程、任务和设置只保存在本机。只有订阅了 Outlook 日历时，程序才会访问你填写的那一个链接，而且只下载、不上传。源码公开，可以自己核实。</p></details><details><summary>能和 Outlook 日历一起用吗？</summary><p>可以。在 Outlook 网页版「发布日历」得到一个 ICS 链接，粘贴到设置中心，就会只读显示在日历上，并按设定的间隔自动更新。也可以一键把它复制成自己的课程，之后不再同步。</p></details><details><summary>有英文界面吗？</summary><p>有。设置中心「外观」最上面可以在中文和 English 之间切换，重启后生效。第一次打开时会跟随 Windows 的显示语言。</p></details><details><summary>点了组件的 ✕，程序就关了吗？</summary><p>没有，只是把组件隐藏了，提醒照常。双击托盘图标可以全部显示出来；要彻底退出，右键托盘图标选「保存并退出」。</p></details><details><summary>任务栏上怎么找到它？</summary><p>三个组件各自不占任务栏，但程序有一个「桌面课笺」任务栏按钮：单击把组件叫到前面，再单击收回去。右键它可以固定到任务栏。也可以在设置里切换成带标题栏的标准窗口。</p></details><details><summary>为什么没有收到提醒？</summary><p>提醒需要程序在运行，任务要设置了截止时间并且没有打勾。再检查一下 Windows 的通知设置和勿扰模式。</p></details><details><summary>换电脑或重装系统怎么办？</summary><p>在设置中心导出全部数据，得到一个文件，拷到新电脑后导入即可。</p></details><details><summary>卸载会留下什么？</summary><p>程序本身只有解压出来的那个文件夹，删掉即可。你的数据保存在本机用户目录下的 DeskStudy 文件夹里，不需要时可以一并删除。如果开启过「登录 Windows 后自动启动」，删除前先在设置中心把它关掉。</p></details></div>
   </div>
 </section>
 
 <section>
   <div class="wrap">
     <div class="final reveal">
-      <div>
-        <h2>这学期的 DDL，别再靠记性</h2>
-        <p>免费、开源、不联网。下载解压，双击就能用。</p>
-      </div>
+      <div><h2>这学期的 DDL，别再靠记性</h2><p>免费、开源、无账号。下载解压，双击就能用。</p></div>
       <div class="act">
-        <a class="btn primary" href="https://github.com/ElinaMa500/DeskStudy/releases/download/v1.3/DeskStudy-1.3-Windows.zip">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="m7 11 5 5 5-5"/><path d="M5 20h14"/></svg>
-          下载 Windows 版
-        </a>
+        <a class="btn primary" href="https://github.com/ElinaMa500/DeskStudy/releases/download/v1.6/DeskStudy-1.6-Windows.zip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="m7 11 5 5 5-5"/><path d="M5 20h14"/></svg>下载 Windows 版</a>
         <a class="btn ghost" href="https://github.com/ElinaMa500/DeskStudy">在 GitHub 查看源码</a>
-        <small>v1.3 · Windows 10 / 11 · 不到 300 KB · <a href="https://github.com/ElinaMa500/DeskStudy/releases">所有版本</a></small>
+        <small>v1.6 · Windows 10 / 11 · 约 630 KB · <a href="https://github.com/ElinaMa500/DeskStudy/releases">所有版本</a></small>
       </div>
     </div>
   </div>
@@ -496,19 +346,13 @@ footer a{color:var(--sub)}
 </main>
 
 <footer>
-  <div class="wrap">
-    桌面课笺 DeskStudy · MIT 许可证开源 ·
-    <a href="https://github.com/ElinaMa500/DeskStudy">GitHub</a> ·
-    <a href="https://github.com/ElinaMa500/DeskStudy/blob/main/USER_GUIDE.md">使用指南</a> ·
-    界面截图均为示例数据
-  </div>
+  <div class="wrap">桌面课笺 DeskStudy · MIT 许可证开源 · <a href="https://github.com/ElinaMa500/DeskStudy">GitHub</a> · <a href="https://github.com/ElinaMa500/DeskStudy/blob/main/USER_GUIDE.md">使用指南</a> · <a href="en/" hreflang="en">English</a> · 界面截图均为示例数据</div>
 </footer>
 
 <script>
 (function () {
   var nav = document.querySelector('.nav');
   addEventListener('scroll', function () { nav.classList.toggle('scrolled', scrollY > 8); }, { passive: true });
-
   var items = document.querySelectorAll('.reveal');
   if ('IntersectionObserver' in window) {
     var io = new IntersectionObserver(function (entries) {
@@ -516,7 +360,6 @@ footer a{color:var(--sub)}
     }, { threshold: 0.1 });
     items.forEach(function (el) { io.observe(el); });
   } else { items.forEach(function (el) { el.classList.add('in'); }); }
-
   var personaTabs = document.querySelectorAll('#persona-tabs button');
   personaTabs.forEach(function (tab) {
     tab.addEventListener('click', function () {
@@ -529,7 +372,6 @@ footer a{color:var(--sub)}
       });
     });
   });
-
   var img = document.getElementById('look'), name = document.getElementById('look-name'), desc = document.getElementById('look-desc');
   var lookTabs = document.querySelectorAll('#look-tabs button');
   lookTabs.forEach(function (tab) {
@@ -537,7 +379,7 @@ footer a{color:var(--sub)}
       lookTabs.forEach(function (t) { t.setAttribute('aria-selected', String(t === tab)); });
       img.classList.add('swap');
       setTimeout(function () {
-        img.src = tab.dataset.img; img.alt = tab.dataset.name + '外观的 Todo 与 DDL 便签';
+        img.src = tab.dataset.img; img.alt = tab.dataset.alt;
         name.textContent = tab.dataset.name; desc.textContent = tab.dataset.desc;
         img.classList.remove('swap');
       }, 180);

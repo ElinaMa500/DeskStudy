@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DeskStudy · Your timetable, to-dos and deadlines, always on your desktop</title>
+<meta name="description" content="Windows desktop widgets for courses, research and teaching: your week, your to-dos and your deadlines stay on the desktop and remind you in time. Deadlines are sorted and shown on the calendar; an Outlook calendar can be synced read-only. Open source, no account, offline by default.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="DeskStudy · Deadlines should not depend on memory">
+<meta property="og:description" content="Windows desktop widgets for courses, research and teaching: your week, your to-dos and your deadlines stay on the desktop and remind you in time. Deadlines are sorted and shown on the calendar; an Outlook calendar can be synced read-only. Open source, no account, offline by default.">
+<meta property="og:url" content="https://elinama500.github.io/DeskStudy/en/">
+<meta property="og:image" content="https://elinama500.github.io/DeskStudy/images/site/en/persona-research.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#f7f5ee">
+<link rel="alternate" hreflang="zh-CN" href="https://elinama500.github.io/DeskStudy/">
+<link rel="alternate" hreflang="en" href="https://elinama500.github.io/DeskStudy/en/">
+<style>
+:root{
+  --ink:#17211d; --text:#2a3531; --sub:#5a6661; --faint:#8a9590; --rule:#e2e6e0; --paper:#f7f5ee; --card:#ffffff;
+  --accent:#2f6a50; --accent-deep:#234f3c; --accent-soft:#e4efe8; --warm:#9a5530; --warm-soft:#f5e7dc; --blue:#47609a; --blue-soft:#e7ecf6;
+  --radius:16px; --shadow:0 20px 60px rgba(23,33,29,.12), 0 2px 8px rgba(23,33,29,.05);
+  --mono:"Cascadia Mono","Consolas","SF Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;font-family:"Segoe UI","PingFang SC","Microsoft YaHei UI","Microsoft YaHei",system-ui,sans-serif;color:var(--text);background:var(--paper);line-height:1.75;-webkit-font-smoothing:antialiased}
+img{max-width:100%;height:auto;display:block}
+a{color:inherit}
+.wrap{width:min(1140px,100% - 40px);margin-inline:auto}
+h1,h2,h3{color:var(--ink);text-wrap:balance}
+p{text-wrap:pretty}
+
+/* nav */
+.nav{position:sticky;top:0;z-index:30;background:rgba(247,245,238,.88);backdrop-filter:saturate(1.4) blur(12px);border-bottom:1px solid transparent;transition:border-color .2s}
+.nav.scrolled{border-color:var(--rule)}
+.nav .wrap{display:flex;align-items:center;gap:24px;height:62px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:17px;text-decoration:none;color:var(--ink)}
+.brand i{width:26px;height:26px;border-radius:7px;background:var(--accent);display:grid;place-items:center}
+.brand i::after{content:"";width:12px;height:10px;border:2px solid #fff;border-top-width:4px;border-radius:3px}
+.nav nav{display:flex;align-items:center;gap:22px;margin-left:auto;font-size:14.5px;color:var(--sub)}
+.nav nav a{text-decoration:none}
+.nav nav a:hover{color:var(--ink)}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;padding:14px 26px;border-radius:12px;font-weight:650;font-size:16px;text-decoration:none;transition:transform .15s,box-shadow .15s,background .15s,border-color .15s;white-space:nowrap}
+.btn.primary{background:var(--accent);color:#fff;box-shadow:0 10px 24px rgba(47,106,80,.28)}
+.btn.primary:hover{background:var(--accent-deep);transform:translateY(-2px);box-shadow:0 14px 30px rgba(47,106,80,.34)}
+.btn.ghost{border:1.5px solid #cbd4ce;color:var(--ink);background:rgba(255,255,255,.7)}
+.btn.ghost:hover{border-color:var(--accent);color:var(--accent-deep)}
+.btn.small{padding:8px 16px;font-size:14px;border-radius:10px;box-shadow:none}
+.btn svg{width:18px;height:18px;flex:none}
+.btn small{font-weight:500;opacity:.8;font-size:13px}
+
+/* hero */
+.hero{position:relative;padding:72px 0 0;overflow:hidden}
+.hero::before{content:"";position:absolute;inset:0;z-index:-2;background-image:linear-gradient(rgba(23,33,29,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(23,33,29,.045) 1px,transparent 1px);background-size:28px 28px;mask-image:linear-gradient(180deg,#000 0,#000 45%,transparent 92%)}
+.hero::after{content:"";position:absolute;inset:-10% -10% auto;height:620px;z-index:-1;background:radial-gradient(560px 340px at 18% 30%,rgba(47,106,80,.16),transparent 70%),radial-gradient(520px 320px at 85% 20%,rgba(154,85,48,.13),transparent 70%)}
+.hero-copy{max-width:800px}
+.eyebrow{display:inline-block;font-size:13.5px;font-weight:650;letter-spacing:.06em;color:var(--accent-deep);padding:6px 12px;border-radius:8px;background:var(--accent-soft)}
+h1{font-size:clamp(38px,6.6vw,74px);line-height:1.1;margin:22px 0 8px;font-weight:800;letter-spacing:-.015em}
+.h1-sub{font-size:clamp(22px,3.5vw,38px);line-height:1.3;font-weight:700;color:var(--accent-deep);margin:0 0 22px}
+.lead{font-size:clamp(16px,1.9vw,19px);color:var(--sub);max-width:35em;margin:0 0 30px}
+.cta{display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:26px 0 0;padding:0;list-style:none}
+.chips li{font-size:13.5px;color:var(--sub);padding:5px 12px;border:1px solid var(--rule);border-radius:999px;background:rgba(255,255,255,.75);white-space:nowrap}
+.chips li b{color:var(--ink);font-weight:650}
+.stage{margin:50px auto 0;width:min(1240px,100% - 24px);padding:14px 14px 0;border-radius:22px 22px 0 0;background:linear-gradient(180deg,rgba(255,255,255,.9),rgba(255,255,255,.4));border:1px solid #fff;border-bottom:0;box-shadow:var(--shadow)}
+.stage img{width:100%;border-radius:10px 10px 0 0}
+.shot-note{font-size:12.5px;color:var(--faint);margin:10px 0 0}
+
+/* sections */
+section{padding:92px 0}
+.head{max-width:44em;margin:0 0 46px}
+.head.center{text-align:center;margin-inline:auto}
+.kicker{font-family:var(--mono);font-size:13px;letter-spacing:.08em;color:var(--accent);font-weight:600}
+h2{font-size:clamp(27px,3.9vw,42px);line-height:1.22;margin:10px 0 14px;font-weight:800}
+.head p{color:var(--sub);font-size:17px;margin:0}
+.band{background:#fff;border-block:1px solid var(--rule)}
+
+/* why */
+.why{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.pain{background:var(--card);border:1px solid var(--rule);border-radius:var(--radius);padding:26px 24px;display:flex;flex-direction:column}
+.pain .q{font-size:18.5px;font-weight:750;color:var(--ink);line-height:1.4;margin:0 0 8px}
+.pain p{margin:0;color:var(--sub);font-size:15px}
+.pain .a{margin-top:auto;padding-top:16px}
+.pain .a span{display:block;border-top:1px dashed #cdd5cf;padding-top:14px;color:var(--accent-deep);font-weight:650;font-size:15px}
+
+/* personas */
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px}
+.tabs.center{justify-content:center}
+.tabs button{font:inherit;font-size:15px;font-weight:650;padding:10px 18px;border-radius:10px;border:1.5px solid var(--rule);background:#fff;color:var(--sub);cursor:pointer;transition:all .15s}
+.tabs button:hover{border-color:var(--accent);color:var(--accent-deep)}
+.tabs button[aria-selected="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
+.persona{display:grid;gap:22px}
+.persona[hidden]{display:none}
+.shot{border-radius:var(--radius);background:#e8eaed;padding:8px;box-shadow:var(--shadow)}
+.shot img{width:100%;border-radius:9px}
+.uses{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.uses li{background:#fff;border:1px solid var(--rule);border-radius:12px;padding:16px 16px}
+.uses b{display:block;color:var(--ink);font-size:15.5px;margin-bottom:2px}
+.uses span{color:var(--sub);font-size:14.5px}
+.persona > div:last-child{display:contents}
+.persona h3{margin:0;font-size:21px;order:-1}
+
+/* details grid */
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.cell{background:var(--card);border:1px solid var(--rule);border-radius:14px;padding:20px 18px}
+.cell .t{font-family:var(--mono);font-size:12.5px;color:var(--accent);font-weight:600;letter-spacing:.04em}
+.cell h3{margin:6px 0 6px;font-size:17px}
+.cell p{margin:0;color:var(--sub);font-size:14.5px}
+
+/* looks */
+.viewer{max-width:880px;margin:0 auto}
+.viewer img{transition:opacity .18s}
+.viewer img.swap{opacity:0}
+.caption{text-align:center;margin:18px auto 0;max-width:36em}
+.caption b{font-size:18px;color:var(--ink)}
+.caption p{margin:4px 0 0;color:var(--sub)}
+
+/* trust */
+.trust{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+.trust .item{display:flex;gap:16px;background:var(--card);border:1px solid var(--rule);border-radius:var(--radius);padding:22px}
+.ico{flex:none;width:44px;height:44px;border-radius:12px;background:var(--accent-soft);color:var(--accent-deep);display:grid;place-items:center}
+.ico svg{width:22px;height:22px}
+.item h3{margin:0 0 4px;font-size:17.5px}
+.item p{margin:0;color:var(--sub);font-size:15px}
+.item a{color:var(--accent-deep);font-weight:600}
+
+/* table */
+.table{overflow-x:auto;border:1px solid var(--rule);border-radius:var(--radius);background:#fff}
+table{border-collapse:collapse;width:100%;min-width:640px;font-size:15px}
+th,td{padding:14px 16px;text-align:left;border-bottom:1px solid var(--rule);vertical-align:top}
+tr:last-child td{border-bottom:0}
+thead th{font-size:14px;color:var(--sub);font-weight:650;background:#fafbf9}
+thead th.us{color:var(--accent-deep);background:var(--accent-soft)}
+td.us{background:#f4f9f6;font-weight:600;color:var(--ink)}
+td:first-child{font-weight:650;color:var(--ink)}
+.yes{color:var(--accent-deep)}.no{color:var(--faint)}
+.fine{font-size:13px;color:var(--faint);margin:12px 0 0}
+
+/* limits */
+.limits{display:grid;grid-template-columns:1fr 1.3fr;gap:44px;align-items:start}
+.limits ul{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.limits li{display:flex;gap:12px;padding:14px 16px;border-radius:12px;background:#fff;border:1px solid var(--rule);font-size:15px}
+.limits li::before{content:"×";color:var(--warm);font-weight:800;flex:none}
+.limits li span{color:var(--sub)}
+.limits li b{color:var(--ink)}
+
+/* steps */
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;counter-reset:s}
+.step{background:#fff;border:1px solid var(--rule);border-radius:var(--radius);padding:26px 22px;counter-increment:s}
+.step::before{content:"0" counter(s);font-family:var(--mono);font-weight:700;color:var(--accent);font-size:15px}
+.step h3{margin:8px 0 6px;font-size:18px}
+.step p{margin:0;color:var(--sub);font-size:15px}
+code{font-family:inherit;background:var(--accent-soft);color:var(--accent-deep);padding:1px 7px;border-radius:6px;font-size:.94em;white-space:nowrap}
+.note{margin:20px 0 0;padding:14px 18px;border-radius:12px;background:var(--warm-soft);color:#6b3c20;font-size:14.5px}
+
+/* faq */
+.faq{max-width:780px;margin:0 auto;display:grid;gap:10px}
+details{background:#fff;border:1px solid var(--rule);border-radius:12px;padding:0 20px}
+summary{cursor:pointer;padding:16px 0;font-weight:650;color:var(--ink);list-style:none;display:flex;justify-content:space-between;gap:16px}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"+";font-size:22px;line-height:1;color:var(--faint);transition:transform .2s}
+details[open] summary::after{transform:rotate(45deg)}
+details p{margin:0 0 18px;color:var(--sub)}
+
+/* final */
+.final{background:var(--ink);color:#fff;border-radius:26px;padding:64px 40px;position:relative;overflow:hidden;display:grid;grid-template-columns:1.4fr 1fr;gap:30px;align-items:center}
+.final::before{content:"";position:absolute;inset:0;background:radial-gradient(520px 280px at 12% 0,rgba(91,160,125,.42),transparent 70%),radial-gradient(460px 260px at 95% 100%,rgba(184,113,75,.30),transparent 70%)}
+.final>*{position:relative}
+.final h2{color:#fff;margin:0 0 10px}
+.final p{color:#c3cfc9;margin:0}
+.final .act{display:grid;gap:12px;justify-items:start}
+.final .btn.primary{background:#fff;color:var(--ink);box-shadow:0 12px 30px rgba(0,0,0,.25)}
+.final .btn.primary:hover{background:#eef4f0}
+.final .btn.ghost{background:transparent;border-color:rgba(255,255,255,.35);color:#fff}
+.final .btn.ghost:hover{border-color:#fff;color:#fff}
+.final small{color:#9fb0a8;font-size:13px}
+footer{padding:34px 0 46px;color:var(--faint);font-size:13.5px;text-align:center}
+footer a{color:var(--sub)}
+
+.reveal{opacity:0;transform:translateY(20px);transition:opacity .6s ease,transform .6s ease}
+.reveal.in{opacity:1;transform:none}
+@media (prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}html{scroll-behavior:auto}.btn{transition:none}}
+
+@media (max-width:980px){
+  .grid,.uses{grid-template-columns:repeat(2,1fr)}
+  .limits,.final{grid-template-columns:1fr}
+  .why,.steps,.trust{grid-template-columns:1fr}
+}
+@media (max-width:720px){
+  section{padding:64px 0}
+  .hero{padding-top:44px}
+  .nav nav a:not(.btn):not(.lang){display:none}
+  .grid,.uses{grid-template-columns:1fr}
+  .stage{padding:8px 8px 0;border-radius:16px 16px 0 0}
+  .pan{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .pan img{width:auto;max-width:none;height:min(62vh,460px)}
+  .final{padding:44px 22px;border-radius:20px}
+  .btn{width:100%}
+  .btn.small{width:auto}
+}
+.nav .lang{font-size:13.5px;font-weight:650;padding:5px 10px;border:1px solid var(--rule);border-radius:8px;color:var(--sub);text-decoration:none;white-space:nowrap;flex-shrink:0}
+.nav .lang:hover{border-color:var(--accent);color:var(--accent-deep)}
+.new{display:inline-block;font-size:11.5px;font-weight:700;letter-spacing:.04em;color:#fff;background:var(--warm);border-radius:6px;padding:1px 7px;margin-left:6px;vertical-align:2px;font-family:"Segoe UI","PingFang SC","Microsoft YaHei UI","Microsoft YaHei",system-ui,sans-serif;letter-spacing:0;text-transform:none}
+</style>
+</head>
+<body>
+
+<header class="nav" id="top">
+  <div class="wrap">
+    <a class="brand" href="#top"><i></i>DeskStudy</a>
+    <nav>
+      <a href="#who">Who it is for</a><a href="#details">Features</a><a href="#trust">Trust</a><a href="#limits">Limits</a>
+      <a class="lang" href="../" hreflang="zh-CN">中文</a>
+      <a class="btn primary small" href="https://github.com/ElinaMa500/DeskStudy/releases/download/v1.6/DeskStudy-1.6-Windows.zip">Free download</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+<div class="hero">
+  <div class="wrap">
+    <div class="hero-copy">
+      <span class="eyebrow">Windows desktop widgets for courses, research and teaching</span>
+      <h1>Deadlines should not depend on memory.</h1>
+      <p class="h1-sub">Your timetable, to-dos and deadlines, always on your desktop.</p>
+      <p class="lead">DeskStudy puts your week, your to-do list and every deadline into three small widgets that stay on your desktop. No app to open: look up and they are there. Deadlines are sorted by due time and marked on the calendar, and you are reminded before they are due.</p>
+      <div class="cta">
+        <a class="btn primary" href="https://github.com/ElinaMa500/DeskStudy/releases/download/v1.6/DeskStudy-1.6-Windows.zip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="m7 11 5 5 5-5"/><path d="M5 20h14"/></svg>Download for Windows <small>v1.6</small></a>
+        <a class="btn ghost" href="https://github.com/ElinaMa500/DeskStudy/blob/main/USER_GUIDE.en.md">Read the guide</a>
+      </div>
+      <ul class="chips"><li><b>Open source</b> · MIT</li><li><b>No account</b></li><li><b>Offline by default</b></li><li><b>No ads</b></li><li><b>English · 中文</b></li><li><b>About 630 KB</b></li><li><b>Unzip and run</b>, no installer</li></ul>
+    </div>
+  </div>
+  <div class="stage pan reveal"><img src="../images/site/en/persona-research.png" width="1303" height="1013" alt="The three DeskStudy widgets: the Deadlines notebook lists submissions by due time, the To-do notebook lists paper revisions, and the week calendar shows a group meeting, a reading group, a supervisor meeting and a two-day conference"></div>
+</div>
+
+<section id="why" class="band">
+  <div class="wrap">
+    <div class="head reveal"><div class="kicker">01 / Why on the desktop</div><h2>Writing it down is easy. Seeing it again is the hard part.</h2><p>What goes wrong in a term is usually the one thing you thought had a few more days.</p></div>
+    <div class="why"><div class="pain reveal"><p class="q">Deadlines are everywhere</p><p>The course site, email, group chats, a conference page. Each deadline lives somewhere else, and only your memory adds them up.</p><div class="a"><span>Keep them in one Deadlines notebook, sorted by due time, showing "Tomorrow" or "3 days left", and marked on the calendar.</span></div></div><div class="pain reveal"><p class="q">To-do apps only work when opened</p><p>You write things down carefully, then never open the app again. A list you do not see is no list.</p><div class="a"><span>Three borderless widgets stay on the desktop behind your windows; one click on the taskbar button brings them forward.</span></div></div><div class="pain reveal"><p class="q">The timetable never matches reality</p><p>A meeting every other week, one moved class, a week off, a few days of holiday: a plain weekly timetable cannot say that.</p><div class="a"><span>Weekly and two-weekly repeats, one-off changes and multi-day all-day events; your school's Outlook calendar can come in too.</span></div></div></div>
+  </div>
+</section>
+
+<section id="who">
+  <div class="wrap">
+    <div class="head reveal"><div class="kicker">02 / Who it is for</div><h2>One tool, three kinds of term</h2><p>These are real screens of the program with sample data. Pick a role.</p></div>
+    <div class="tabs reveal" role="tablist" aria-label="Who it is for" id="persona-tabs"><button role="tab" aria-selected="true" data-panel="p-student">Undergraduate</button><button role="tab" aria-selected="false" data-panel="p-research">Graduate · PhD</button><button role="tab" aria-selected="false" data-panel="p-faculty">Teaching staff</button></div>
+    
+    <div class="persona reveal" id="p-student">
+      <div class="shot pan"><img src="../images/site/en/persona-student.png" width="1303" height="1013" alt="Undergraduate example: Calculus, Linear Algebra, Academic English and Physics lab in the week view, and deadlines for problem sets and lab reports"></div>
+      <div>
+        <h3>Enter your timetable once, never miss homework</h3>
+        <ul class="uses"><li><b>Your timetable, once a term</b><span>The whole term fills in, with the teaching week shown.</span></li><li><b>Homework and lab reports as deadlines</b><span>See "Tomorrow" and "3 days left"; the most urgent is always on top.</span></li><li><b>Moved or cancelled class</b><span>Change just that one; other weeks stay as they are.</span></li><li><b>Double-click to edit</b><span>Fix a typo where it is and press Enter.</span></li></ul>
+      </div>
+    </div>
+    <div class="persona" id="p-research" hidden>
+      <div class="shot pan"><img loading="lazy" src="../images/site/en/persona-research.png" width="1303" height="1013" alt="Graduate example: group meeting, reading group, supervisor meeting and TA problem classes in the week view, a two-day conference, and deadlines for submissions and applications"></div>
+      <div>
+        <h3>Meetings, papers and teaching duties in one view</h3>
+        <ul class="uses"><li><b>Group meeting every two weeks</b><span>Set it once. Moved this time? Change just that one.</span></li><li><b>Submissions, revisions, proposals</b><span>Sorted by due time, each with its own reminder, and visible on the calendar.</span></li><li><b>Conferences as all-day events</b><span>A multi-day event is one bar across the top of the calendar.</span></li><li><b>Your school calendar inside</b><span>Seminars and office hours from Outlook, synced read-only and colored by name.</span></li></ul>
+      </div>
+    </div>
+    <div class="persona" id="p-faculty" hidden>
+      <div class="shot pan"><img loading="lazy" src="../images/site/en/persona-faculty.png" width="1303" height="1013" alt="Teaching example: undergraduate and postgraduate courses, office hours and a group meeting in the week view, midterm week, and deadlines for reviews, a grant proposal and grades"></div>
+      <div>
+        <h3>Teaching, supervision and every deadline on one screen</h3>
+        <ul class="uses"><li><b>Courses, office hours, group meetings</b><span>One week view, with fortnightly meetings shown correctly.</span></li><li><b>Reviews, grants, grade entry</b><span>Be reminded a day early for what matters, not just at the last minute.</span></li><li><b>Exam weeks and breaks at a glance</b><span>All-day events span the days they cover.</span></li><li><b>Quiet hours</b><span>Reminders wait until quiet hours end, then arrive together.</span></li></ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="details" class="band">
+  <div class="wrap">
+    <div class="head reveal"><div class="kicker">03 / Features</div><h2>Made for the rhythm of terms and research</h2><p>Nothing flashy: just what you find you cannot do without after a few weeks.</p></div>
+    <div class="grid"><div class="cell reveal"><div class="t">Repeats</div><h3>Weekly and two-weekly</h3><p>A course can run on several days a week; fortnightly meetings work too.</p></div><div class="cell reveal"><div class="t">Exceptions</div><h3>Change just this one</h3><p>Moved or cancelled classes are one-off changes; other weeks stay as they are.</p></div><div class="cell reveal"><div class="t">All day <span class=new>New in 1.6</span></div><h3>Holidays and exam weeks</h3><p>All-day events can span several days, sit under the dates, and repeat weekly.</p></div><div class="cell reveal"><div class="t">Deadlines <span class=new>New in 1.6</span></div><h3>Sorted by due time</h3><p>The most urgent on top, done ones at the bottom; new ones take their place by themselves.</p></div><div class="cell reveal"><div class="t">Calendar <span class=new>New in 1.6</span></div><h3>Deadlines on the calendar</h3><p>Timed deadlines are small ⚑ tags; days with deadlines get a badge. Click one to jump to the task.</p></div><div class="cell reveal"><div class="t">Outlook <span class=new>New in 1.6</span></div><h3>Your school calendar</h3><p>Paste the link of a published Outlook calendar to show it read-only, or copy it into your own events once.</p></div><div class="cell reveal"><div class="t">Reminders</div><h3>Per-task lead time</h3><p>Each task has its own lead time; you are reminded then and when it is due. Missed ones arrive later.</p></div><div class="cell reveal"><div class="t">Editing <span class=new>New in 1.6</span></div><h3>Double-click to edit</h3><p>Edit a task where it is; clicking elsewhere saves. Type and press Enter to add one.</p></div><div class="cell reveal"><div class="t">Always there <span class=new>New in 1.6</span></div><h3>Present, not in the way</h3><p>Widgets stay behind your windows; the taskbar button or a shortcut brings them forward.</p></div><div class="cell reveal"><div class="t">Fold</div><h3>Out of the way for now</h3><p>Fold a widget into its header bar at the bottom of the screen; unfold it when you need it.</p></div><div class="cell reveal"><div class="t">Teaching week</div><h3>Which week is it?</h3><p>Enter your term dates and the calendar shows the teaching week.</p></div><div class="cell reveal"><div class="t">Language <span class=new>New in 1.6</span></div><h3>English and 中文</h3><p>Switch the interface between English and Chinese; it follows Windows the first time.</p></div></div>
+  </div>
+</section>
+
+<section id="looks">
+  <div class="wrap">
+    <div class="head center reveal"><div class="kicker">04 / Looks</div><h2>Five notebook layouts, one click to switch</h2><p>The calendar follows, and nothing is lost when you switch. Theme, background, opacity and font size can be changed too.</p></div>
+    <div class="tabs center reveal" role="tablist" aria-label="Looks" id="look-tabs"><button role="tab" aria-selected="true" data-img="../images/site/en/layout-clean.png" data-name="Clean cards" data-desc="White, a large title, hairlines between tasks. The simplest." data-alt="Deadlines and To-do notebooks in the Clean cards layout">Clean cards</button><button role="tab" aria-selected="false" data-img="../images/site/en/layout-journal.png" data-name="Journal" data-desc="Cream paper with narrow page tabs, like a notebook." data-alt="Deadlines and To-do notebooks in the Journal layout">Journal</button><button role="tab" aria-selected="false" data-img="../images/site/en/layout-card.png" data-name="Light cards" data-desc="The default. Each task is a small card." data-alt="Deadlines and To-do notebooks in the Light cards layout">Light cards</button><button role="tab" aria-selected="false" data-img="../images/site/en/layout-paper.png" data-name="Paper" data-desc="Warm paper with page numbers down the left." data-alt="Deadlines and To-do notebooks in the Paper layout">Paper</button><button role="tab" aria-selected="false" data-img="../images/site/en/layout-original.png" data-name="Original" data-desc="Every button in view, with edit, move and delete under each task." data-alt="Deadlines and To-do notebooks in the Original layout">Original</button></div>
+    <div class="viewer reveal">
+      <div class="shot"><img id="look" loading="lazy" src="../images/site/en/layout-clean.png" width="878" height="552" alt="Deadlines and To-do notebooks in the Clean cards layout"></div>
+      <div class="caption" aria-live="polite"><b id="look-name">Clean cards</b><p id="look-desc">White, a large title, hairlines between tasks. The simplest.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="trust" class="band">
+  <div class="wrap">
+    <div class="head reveal"><div class="kicker">05 / Trust</div><h2>Why it is fine on a work computer</h2><p>Unpublished research, students' grades and review assignments do not belong on someone else's server.</p></div>
+    <div class="trust"><div class="item reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></div><div><h3>Your data stays here</h3><p>No account, nothing uploaded; everything lives in one folder on your computer. DeskStudy is offline by default and only downloads the Outlook link you give it, if you subscribe to one.</p></div></div><div class="item reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 8-4 4 4 4"/><path d="m16 8 4 4-4 4"/><path d="m13.5 5-3 14"/></svg></div><div><h3>Open source, check it yourself</h3><p>MIT licensed, with no third-party runtime dependencies. Read the code or build it yourself. <a href="https://github.com/ElinaMa500/DeskStudy">GitHub repository</a></p></div></div><div class="item reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v5h-5"/></svg></div><div><h3>Saved automatically, with a way back</h3><p>Changes save by themselves and the previous good copy is kept. Before importing, restoring or copying an Outlook calendar, DeskStudy makes a backup.</p></div></div><div class="item reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg></div><div><h3>Every release is verified</h3><p>Version 1.6 has 768 automated checks in 24 suites, covering repeats, time zones, reminders, Outlook parsing and the interface; results and what was not verified are written down. <a href="https://github.com/ElinaMa500/DeskStudy/blob/main/VERIFICATION.md">Verification notes</a></p></div></div></div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="head reveal"><div class="kicker">06 / Compared</div><h2>How it compares with what you use now</h2></div>
+    <div class="table reveal"><table>
+      <thead><tr><th></th><th class=us>DeskStudy</th><th>Sticky notes</th><th>To-do and calendar apps on phone or web</th></tr></thead>
+      <tbody><tr><td>Seen without opening anything</td><td class="us yes">Always on the desktop</td><td class="yes">Stuck to the screen</td><td class="no">You have to open them</td></tr><tr><td>Reminders</td><td class="us yes">Before and when due</td><td class="no">None</td><td class="yes">Yes</td></tr><tr><td>Repeating timetable, one-off changes</td><td class="us yes">Weekly, two-weekly, exceptions</td><td class="no">None</td><td class="">Depends on the app</td></tr><tr><td>Outlook calendar</td><td class="us yes">Read-only sync, or copy into your own</td><td class="no">None</td><td class="">Depends on the app</td></tr><tr><td>Account</td><td class="us yes">Not needed</td><td class="yes">Not needed</td><td class="">Usually needed</td></tr><tr><td>Where data lives</td><td class="us yes">Only on this computer</td><td class="yes">On your desk</td><td class="">Usually in the cloud</td></tr><tr><td>Sync across devices</td><td class="us no">No</td><td class="no">No</td><td class="yes">Usually</td></tr></tbody>
+    </table></div>
+    <p class="fine reveal">The last column describes such apps in general; individual apps differ.</p>
+  </div>
+</section>
+
+<section id="limits" class="band">
+  <div class="wrap limits">
+    <div class="reveal"><div class="kicker">07 / Limits</div><h2>When it is not the right tool</h2><p style="color:var(--sub);margin:0">Better to know before you download.</p></div>
+    <ul class="reveal"><li><span><b>Windows 10 and 11 only.</b> No macOS, Linux or phone version.</span></li><li><span><b>No sync between devices.</b> Export a file on one computer and import it on the other.</span></li><li><span><b>Outlook is read-only.</b> Outlook events cannot be changed here, and Google Calendar is not supported. Published Outlook links carry no colors, so you set them per event name.</span></li><li><span><b>No shared use.</b> It is a personal tool.</span></li><li><span><b>Not code-signed.</b> Windows shows a warning the first time; you confirm it once.</span></li><li><span><b>Reminders need DeskStudy running.</b> Turn on "Start when I sign in to Windows".</span></li><li><span><b>Win+D may hide the widgets too.</b> The taskbar button or the shortcut brings them back.</span></li></ul>
+  </div>
+</section>
+
+<section id="start">
+  <div class="wrap">
+    <div class="head reveal"><div class="kicker">08 / Get started</div><h2>Unzip, double-click, start</h2><p>No installer, no administrator rights.</p></div>
+    <div class="steps"><div class="step reveal"><h3>Download and unzip</h3><p>Download the zip and unzip it into a folder that stays put, e.g. <code>D:\DeskStudy</code>.</p></div><div class="step reveal"><h3>Double-click DeskStudy.exe</h3><p>You start with an empty calendar and two empty notebooks.</p></div><div class="step reveal"><h3>Add your week and tasks</h3><p>Double-click the calendar to add a course; type at the end of a notebook and press Enter. Bring in your Outlook calendar if you like.</p></div></div>
+    <p class="note reveal">If Windows says "Windows protected your PC" the first time, choose More info → Run anyway; the program is not code-signed. "User Guide.html" in the zip explains everything with pictures. The interface follows your Windows language and can be switched to English under Settings → Appearance.</p>
+    <p class="reveal" style="margin:26px 0 0"><a class="btn primary" href="https://github.com/ElinaMa500/DeskStudy/releases/download/v1.6/DeskStudy-1.6-Windows.zip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="m7 11 5 5 5-5"/><path d="M5 20h14"/></svg>Download for Windows <small>v1.6</small></a></p>
+  </div>
+</section>
+
+<section id="faq" class="band">
+  <div class="wrap">
+    <div class="head center reveal"><div class="kicker">09 / Questions</div><h2>You might be wondering</h2></div>
+    <div class="faq reveal"><details><summary>Does it cost anything? Ads? In-app purchases?</summary><p>No. DeskStudy is free and open source under the MIT license.</p></details><details><summary>Does it upload my data?</summary><p>No. Your courses, tasks and settings stay on this computer. If you subscribe to an Outlook calendar, DeskStudy only downloads from the link you gave it, and never uploads anything. The source is public if you want to check.</p></details><details><summary>Can I use it with Outlook?</summary><p>Yes. Publish your calendar in Outlook on the web, paste the ICS link into Settings, and it appears read-only on the calendar, refreshed on a schedule. You can also copy it into your own events once and stop syncing.</p></details><details><summary>Is there a Chinese interface?</summary><p>Yes. Switch between English and 中文 at the top of Settings → Appearance and restart. The first time, DeskStudy follows your Windows display language.</p></details><details><summary>Does ✕ close the program?</summary><p>No, it hides that widget and reminders continue. Double-click the tray icon to show everything; to quit, right-click the tray icon and choose Save and exit.</p></details><details><summary>Where is it on the taskbar?</summary><p>The widgets have no taskbar buttons of their own, but DeskStudy has one: click it to bring the widgets forward, click again to send them back, and right-click it to pin it. Settings can also switch to ordinary windows with title bars.</p></details><details><summary>I did not get a reminder.</summary><p>DeskStudy must be running and the task needs a due time and must not be ticked. Check Windows notification settings and Do not disturb as well.</p></details><details><summary>New computer or a fresh Windows?</summary><p>Export all data in Settings, copy the file over and import it.</p></details><details><summary>What does uninstalling leave behind?</summary><p>The program is just the unzipped folder: delete it. Your data is in a DeskStudy folder in your user profile; delete that too if you no longer need it. If you turned on starting with Windows, turn it off in Settings first.</p></details></div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="final reveal">
+      <div><h2>Stop keeping this term's deadlines in your head</h2><p>Free, open source, no account. Download, unzip, double-click.</p></div>
+      <div class="act">
+        <a class="btn primary" href="https://github.com/ElinaMa500/DeskStudy/releases/download/v1.6/DeskStudy-1.6-Windows.zip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="m7 11 5 5 5-5"/><path d="M5 20h14"/></svg>Download for Windows</a>
+        <a class="btn ghost" href="https://github.com/ElinaMa500/DeskStudy">Source on GitHub</a>
+        <small>v1.6 · Windows 10 / 11 · about 630 KB · <a href="https://github.com/ElinaMa500/DeskStudy/releases">All versions</a></small>
+      </div>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">DeskStudy · MIT licensed · <a href="https://github.com/ElinaMa500/DeskStudy">GitHub</a> · <a href="https://github.com/ElinaMa500/DeskStudy/blob/main/USER_GUIDE.en.md">User guide</a> · <a href="../" hreflang="zh-CN">中文</a> · Screenshots show sample data</div>
+</footer>
+
+<script>
+(function () {
+  var nav = document.querySelector('.nav');
+  addEventListener('scroll', function () { nav.classList.toggle('scrolled', scrollY > 8); }, { passive: true });
+  var items = document.querySelectorAll('.reveal');
+  if ('IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+    }, { threshold: 0.1 });
+    items.forEach(function (el) { io.observe(el); });
+  } else { items.forEach(function (el) { el.classList.add('in'); }); }
+  var personaTabs = document.querySelectorAll('#persona-tabs button');
+  personaTabs.forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      personaTabs.forEach(function (t) {
+        var on = t === tab;
+        t.setAttribute('aria-selected', String(on));
+        var panel = document.getElementById(t.dataset.panel);
+        panel.hidden = !on;
+        if (on) panel.classList.add('in');
+      });
+    });
+  });
+  var img = document.getElementById('look'), name = document.getElementById('look-name'), desc = document.getElementById('look-desc');
+  var lookTabs = document.querySelectorAll('#look-tabs button');
+  lookTabs.forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      lookTabs.forEach(function (t) { t.setAttribute('aria-selected', String(t === tab)); });
+      img.classList.add('swap');
+      setTimeout(function () {
+        img.src = tab.dataset.img; img.alt = tab.dataset.alt;
+        name.textContent = tab.dataset.name; desc.textContent = tab.dataset.desc;
+        img.classList.remove('swap');
+      }, 180);
+    });
+  });
+})();
+</script>
+</body>
+</html>

@@ -410,7 +410,7 @@ public static class NotebookLayoutTests
         try
         {
             // "langfresh": a brand-new user whose Windows display language is English.
-            if (mode == "langfresh" || mode == "english" || mode == "guide-en") Thread.CurrentThread.CurrentUICulture = System.Globalization.CultureInfo.GetCultureInfo("en-US");
+            if (mode == "langfresh" || mode == "english" || mode == "guide-en" || mode == "site-en") Thread.CurrentThread.CurrentUICulture = System.Globalization.CultureInfo.GetCultureInfo("en-US");
             using (var app = new AppController(path, null, false))
             {
                 Pump(150);
@@ -432,6 +432,7 @@ public static class NotebookLayoutTests
                 else if (mode == "outlook") OutlookChecks.Run(app, path);
                 else if (mode == "allday") AllDayChecks.Run(app, path);
                 else if (mode == "guide-zh" || mode == "guide-en") GuideShots.Run(app, path, mode.Substring(6));
+                else if (mode == "site-zh" || mode == "site-en") SiteShots.Run(app, path, mode.Substring(5));
                 else if (mode == "alldayread") AllDayChecks.Read(app);
                 else if (mode == "pageturn") PageTurnChecks.Run(app, args[2], true);
                 else if (mode == "outlookread") OutlookChecks.Read(app);
