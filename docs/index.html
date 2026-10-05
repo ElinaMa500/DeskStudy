@@ -3,388 +3,427 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>桌面课笺 · 课表、待办和 DDL，一直在桌面上</title>
-<meta name="description" content="为课程、科研与教学而做的 Windows 桌面组件：周课表、待办、截止日期常驻桌面，到期提醒；DDL 按截止时间排序并显示在日历上，可只读同步 Outlook 日历。开源、无账号、默认不联网，中文和英文界面。">
+<title>桌面课笺 · 抬头就能看到的课表和 DDL</title>
+<meta name="description" content="常驻 Windows 桌面的课表、待办和 DDL 组件。DDL 自动排序并标在日历上，可同步 Outlook 日历。开源免费，无需账号。">
 <meta property="og:type" content="website">
-<meta property="og:title" content="桌面课笺 · DDL 不该靠记性">
-<meta property="og:description" content="为课程、科研与教学而做的 Windows 桌面组件：周课表、待办、截止日期常驻桌面，到期提醒；DDL 按截止时间排序并显示在日历上，可只读同步 Outlook 日历。开源、无账号、默认不联网，中文和英文界面。">
+<meta property="og:title" content="桌面课笺 · 抬头就能看到的课表和 DDL">
+<meta property="og:description" content="常驻 Windows 桌面的课表、待办和 DDL 组件。DDL 自动排序并标在日历上，可同步 Outlook 日历。开源免费，无需账号。">
 <meta property="og:url" content="https://elinama500.github.io/DeskStudy/">
 <meta property="og:image" content="https://elinama500.github.io/DeskStudy/images/site/zh/persona-research.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="theme-color" content="#f7f5ee">
+<meta name="theme-color" content="#fffdf8">
 <link rel="alternate" hreflang="zh-CN" href="https://elinama500.github.io/DeskStudy/">
 <link rel="alternate" hreflang="en" href="https://elinama500.github.io/DeskStudy/en/">
 <style>
-:root{
-  --ink:#17211d; --text:#2a3531; --sub:#5a6661; --faint:#8a9590; --rule:#e2e6e0; --paper:#f7f5ee; --card:#ffffff;
-  --accent:#2f6a50; --accent-deep:#234f3c; --accent-soft:#e4efe8; --warm:#9a5530; --warm-soft:#f5e7dc; --blue:#47609a; --blue-soft:#e7ecf6;
-  --radius:16px; --shadow:0 20px 60px rgba(23,33,29,.12), 0 2px 8px rgba(23,33,29,.05);
-  --mono:"Cascadia Mono","Consolas","SF Mono",ui-monospace,monospace;
-}
+:root{--bg:#fffdf8;--ink:#1a1a1a;--sub:#6b6760;--mute:#9a958c;--line:#ece7dc;--card:#fff;
+--accent:#e8643c;--accent-soft:#ffd7c6;--green:#2f6f53;--mint:#d9f2e6;--yellow:#fff3b0;--lilac:#dfe5ff;--peach:#ffe4d6;
+--sans:"Segoe UI Variable Display","Segoe UI","PingFang SC","Microsoft YaHei UI","Microsoft YaHei",system-ui,sans-serif}
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
-body{margin:0;font-family:"Segoe UI","PingFang SC","Microsoft YaHei UI","Microsoft YaHei",system-ui,sans-serif;color:var(--text);background:var(--paper);line-height:1.75;-webkit-font-smoothing:antialiased}
-img{max-width:100%;height:auto;display:block}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased;overflow-x:hidden}
 a{color:inherit}
-.wrap{width:min(1140px,100% - 40px);margin-inline:auto}
-h1,h2,h3{color:var(--ink);text-wrap:balance}
-p{text-wrap:pretty}
+img{display:block;max-width:100%;height:auto}
+.wrap{max-width:1200px;margin:0 auto;padding:0 32px}
+.bgs{position:absolute;left:0;right:0;top:-72px;bottom:-240px;overflow:hidden;pointer-events:none;z-index:0}
+.blob{position:absolute;border-radius:50%;filter:blur(70px);opacity:.5;pointer-events:none;z-index:0}
 
 /* nav */
-.nav{position:sticky;top:0;z-index:30;background:rgba(247,245,238,.88);backdrop-filter:saturate(1.4) blur(12px);border-bottom:1px solid transparent;transition:border-color .2s}
-.nav.scrolled{border-color:var(--rule)}
-.nav .wrap{display:flex;align-items:center;gap:24px;height:62px}
-.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:17px;text-decoration:none;color:var(--ink)}
-.brand i{width:26px;height:26px;border-radius:7px;background:var(--accent);display:grid;place-items:center}
-.brand i::after{content:"";width:12px;height:10px;border:2px solid #fff;border-top-width:4px;border-radius:3px}
-.nav nav{display:flex;align-items:center;gap:22px;margin-left:auto;font-size:14.5px;color:var(--sub)}
-.nav nav a{text-decoration:none}
+.nav{position:sticky;top:0;z-index:50;transition:background .25s,box-shadow .25s}
+.nav.scrolled{background:rgba(255,253,248,.85);backdrop-filter:blur(14px);box-shadow:0 1px 0 var(--line)}
+.nav .wrap{display:flex;align-items:center;justify-content:space-between;height:72px}
+.brand{display:flex;gap:10px;align-items:center;font-weight:800;font-size:17px;text-decoration:none}
+.brand i{width:22px;height:22px;border-radius:7px;background:var(--accent);transition:transform .4s cubic-bezier(.3,1.6,.5,1)}
+.brand:hover i{transform:rotate(-12deg) scale(1.1)}
+.nav nav{display:flex;gap:26px;align-items:center;font-size:15px;color:var(--sub)}
+.nav nav a{text-decoration:none;transition:color .2s}
 .nav nav a:hover{color:var(--ink)}
+.nav .lang{border:1.5px solid var(--line);border-radius:99px;padding:5px 12px;white-space:nowrap}
+.nav .get{background:var(--ink);color:#fff!important;border-radius:99px;padding:8px 16px;font-weight:700}
 
 /* buttons */
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;padding:14px 26px;border-radius:12px;font-weight:650;font-size:16px;text-decoration:none;transition:transform .15s,box-shadow .15s,background .15s,border-color .15s;white-space:nowrap}
-.btn.primary{background:var(--accent);color:#fff;box-shadow:0 10px 24px rgba(47,106,80,.28)}
-.btn.primary:hover{background:var(--accent-deep);transform:translateY(-2px);box-shadow:0 14px 30px rgba(47,106,80,.34)}
-.btn.ghost{border:1.5px solid #cbd4ce;color:var(--ink);background:rgba(255,255,255,.7)}
-.btn.ghost:hover{border-color:var(--accent);color:var(--accent-deep)}
-.btn.small{padding:8px 16px;font-size:14px;border-radius:10px;box-shadow:none}
-.btn svg{width:18px;height:18px;flex:none}
-.btn small{font-weight:500;opacity:.8;font-size:13px}
+.btn{display:inline-flex;align-items:center;gap:10px;background:var(--ink);color:#fff;font-weight:750;font-size:17px;padding:17px 30px;border-radius:14px;text-decoration:none;
+ box-shadow:0 6px 0 var(--accent);transition:transform .15s,box-shadow .15s}
+.btn:hover{transform:translateY(-2px);box-shadow:0 8px 0 var(--accent)}
+.btn:active{transform:translateY(4px);box-shadow:0 2px 0 var(--accent)}
+.btn svg{width:20px;height:20px}
 
 /* hero */
-.hero{position:relative;padding:72px 0 0;overflow:hidden}
-.hero::before{content:"";position:absolute;inset:0;z-index:-2;background-image:linear-gradient(rgba(23,33,29,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(23,33,29,.045) 1px,transparent 1px);background-size:28px 28px;mask-image:linear-gradient(180deg,#000 0,#000 45%,transparent 92%)}
-.hero::after{content:"";position:absolute;inset:-10% -10% auto;height:620px;z-index:-1;background:radial-gradient(560px 340px at 18% 30%,rgba(47,106,80,.16),transparent 70%),radial-gradient(520px 320px at 85% 20%,rgba(154,85,48,.13),transparent 70%)}
-.hero-copy{max-width:800px}
-.eyebrow{display:inline-block;font-size:13.5px;font-weight:650;letter-spacing:.06em;color:var(--accent-deep);padding:6px 12px;border-radius:8px;background:var(--accent-soft)}
-h1{font-size:clamp(38px,6.6vw,74px);line-height:1.1;margin:22px 0 8px;font-weight:800;letter-spacing:-.015em}
-.h1-sub{font-size:clamp(22px,3.5vw,38px);line-height:1.3;font-weight:700;color:var(--accent-deep);margin:0 0 22px}
-.lead{font-size:clamp(16px,1.9vw,19px);color:var(--sub);max-width:35em;margin:0 0 30px}
-.cta{display:flex;gap:14px;flex-wrap:wrap;align-items:center}
-.chips{display:flex;flex-wrap:wrap;gap:8px;margin:26px 0 0;padding:0;list-style:none}
-.chips li{font-size:13.5px;color:var(--sub);padding:5px 12px;border:1px solid var(--rule);border-radius:999px;background:rgba(255,255,255,.75);white-space:nowrap}
-.chips li b{color:var(--ink);font-weight:650}
-.stage{margin:50px auto 0;width:min(1240px,100% - 24px);padding:14px 14px 0;border-radius:22px 22px 0 0;background:linear-gradient(180deg,rgba(255,255,255,.9),rgba(255,255,255,.4));border:1px solid #fff;border-bottom:0;box-shadow:var(--shadow)}
-.stage img{width:100%;border-radius:10px 10px 0 0}
-.shot-note{font-size:12.5px;color:var(--faint);margin:10px 0 0}
+.hero{position:relative;min-height:min(calc(100vh - 72px),820px);display:flex;align-items:center;padding:20px 0 60px}
+.hero .wrap{position:relative;z-index:1;display:grid;grid-template-columns:1fr 1.25fr;gap:24px;align-items:center;width:100%}
+h1{font-size:clamp(40px,4.9vw,68px);font-weight:900;letter-spacing:-.035em;line-height:1.12;margin:0}
+em.mark{font-style:normal;color:var(--accent);position:relative;z-index:0;white-space:nowrap}
+em.mark::after{content:"";position:absolute;left:-2px;right:-2px;bottom:.08em;height:.2em;background:var(--accent-soft);z-index:-1;border-radius:4px;transform-origin:left;animation:swipe .8s .5s cubic-bezier(.6,0,.2,1) both}
+@keyframes swipe{from{transform:scaleX(0)}}
+.hero p.lead{font-size:21px;color:var(--sub);line-height:1.6;margin:22px 0 34px}
+.facts{margin-top:28px;display:flex;flex-wrap:wrap;gap:8px 18px;color:var(--mute);font-size:14px}
+.facts span+span::before{content:"·";margin-right:18px}
+.art{position:relative;aspect-ratio:820/760;width:100%}
+.w{position:absolute;touch-action:none;user-select:none;-webkit-user-select:none;transition:box-shadow .2s, transform .45s cubic-bezier(.3,1.4,.5,1)}
+.w img{width:100%;border-radius:12px;box-shadow:0 30px 60px rgba(80,60,30,.22),0 0 0 1px rgba(0,0,0,.05);pointer-events:none;transition:box-shadow .2s}
+.w.drag{transition:none;cursor:grabbing}
+.w.drag img{box-shadow:0 50px 90px rgba(80,60,30,.32),0 0 0 1px rgba(0,0,0,.05)}
+@media (pointer:fine){.w{cursor:grab}}
+.sticker{position:absolute;font-size:15px;font-weight:750;padding:9px 15px;border-radius:12px;box-shadow:0 8px 20px rgba(0,0,0,.12);white-space:nowrap;pointer-events:none}
+.hint{position:absolute;left:38%;bottom:-7%;font-size:15px;color:var(--mute);display:flex;gap:8px;align-items:center;transition:opacity .4s}
+.hint svg{width:34px;height:34px;color:var(--accent)}
+.hint.gone{opacity:0}
+.enter{animation:drop .9s cubic-bezier(.2,1.2,.4,1) both}
+@keyframes drop{from{opacity:0;translate:0 40px}}
 
 /* sections */
-section{padding:92px 0}
-.head{max-width:44em;margin:0 0 46px}
-.head.center{text-align:center;margin-inline:auto}
-.kicker{font-family:var(--mono);font-size:13px;letter-spacing:.08em;color:var(--accent);font-weight:600}
-h2{font-size:clamp(27px,3.9vw,42px);line-height:1.22;margin:10px 0 14px;font-weight:800}
-.head p{color:var(--sub);font-size:17px;margin:0}
-.band{background:#fff;border-block:1px solid var(--rule)}
+section{position:relative;padding:120px 0}
+.tag{display:inline-block;font-size:14px;font-weight:800;padding:6px 13px;border-radius:10px;transform:rotate(-3deg);margin-bottom:18px}
+h2{font-size:clamp(36px,4.6vw,58px);font-weight:900;letter-spacing:-.035em;line-height:1.08;margin:0}
+.sec-p{font-size:19px;color:var(--sub);line-height:1.6;margin:16px 0 0;max-width:560px}
+.split{display:grid;grid-template-columns:.9fr 1.1fr;gap:64px;align-items:center}
+.split.flip{grid-template-columns:1.1fr .9fr}
+.split.flip > :first-child{order:2}
+.panel{background:var(--card);border-radius:22px;box-shadow:0 30px 70px rgba(80,60,30,.13),0 0 0 1px rgba(0,0,0,.04);padding:22px;position:relative}
 
-/* why */
-.why{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
-.pain{background:var(--card);border:1px solid var(--rule);border-radius:var(--radius);padding:26px 24px;display:flex;flex-direction:column}
-.pain .q{font-size:18.5px;font-weight:750;color:var(--ink);line-height:1.4;margin:0 0 8px}
-.pain p{margin:0;color:var(--sub);font-size:15px}
-.pain .a{margin-top:auto;padding-top:16px}
-.pain .a span{display:block;border-top:1px dashed #cdd5cf;padding-top:14px;color:var(--accent-deep);font-weight:650;font-size:15px}
+/* DDL demo */
+.week{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:16px}
+.day{border-radius:12px;padding:8px 0 9px;text-align:center;font-size:12.5px;color:var(--mute);background:#faf8f3;position:relative;cursor:default;transition:background .2s,transform .2s}
+.day b{display:block;font-size:17px;color:var(--ink);font-weight:700;margin-top:2px}
+.day.today{background:var(--mint)}
+.day .flag{position:absolute;top:-7px;right:-4px;background:var(--accent);color:#fff;font-size:11px;font-weight:800;border-radius:99px;padding:2px 6px;transform:scale(0);transition:transform .35s cubic-bezier(.3,1.8,.5,1)}
+.day.has{cursor:pointer}
+.day.has .flag{transform:scale(1)}
+.day.has:hover{transform:translateY(-2px);background:var(--peach)}
+.list{position:relative}
+.item{display:flex;align-items:center;gap:13px;padding:13px 12px;border-radius:12px;background:#fff;border-bottom:1px solid var(--line);transition:background .4s}
+.item .box{width:22px;height:22px;border-radius:7px;border:2px solid #cfc8bb;flex:none;display:grid;place-items:center;cursor:pointer;transition:all .2s;background:#fff}
+.item .box:hover{border-color:var(--green)}
+.item .box svg{width:14px;height:14px;color:#fff;opacity:0;transform:scale(.4);transition:all .25s cubic-bezier(.3,1.8,.5,1)}
+.item.done .box{background:var(--green);border-color:var(--green)}
+.item.done .box svg{opacity:1;transform:none}
+.item .t{flex:1;min-width:0}
+.item .t div{font-size:16px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item .t small{display:block;font-size:13px;color:var(--mute);margin-top:3px}
+.item .due{font-size:12.5px;font-weight:800;padding:4px 9px;border-radius:99px;background:#f3efe6;color:var(--sub);white-space:nowrap}
+.item .due.hot{background:var(--accent-soft);color:#b8431f}
+.item.done .t div{color:var(--mute);text-decoration:line-through}
+.item.done .due{opacity:.4}
+.item.hl{background:var(--yellow)}
+.add{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
+.add input{flex:1 1 200px;min-width:0;font:inherit;font-size:15px;border:1.5px solid var(--line);border-radius:12px;padding:11px 14px;background:#fffdf8;outline:none;transition:border-color .2s}
+.add input:focus{border-color:var(--accent)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font:inherit;font-size:13.5px;font-weight:650;border:1.5px solid var(--line);background:#fff;border-radius:99px;padding:8px 12px;cursor:pointer;color:var(--sub);transition:all .15s}
+.chip:hover{border-color:#cfc8bb}
+.chip[aria-pressed=true]{background:var(--ink);color:#fff;border-color:var(--ink)}
+.go{font:inherit;font-weight:800;font-size:14px;border:0;border-radius:12px;background:var(--accent);color:#fff;padding:0 18px;cursor:pointer;min-height:42px;transition:transform .15s}
+.go:active{transform:scale(.95)}
+.try{position:absolute;top:-16px;right:22px;background:var(--yellow);transform:rotate(4deg)}
 
-/* personas */
-.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px}
-.tabs.center{justify-content:center}
-.tabs button{font:inherit;font-size:15px;font-weight:650;padding:10px 18px;border-radius:10px;border:1.5px solid var(--rule);background:#fff;color:var(--sub);cursor:pointer;transition:all .15s}
-.tabs button:hover{border-color:var(--accent);color:var(--accent-deep)}
-.tabs button[aria-selected="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
-.persona{display:grid;gap:22px}
-.persona[hidden]{display:none}
-.shot{border-radius:var(--radius);background:#e8eaed;padding:8px;box-shadow:var(--shadow)}
-.shot img{width:100%;border-radius:9px}
-.uses{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
-.uses li{background:#fff;border:1px solid var(--rule);border-radius:12px;padding:16px 16px}
-.uses b{display:block;color:var(--ink);font-size:15.5px;margin-bottom:2px}
-.uses span{color:var(--sub);font-size:14.5px}
-.persona > div:last-child{display:contents}
-.persona h3{margin:0;font-size:21px;order:-1}
-
-/* details grid */
-.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
-.cell{background:var(--card);border:1px solid var(--rule);border-radius:14px;padding:20px 18px}
-.cell .t{font-family:var(--mono);font-size:12.5px;color:var(--accent);font-weight:600;letter-spacing:.04em}
-.cell h3{margin:6px 0 6px;font-size:17px}
-.cell p{margin:0;color:var(--sub);font-size:14.5px}
+/* Outlook demo */
+.cal{display:grid;grid-template-columns:44px repeat(5,1fr);position:relative}
+.cal .hd{font-size:13px;color:var(--mute);text-align:center;padding-bottom:8px}
+.cal .hd b{color:var(--ink);font-size:15px;margin-left:3px}
+.allday{grid-column:2/7;height:26px;position:relative;margin-bottom:6px}
+.grid-area{grid-column:1/7;display:grid;grid-template-columns:44px repeat(5,1fr);position:relative;height:300px;border-top:1px solid var(--line)}
+.hours{position:relative}
+.hours span{position:absolute;right:8px;font-size:11px;color:var(--mute);transform:translateY(-50%)}
+.col{position:relative;border-left:1px solid var(--line)}
+.ev{position:absolute;left:3px;right:3px;border-radius:7px;padding:4px 6px;font-size:12px;line-height:1.3;overflow:hidden;border-left:3px solid;transition:background .3s,border-color .3s,opacity .4s,transform .4s cubic-bezier(.3,1.5,.5,1)}
+.ev b{display:block;font-weight:700}
+.ev.own{background:#f4ece1;border-color:#c99a6b;color:#5b4430}
+.ev.ext{cursor:pointer;color:#1f2a44;opacity:0;transform:scale(.85);pointer-events:none}
+.on .ev.ext{opacity:1;transform:none;pointer-events:auto}
+.ev.ext:hover{filter:brightness(.96)}
+.ev.bar{top:0;bottom:0;display:flex;align-items:center}
+.switch{display:flex;align-items:center;gap:12px;font-weight:750;font-size:16px;cursor:pointer;margin-bottom:18px;user-select:none}
+.switch i{width:50px;height:30px;border-radius:99px;background:#ddd6c9;position:relative;transition:background .25s;flex:none}
+.switch i::after{content:"";position:absolute;left:3px;top:3px;width:24px;height:24px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.2);transition:transform .3s cubic-bezier(.3,1.6,.5,1)}
+.on .switch i{background:var(--green)}
+.on .switch i::after{transform:translateX(20px)}
+.switch small{font-weight:500;color:var(--mute);font-size:13.5px}
+.tip{font-size:13.5px;color:var(--mute);margin-top:12px;min-height:20px;transition:opacity .3s;opacity:0}
+.on .tip{opacity:1}
 
 /* looks */
-.viewer{max-width:880px;margin:0 auto}
-.viewer img{transition:opacity .18s}
-.viewer img.swap{opacity:0}
-.caption{text-align:center;margin:18px auto 0;max-width:36em}
-.caption b{font-size:18px;color:var(--ink)}
-.caption p{margin:4px 0 0;color:var(--sub)}
+.looks{text-align:center}
+.looks .sec-p{margin-left:auto;margin-right:auto}
+.ltabs{display:flex;justify-content:center;flex-wrap:wrap;gap:10px;margin:36px 0 30px}
+.ltab{font:inherit;font-weight:750;font-size:15px;border:0;border-radius:12px;padding:11px 18px;cursor:pointer;background:#fff;box-shadow:0 0 0 1.5px var(--line);transition:transform .25s cubic-bezier(.3,1.6,.5,1),background .2s}
+.ltab:hover{transform:rotate(-2deg) translateY(-2px)}
+.ltab[aria-selected=true]{background:var(--ink);color:#fff;box-shadow:0 5px 0 var(--accent);transform:rotate(-2deg)}
+.stage{max-width:900px;margin:0 auto;position:relative}
+.stage img{border-radius:16px;box-shadow:0 30px 70px rgba(80,60,30,.18);transition:opacity .25s,transform .35s cubic-bezier(.3,1.3,.5,1)}
+.stage img.out{opacity:0;transform:translateY(10px) scale(.985)}
+.stage p{color:var(--sub);font-size:16px;margin:20px 0 0;min-height:24px}
 
-/* trust */
-.trust{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
-.trust .item{display:flex;gap:16px;background:var(--card);border:1px solid var(--rule);border-radius:var(--radius);padding:22px}
-.ico{flex:none;width:44px;height:44px;border-radius:12px;background:var(--accent-soft);color:var(--accent-deep);display:grid;place-items:center}
-.ico svg{width:22px;height:22px}
-.item h3{margin:0 0 4px;font-size:17.5px}
-.item p{margin:0;color:var(--sub);font-size:15px}
-.item a{color:var(--accent-deep);font-weight:600}
+/* bento */
+.bento{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:44px}
+.tile{border-radius:20px;padding:26px;min-height:170px;position:relative;overflow:hidden;transition:transform .35s cubic-bezier(.3,1.5,.5,1)}
+.tile:hover{transform:translateY(-4px) rotate(-.6deg)}
+.tile:nth-child(even):hover{transform:translateY(-4px) rotate(.6deg)}
+.tile svg{width:34px;height:34px;margin-bottom:18px}
+.tile h3{font-size:21px;margin:0 0 6px;letter-spacing:-.01em}
+.tile p{margin:0;color:var(--sub);font-size:15px;line-height:1.55}
 
-/* table */
-.table{overflow-x:auto;border:1px solid var(--rule);border-radius:var(--radius);background:#fff}
-table{border-collapse:collapse;width:100%;min-width:640px;font-size:15px}
-th,td{padding:14px 16px;text-align:left;border-bottom:1px solid var(--rule);vertical-align:top}
-tr:last-child td{border-bottom:0}
-thead th{font-size:14px;color:var(--sub);font-weight:650;background:#fafbf9}
-thead th.us{color:var(--accent-deep);background:var(--accent-soft)}
-td.us{background:#f4f9f6;font-weight:600;color:var(--ink)}
-td:first-child{font-weight:650;color:var(--ink)}
-.yes{color:var(--accent-deep)}.no{color:var(--faint)}
-.fine{font-size:13px;color:var(--faint);margin:12px 0 0}
+/* trust + final */
+.trust{display:flex;flex-wrap:wrap;justify-content:center;gap:12px;margin-top:8px}
+.trust span{background:#fff;border-radius:99px;padding:11px 18px;font-weight:700;font-size:15px;box-shadow:0 0 0 1.5px var(--line);display:flex;align-items:center;gap:8px}
+.trust span i{width:8px;height:8px;border-radius:50%;background:var(--green)}
+.final{text-align:center;padding:30px 0 110px}
+.final h2{margin-bottom:34px}
+.final .small{color:var(--mute);font-size:14px;margin-top:30px;line-height:1.8}
+footer{border-top:1px solid var(--line);padding:30px 0 40px;color:var(--mute);font-size:14px;text-align:center}
+footer a{margin:0 8px}
 
-/* limits */
-.limits{display:grid;grid-template-columns:1fr 1.3fr;gap:44px;align-items:start}
-.limits ul{list-style:none;margin:0;padding:0;display:grid;gap:10px}
-.limits li{display:flex;gap:12px;padding:14px 16px;border-radius:12px;background:#fff;border:1px solid var(--rule);font-size:15px}
-.limits li::before{content:"×";color:var(--warm);font-weight:800;flex:none}
-.limits li span{color:var(--sub)}
-.limits li b{color:var(--ink)}
-
-/* steps */
-.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;counter-reset:s}
-.step{background:#fff;border:1px solid var(--rule);border-radius:var(--radius);padding:26px 22px;counter-increment:s}
-.step::before{content:"0" counter(s);font-family:var(--mono);font-weight:700;color:var(--accent);font-size:15px}
-.step h3{margin:8px 0 6px;font-size:18px}
-.step p{margin:0;color:var(--sub);font-size:15px}
-code{font-family:inherit;background:var(--accent-soft);color:var(--accent-deep);padding:1px 7px;border-radius:6px;font-size:.94em;white-space:nowrap}
-.note{margin:20px 0 0;padding:14px 18px;border-radius:12px;background:var(--warm-soft);color:#6b3c20;font-size:14.5px}
-
-/* faq */
-.faq{max-width:780px;margin:0 auto;display:grid;gap:10px}
-details{background:#fff;border:1px solid var(--rule);border-radius:12px;padding:0 20px}
-summary{cursor:pointer;padding:16px 0;font-weight:650;color:var(--ink);list-style:none;display:flex;justify-content:space-between;gap:16px}
-summary::-webkit-details-marker{display:none}
-summary::after{content:"+";font-size:22px;line-height:1;color:var(--faint);transition:transform .2s}
-details[open] summary::after{transform:rotate(45deg)}
-details p{margin:0 0 18px;color:var(--sub)}
-
-/* final */
-.final{background:var(--ink);color:#fff;border-radius:26px;padding:64px 40px;position:relative;overflow:hidden;display:grid;grid-template-columns:1.4fr 1fr;gap:30px;align-items:center}
-.final::before{content:"";position:absolute;inset:0;background:radial-gradient(520px 280px at 12% 0,rgba(91,160,125,.42),transparent 70%),radial-gradient(460px 260px at 95% 100%,rgba(184,113,75,.30),transparent 70%)}
-.final>*{position:relative}
-.final h2{color:#fff;margin:0 0 10px}
-.final p{color:#c3cfc9;margin:0}
-.final .act{display:grid;gap:12px;justify-items:start}
-.final .btn.primary{background:#fff;color:var(--ink);box-shadow:0 12px 30px rgba(0,0,0,.25)}
-.final .btn.primary:hover{background:#eef4f0}
-.final .btn.ghost{background:transparent;border-color:rgba(255,255,255,.35);color:#fff}
-.final .btn.ghost:hover{border-color:#fff;color:#fff}
-.final small{color:#9fb0a8;font-size:13px}
-footer{padding:34px 0 46px;color:var(--faint);font-size:13.5px;text-align:center}
-footer a{color:var(--sub)}
-
-.reveal{opacity:0;transform:translateY(20px);transition:opacity .6s ease,transform .6s ease}
+.reveal{opacity:0;transform:translateY(28px);transition:opacity .7s,transform .7s cubic-bezier(.2,.8,.2,1)}
 .reveal.in{opacity:1;transform:none}
-@media (prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}html{scroll-behavior:auto}.btn{transition:none}}
 
-@media (max-width:980px){
-  .grid,.uses{grid-template-columns:repeat(2,1fr)}
-  .limits,.final{grid-template-columns:1fr}
-  .why,.steps,.trust{grid-template-columns:1fr}
+@media (max-width:900px){
+ .wrap{padding:0 20px}
+ .nav nav a:not(.lang):not(.get){display:none}
+ .hero{min-height:0;padding:30px 0 60px}
+ .hero .wrap,.split,.split.flip{grid-template-columns:1fr}
+ .split.flip > :first-child{order:0}
+ .split{gap:36px}
+ .art{margin-top:30px}
+ .hint{display:none}
+ section{padding:80px 0}
+ .bento{grid-template-columns:1fr 1fr}
+ .sticker{font-size:12px;padding:6px 10px}
 }
-@media (max-width:720px){
-  section{padding:64px 0}
-  .hero{padding-top:44px}
-  .nav nav a:not(.btn):not(.lang){display:none}
-  .grid,.uses{grid-template-columns:1fr}
-  .stage{padding:8px 8px 0;border-radius:16px 16px 0 0}
-  .pan{overflow-x:auto;-webkit-overflow-scrolling:touch}
-  .pan img{width:auto;max-width:none;height:min(62vh,460px)}
-  .final{padding:44px 22px;border-radius:20px}
-  .btn{width:100%}
-  .btn.small{width:auto}
-}
-.nav .lang{font-size:13.5px;font-weight:650;padding:5px 10px;border:1px solid var(--rule);border-radius:8px;color:var(--sub);text-decoration:none;white-space:nowrap;flex-shrink:0}
-.nav .lang:hover{border-color:var(--accent);color:var(--accent-deep)}
-.new{display:inline-block;font-size:11.5px;font-weight:700;letter-spacing:.04em;color:#fff;background:var(--warm);border-radius:6px;padding:1px 7px;margin-left:6px;vertical-align:2px;font-family:"Segoe UI","PingFang SC","Microsoft YaHei UI","Microsoft YaHei",system-ui,sans-serif;letter-spacing:0;text-transform:none}
+@media (max-width:560px){.bento{grid-template-columns:1fr}.panel{padding:16px}.cal .hd{font-size:11px}.cal .hd b{font-size:13px;display:block;margin:0}.ev{font-size:10.5px;padding:3px 4px}.ev span{display:none}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}.reveal{opacity:1;transform:none}}
 </style>
 </head>
 <body>
+<header class="nav"><div class="wrap">
+  <a class="brand" href="#top"><i></i>桌面课笺</a>
+  <nav>
+    <a href="#ddl">功能</a><a href="#looks">外观</a><a href="#more">更多</a>
+    <a class="lang" href="en/" hreflang="en">English</a>
+    <a class="get" href="https://github.com/ElinaMa500/DeskStudy/releases/download/v1.6/DeskStudy-1.6-Windows.zip">下载</a>
+  </nav>
+</div></header>
 
-<header class="nav" id="top">
-  <div class="wrap">
-    <a class="brand" href="#top"><i></i>桌面课笺</a>
-    <nav>
-      <a href="#who">典型用法</a><a href="#details">功能</a><a href="#trust">可信度</a><a href="#limits">局限</a>
-      <a class="lang" href="en/" hreflang="en">English</a>
-      <a class="btn primary small" href="https://github.com/ElinaMa500/DeskStudy/releases/download/v1.6/DeskStudy-1.6-Windows.zip">免费下载</a>
-    </nav>
-  </div>
-</header>
-
-<main>
+<main id="top">
 <div class="hero">
+  <div class="bgs">
+  <div class="blob" style="width:560px;height:560px;background:#ffc9a8;right:6%;top:4%"></div>
+  <div class="blob" style="width:440px;height:440px;background:#b9e3cf;right:38%;top:52%"></div>
+  <div class="blob" style="width:400px;height:400px;background:#cfd8ff;right:-6%;top:56%"></div>
+  </div>
   <div class="wrap">
-    <div class="hero-copy">
-      <span class="eyebrow">为课程、科研与教学而做的 Windows 桌面组件</span>
-      <h1>DDL 不该靠记性。</h1>
-      <p class="h1-sub">课表、待办和截止日期，一直在桌面上。</p>
-      <p class="lead">桌面课笺把一周的课表、手头的待办和每一个截止时间，做成三个常驻桌面的小组件。不用打开任何应用，抬头就能看到；DDL 按截止时间排好、标在日历上，快到期时会提醒你。</p>
-      <div class="cta">
-        <a class="btn primary" href="https://github.com/ElinaMa500/DeskStudy/releases/download/v1.6/DeskStudy-1.6-Windows.zip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="m7 11 5 5 5-5"/><path d="M5 20h14"/></svg>下载 Windows 版 <small>v1.6</small></a>
-        <a class="btn ghost" href="https://github.com/ElinaMa500/DeskStudy/blob/main/USER_GUIDE.md">看使用指南</a>
-      </div>
-      <ul class="chips"><li><b>开源</b> · MIT</li><li><b>无账号</b></li><li><b>默认不联网</b></li><li><b>无广告</b></li><li><b>中文 · English</b></li><li><b>约 630 KB</b></li><li><b>解压即用</b>，无需安装</li></ul>
+    <div class="enter">
+      <h1>抬头就能看到的<br>课表和 <em class="mark">DDL</em>。</h1>
+      <p class="lead">三个小组件常驻桌面，<br>DDL 自动排好、到点提醒。</p>
+      <a class="btn" href="https://github.com/ElinaMa500/DeskStudy/releases/download/v1.6/DeskStudy-1.6-Windows.zip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="m7 11 5 5 5-5"/><path d="M5 20h14"/></svg>免费下载 Windows 版</a>
+      <div class="facts"><span>开源免费</span><span>无需账号</span><span>630 KB 解压即用</span></div>
+    </div>
+    <div class="art enter" style="animation-delay:.15s" aria-label="桌面课笺的三个组件">
+      <div class="w" data-rot="2" style="left:17%;top:2%;width:68%"><img src="images/site/zh/hero-cal.png" width="842" height="977" alt="周课表组件" draggable="false">
+        <span class="sticker" style="right:-4%;top:-3%;background:var(--mint);transform:rotate(5deg)">同步学校 Outlook 日历</span></div>
+      <div class="w" data-rot="-3" style="left:0;top:30%;width:41%"><img src="images/site/zh/hero-ddl.png" width="416" height="484" alt="DDL 便签组件" draggable="false">
+        <span class="sticker" style="left:-4%;top:-14%;background:var(--yellow);transform:rotate(-4deg)">⚑ 自动按截止时间排</span></div>
+      <div class="w" data-rot="4" style="left:63%;top:54%;width:36%"><img src="images/site/zh/hero-todo.png" width="416" height="484" alt="待办便签组件" draggable="false"></div>
+      <div class="hint">拖拖看<svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 32c10-2 20-10 24-24"/><path d="m22 10 8-2 2 8"/></svg></div>
     </div>
   </div>
-  <div class="stage pan reveal"><img src="images/site/zh/persona-research.png" width="1303" height="1013" alt="桌面课笺的三个组件：DDL 便签按截止时间排列投稿和申请，Todo 便签列出论文修改任务，周课表显示组会、文献研讨、导师面谈和一个跨两天的学术会议"></div>
 </div>
 
-<section id="why" class="band">
-  <div class="wrap">
-    <div class="head reveal"><div class="kicker">01 / 为什么放在桌面上</div><h2>记下来不难，难的是之后还看得到</h2><p>一学期里真正误事的，往往是那几件「我以为还有几天」的事。</p></div>
-    <div class="why"><div class="pain reveal"><p class="q">截止时间散落在各处</p><p>课程平台、邮件、群通知、会议官网。每个 DDL 在不同的地方，全靠脑子汇总。</p><div class="a"><span>集中记在一本 DDL 便签里，按截止时间自动排好，直接显示「明天截止」「剩余 3 天」，还会标在日历上。</span></div></div><div class="pain reveal"><p class="q">待办应用要打开才看得到</p><p>写进去的时候很认真，之后就再没打开过。看不到的清单，等于没有清单。</p><div class="a"><span>三个无边框组件常驻桌面，平时待在其他窗口下面；点一下任务栏按钮就全部浮到前面。</span></div></div><div class="pain reveal"><p class="q">课表和临时变动对不上</p><p>双周的组会、单次的调课、某一周的停课、放假几天，普通的周课表表达不了。</p><div class="a"><span>支持每周与每两周循环、单次调整、跨多天的全天日程；学校的 Outlook 日历也能同步进来。</span></div></div></div>
-  </div>
-</section>
-
-<section id="who">
-  <div class="wrap">
-    <div class="head reveal"><div class="kicker">02 / 典型用法</div><h2>同一个工具，三种学期节奏</h2><p>下面是程序的实际界面，内容为示例数据。点击切换角色。</p></div>
-    <div class="tabs reveal" role="tablist" aria-label="典型用法" id="persona-tabs"><button role="tab" aria-selected="true" data-panel="p-student">本科生</button><button role="tab" aria-selected="false" data-panel="p-research">研究生 · 博士生</button><button role="tab" aria-selected="false" data-panel="p-faculty">教师</button></div>
-    
-    <div class="persona reveal" id="p-student">
-      <div class="shot pan"><img src="images/site/zh/persona-student.png" width="1303" height="1013" alt="本科生示例：高等数学、线性代数、大学英语和物理实验的周视图，以及作业和实验报告的截止事项"></div>
-      <div>
-        <h3>课表录一次，作业不再漏交</h3>
-        <ul class="uses"><li><b>学期初录一次课表</b><span>整个学期自动排好，并显示当前是教学第几周。</span></li><li><b>作业、实验报告进 DDL</b><span>直接看到「明天截止」「剩余 3 天」，最急的总在最上面。</span></li><li><b>调课、停课只改那一次</b><span>其他周的课表不受影响。</span></li><li><b>双击就能改任务</b><span>写错了直接双击修改，回车保存。</span></li></ul>
-      </div>
+<section id="ddl">
+  <div class="wrap split">
+    <div class="reveal">
+      <span class="tag" style="background:var(--yellow)">⚑ DDL</span>
+      <h2>DDL 自己<br>排好队</h2>
+      <p class="sec-p">最急的永远在最上面，做完的沉到底；有 DDL 的日子，日历上会插一面小旗。</p>
     </div>
-    <div class="persona" id="p-research" hidden>
-      <div class="shot pan"><img loading="lazy" src="images/site/zh/persona-research.png" width="1303" height="1013" alt="研究生示例：课题组组会、文献研讨、导师一对一和助教习题课的周视图，跨两天的学术会议，以及投稿和申请的截止事项"></div>
-      <div>
-        <h3>组会、论文和助教工作放在一起看</h3>
-        <ul class="uses"><li><b>双周组会设成「每两周」</b><span>不用每次手动建。某次改期，只改那一次。</span></li><li><b>截稿、返修、开题进 DDL</b><span>按截止时间自动排序，每项单独设提前量，日历上也能看到。</span></li><li><b>会议、出差用全天日程</b><span>跨几天就是一条横条，放在日历最上面一行。</span></li><li><b>学校日历同步进来</b><span>Outlook 里的讲座、答疑可以只读同步，按日程名称配色。</span></li></ul>
-      </div>
-    </div>
-    <div class="persona" id="p-faculty" hidden>
-      <div class="shot pan"><img loading="lazy" src="images/site/zh/persona-faculty.png" width="1303" height="1013" alt="教师示例：本科课、研究生课、Office Hour 和组会的周视图，期中考试周，以及审稿、基金申请和成绩录入的截止事项"></div>
-      <div>
-        <h3>授课、指导和各种截止，一屏看全</h3>
-        <ul class="uses"><li><b>本科课、研究生课、Office Hour、组会</b><span>都在同一张周视图里，双周的例会也能正确显示。</span></li><li><b>审稿、基金申请、成绩录入集中提醒</b><span>重要的事可以提前一天提醒，而不是到点才响。</span></li><li><b>考试周、假期一目了然</b><span>全天日程横跨对应的几天。</span></li><li><b>设置免打扰时段</b><span>时段内的提醒会推迟，结束后汇总给你。</span></li></ul>
+    <div class="panel reveal">
+      <span class="sticker try">试试看 ↓</span>
+      <div class="week" id="ddl-week"></div>
+      <div class="list" id="ddl-list"></div>
+      <div class="add">
+        <input id="ddl-input" maxlength="40" placeholder="加一个 DDL，回车…" aria-label="加一个 DDL，回车…">
+        <div class="chips" id="ddl-chips"><button class="chip" data-days="0" aria-pressed="false">今天</button><button class="chip" data-days="1" aria-pressed="true">明天</button><button class="chip" data-days="3" aria-pressed="false">3 天后</button><button class="chip" data-days="6" aria-pressed="false">下周</button></div>
+        <button class="go" id="ddl-add">添加</button>
       </div>
     </div>
   </div>
 </section>
 
-<section id="details" class="band">
-  <div class="wrap">
-    <div class="head reveal"><div class="kicker">03 / 功能</div><h2>为学期和科研的节奏设计</h2><p>这些不是花哨的功能，是用一段时间之后才会发现少不了的东西。</p></div>
-    <div class="grid"><div class="cell reveal"><div class="t">循环</div><h3>每周与每两周</h3><p>一门课可以勾选一周里的多天。双周组会、单双周课程都能表达。</p></div><div class="cell reveal"><div class="t">例外</div><h3>只改这一次</h3><p>调课、停课保存为单次例外，其他周保持原样。</p></div><div class="cell reveal"><div class="t">全天 <span class=new>1.6 新增</span></div><h3>假期和考试周</h3><p>全天日程可以跨多天，显示在星期行下面，也能每周重复。</p></div><div class="cell reveal"><div class="t">DDL <span class=new>1.6 新增</span></div><h3>按截止时间排序</h3><p>最急的在最上面，完成的沉到底；新加的会自己排到该在的位置。</p></div><div class="cell reveal"><div class="t">日历 <span class=new>1.6 新增</span></div><h3>DDL 标在日历上</h3><p>有时间的 DDL 是一个 ⚑ 小标签，有 DDL 的日子旁边有角标；单击跳到那条任务。</p></div><div class="cell reveal"><div class="t">Outlook <span class=new>1.6 新增</span></div><h3>同步学校日历</h3><p>粘贴 Outlook 发布的日历链接，只读显示；也可以一次性复制成自己的课程。</p></div><div class="cell reveal"><div class="t">提醒</div><h3>提前量逐项设置</h3><p>每个任务单独设提前多久提醒，提前和截止时各提醒一次；错过的会补发。</p></div><div class="cell reveal"><div class="t">编辑 <span class=new>1.6 新增</span></div><h3>双击就改</h3><p>双击任务文字原地修改，点别处自动保存；打字回车就是一条新任务。</p></div><div class="cell reveal"><div class="t">常驻 <span class=new>1.6 新增</span></div><h3>在，但不打扰</h3><p>平时待在其他窗口下面；单击任务栏按钮或按快捷键，组件浮到前面。</p></div><div class="cell reveal"><div class="t">折叠</div><h3>暂时收起来</h3><p>组件可以折叠成一条顶栏，停在屏幕底部，需要时再展开。</p></div><div class="cell reveal"><div class="t">教学周</div><h3>现在是第几周</h3><p>填好学期起止日期，日历上直接显示当前教学周。</p></div><div class="cell reveal"><div class="t">语言 <span class=new>1.6 新增</span></div><h3>中文和 English</h3><p>界面可在中文和英文之间切换，第一次打开时跟随 Windows 语言。</p></div></div>
-  </div>
-</section>
-
-<section id="looks">
-  <div class="wrap">
-    <div class="head center reveal"><div class="kicker">04 / 外观</div><h2>五种便签外观，点一下就换</h2><p>日历会跟着换风格，切换不会丢任何内容。主题、背景色、透明度和字号也都可以调。</p></div>
-    <div class="tabs center reveal" role="tablist" aria-label="外观" id="look-tabs"><button role="tab" aria-selected="true" data-img="images/site/zh/layout-clean.png" data-name="清爽卡片" data-desc="白底，大标题，任务之间只有细线，最简洁。" data-alt="清爽卡片外观的 DDL 与 Todo 便签">清爽卡片</button><button role="tab" aria-selected="false" data-img="images/site/zh/layout-journal.png" data-name="手账纸页" data-desc="米色纸页，左边是窄页签，更像一本笔记本。" data-alt="手账纸页外观的 DDL 与 Todo 便签">手账纸页</button><button role="tab" aria-selected="false" data-img="images/site/zh/layout-card.png" data-name="轻量卡片" data-desc="默认外观。每个任务是一张小卡片。" data-alt="轻量卡片外观的 DDL 与 Todo 便签">轻量卡片</button><button role="tab" aria-selected="false" data-img="images/site/zh/layout-paper.png" data-name="纸页本" data-desc="暖色纸张，左边一列页码，点页码直接翻页。" data-alt="纸页本外观的 DDL 与 Todo 便签">纸页本</button><button role="tab" aria-selected="false" data-img="images/site/zh/layout-original.png" data-name="原始外观" data-desc="按钮最全，每个任务下面直接有编辑、移动、删除。" data-alt="原始外观的 DDL 与 Todo 便签">原始外观</button></div>
-    <div class="viewer reveal">
-      <div class="shot"><img id="look" loading="lazy" src="images/site/zh/layout-clean.png" width="878" height="552" alt="清爽卡片外观的 DDL 与 Todo 便签"></div>
-      <div class="caption" aria-live="polite"><b id="look-name">清爽卡片</b><p id="look-desc">白底，大标题，任务之间只有细线，最简洁。</p></div>
+<section id="outlook" style="background:linear-gradient(#fffdf8,#f6f8ff 30%,#f6f8ff 70%,#fffdf8)">
+  <div class="wrap split flip">
+    <div class="reveal">
+      <span class="tag" style="background:var(--lilac)">Outlook</span>
+      <h2>学校日历，<br>一键同步进来</h2>
+      <p class="sec-p">粘贴 Outlook 发布的日历链接，讲座、答疑直接出现在课表里。只读，不会改动你的 Outlook。</p>
     </div>
-  </div>
-</section>
-
-<section id="trust" class="band">
-  <div class="wrap">
-    <div class="head reveal"><div class="kicker">05 / 可信度</div><h2>可以放心装在工作电脑上的理由</h2><p>未发表的课题、学生的成绩、审稿任务，这些不该出现在别人的服务器上。</p></div>
-    <div class="trust"><div class="item reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></div><div><h3>数据只在本机</h3><p>没有账号，不上传任何内容，所有数据保存在你电脑上的一个文件夹里。程序默认不联网；只有你订阅 Outlook 日历时，才会去下载你给的那一个链接。</p></div></div><div class="item reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 8-4 4 4 4"/><path d="m16 8 4 4-4 4"/><path d="m13.5 5-3 14"/></svg></div><div><h3>源码公开，可以自己审</h3><p>以 MIT 许可证开源，没有第三方运行依赖。你可以阅读全部代码，也可以自己编译。<a href="https://github.com/ElinaMa500/DeskStudy">GitHub 仓库</a></p></div></div><div class="item reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v5h-5"/></svg></div><div><h3>自动保存，留有退路</h3><p>编辑后自动保存，并保留上一份成功保存的数据。导入、恢复和复制 Outlook 日历之前都会先自动备份。</p></div></div><div class="item reveal"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg></div><div><h3>每个版本附验证记录</h3><p>1.6 共有 24 组、768 项自动化测试，覆盖循环日期、时区、提醒、Outlook 解析和界面；结果和未验证的部分都如实写明。<a href="https://github.com/ElinaMa500/DeskStudy/blob/main/VERIFICATION.md">查看验证记录</a></p></div></div></div>
-  </div>
-</section>
-
-<section>
-  <div class="wrap">
-    <div class="head reveal"><div class="kicker">06 / 对比</div><h2>和你现在的办法比一比</h2></div>
-    <div class="table reveal"><table>
-      <thead><tr><th></th><th class=us>桌面课笺</th><th>纸质便利贴</th><th>手机或网页上的待办、日历应用</th></tr></thead>
-      <tbody><tr><td>不用打开就能看到</td><td class="us yes">常驻桌面</td><td class="yes">贴在屏幕边</td><td class="no">需要主动打开</td></tr><tr><td>到期提醒</td><td class="us yes">提前与到期各一次</td><td class="no">没有</td><td class="yes">有</td></tr><tr><td>循环课表与单次调课</td><td class="us yes">每周、每两周、单次例外</td><td class="no">没有</td><td class="">视应用而定</td></tr><tr><td>Outlook 日历</td><td class="us yes">可只读同步，或复制成自己的课程</td><td class="no">没有</td><td class="">视应用而定</td></tr><tr><td>账号</td><td class="us yes">不需要</td><td class="yes">不需要</td><td class="">多数需要</td></tr><tr><td>数据存放位置</td><td class="us yes">只在本机</td><td class="yes">在你桌上</td><td class="">多数在云端</td></tr><tr><td>多设备同步</td><td class="us no">不支持</td><td class="no">不支持</td><td class="yes">多数支持</td></tr></tbody>
-    </table></div>
-    <p class="fine reveal">第三列是对这类应用的一般性描述，具体以各应用为准。</p>
-  </div>
-</section>
-
-<section id="limits" class="band">
-  <div class="wrap limits">
-    <div class="reveal"><div class="kicker">07 / 局限</div><h2>它不适合这些情况</h2><p style="color:var(--sub);margin:0">先说清楚，省得你下载之后才发现。</p></div>
-    <ul class="reveal"><li><span><b>只支持 Windows 10 和 11。</b>没有 macOS、Linux 和手机版本。</span></li><li><span><b>不在多台设备间同步。</b>换电脑时可以导出一个文件再导入。</span></li><li><span><b>Outlook 只能只读同步。</b>不能在这里改 Outlook 的日程，也不支持 Google 日历等；Outlook 发布的链接不带颜色，需要按日程名称自己设。</span></li><li><span><b>不支持多人协作。</b>它是个人用的工具。</span></li><li><span><b>没有数字签名。</b>首次运行时 Windows 会弹出安全提示，需要手动确认。</span></li><li><span><b>提醒需要程序在运行。</b>建议打开「登录 Windows 后自动启动」。</span></li><li><span><b>按 Win+D 显示桌面时，组件可能一起被收起。</b>单击任务栏按钮或按快捷键就能叫回来。</span></li></ul>
-  </div>
-</section>
-
-<section id="start">
-  <div class="wrap">
-    <div class="head reveal"><div class="kicker">08 / 上手</div><h2>解压，双击，开始用</h2><p>不用安装，不需要管理员权限。</p></div>
-    <div class="steps"><div class="step reveal"><h3>下载并解压</h3><p>下载压缩包，解压到一个固定的文件夹，比如 <code>D:\桌面课笺</code>。</p></div><div class="step reveal"><h3>双击 DeskStudy.exe</h3><p>第一次打开是空白课表和两本空便签，直接开始用。</p></div><div class="step reveal"><h3>录入课表和任务</h3><p>双击日历空白处添加课程，在便签底部打字回车添加任务；学校日历可以从 Outlook 同步进来。</p></div></div>
-    <p class="note reveal">首次运行如果出现「Windows 已保护你的电脑」，点「更多信息」→「仍要运行」。出现这个提示是因为程序没有购买数字签名。压缩包里的「使用指南.html」和「User Guide.html」有完整的图文说明。</p>
-    <p class="reveal" style="margin:26px 0 0"><a class="btn primary" href="https://github.com/ElinaMa500/DeskStudy/releases/download/v1.6/DeskStudy-1.6-Windows.zip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="m7 11 5 5 5-5"/><path d="M5 20h14"/></svg>下载 Windows 版 <small>v1.6</small></a></p>
-  </div>
-</section>
-
-<section id="faq" class="band">
-  <div class="wrap">
-    <div class="head center reveal"><div class="kicker">09 / 常见问题</div><h2>你可能想问</h2></div>
-    <div class="faq reveal"><details><summary>要钱吗？有没有广告或内购？</summary><p>都没有。桌面课笺免费，以 MIT 许可证开源。</p></details><details><summary>会不会上传我的数据？</summary><p>不会。你的课程、任务和设置只保存在本机。只有订阅了 Outlook 日历时，程序才会访问你填写的那一个链接，而且只下载、不上传。源码公开，可以自己核实。</p></details><details><summary>能和 Outlook 日历一起用吗？</summary><p>可以。在 Outlook 网页版「发布日历」得到一个 ICS 链接，粘贴到设置中心，就会只读显示在日历上，并按设定的间隔自动更新。也可以一键把它复制成自己的课程，之后不再同步。</p></details><details><summary>有英文界面吗？</summary><p>有。设置中心「外观」最上面可以在中文和 English 之间切换，重启后生效。第一次打开时会跟随 Windows 的显示语言。</p></details><details><summary>点了组件的 ✕，程序就关了吗？</summary><p>没有，只是把组件隐藏了，提醒照常。双击托盘图标可以全部显示出来；要彻底退出，右键托盘图标选「保存并退出」。</p></details><details><summary>任务栏上怎么找到它？</summary><p>三个组件各自不占任务栏，但程序有一个「桌面课笺」任务栏按钮：单击把组件叫到前面，再单击收回去。右键它可以固定到任务栏。也可以在设置里切换成带标题栏的标准窗口。</p></details><details><summary>为什么没有收到提醒？</summary><p>提醒需要程序在运行，任务要设置了截止时间并且没有打勾。再检查一下 Windows 的通知设置和勿扰模式。</p></details><details><summary>换电脑或重装系统怎么办？</summary><p>在设置中心导出全部数据，得到一个文件，拷到新电脑后导入即可。</p></details><details><summary>卸载会留下什么？</summary><p>程序本身只有解压出来的那个文件夹，删掉即可。你的数据保存在本机用户目录下的 DeskStudy 文件夹里，不需要时可以一并删除。如果开启过「登录 Windows 后自动启动」，删除前先在设置中心把它关掉。</p></details></div>
-  </div>
-</section>
-
-<section>
-  <div class="wrap">
-    <div class="final reveal">
-      <div><h2>这学期的 DDL，别再靠记性</h2><p>免费、开源、无账号。下载解压，双击就能用。</p></div>
-      <div class="act">
-        <a class="btn primary" href="https://github.com/ElinaMa500/DeskStudy/releases/download/v1.6/DeskStudy-1.6-Windows.zip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="m7 11 5 5 5-5"/><path d="M5 20h14"/></svg>下载 Windows 版</a>
-        <a class="btn ghost" href="https://github.com/ElinaMa500/DeskStudy">在 GitHub 查看源码</a>
-        <small>v1.6 · Windows 10 / 11 · 约 630 KB · <a href="https://github.com/ElinaMa500/DeskStudy/releases">所有版本</a></small>
+    <div class="panel reveal" id="ol">
+      <div class="switch" id="ol-switch" role="switch" tabindex="0" aria-checked="false"><i></i><span>同步 Outlook <small>只读</small></span></div>
+      <div class="cal">
+        <div></div><div class="hd">周一<b></b></div><div class="hd">周二<b></b></div><div class="hd">周三<b></b></div><div class="hd">周四<b></b></div><div class="hd">周五<b></b></div>
+        <div style="font-size:11px;color:var(--mute);text-align:right;padding-right:8px;line-height:26px">全天</div><div class="allday"></div>
+        <div class="grid-area"><div class="hours"><span style="top:30px">09:00</span><span style="top:60px">10:00</span><span style="top:90px">11:00</span><span style="top:120px">12:00</span><span style="top:150px">13:00</span><span style="top:180px">14:00</span><span style="top:210px">15:00</span><span style="top:240px">16:00</span><span style="top:270px">17:00</span></div><div class="col"></div><div class="col"></div><div class="col"></div><div class="col"></div><div class="col"></div></div>
       </div>
+      <div class="tip">点一下 Outlook 日程，换个颜色 →</div>
     </div>
   </div>
 </section>
+
+<section id="looks" class="looks">
+  <div class="wrap">
+    <div class="reveal">
+      <span class="tag" style="background:var(--peach)">外观</span>
+      <h2>五种便签外观，<br>点一下就换</h2>
+    </div>
+    <div class="ltabs reveal" role="tablist"><button class="ltab" role="tab" aria-selected="true" data-img="images/site/zh/layout-clean.png" data-desc="白底细线，最简洁。" data-alt="清爽卡片外观">清爽卡片</button><button class="ltab" role="tab" aria-selected="false" data-img="images/site/zh/layout-journal.png" data-desc="米色纸页加页签，像一本笔记本。" data-alt="手账纸页外观">手账纸页</button><button class="ltab" role="tab" aria-selected="false" data-img="images/site/zh/layout-card.png" data-desc="默认外观，每个任务一张小卡片。" data-alt="轻量卡片外观">轻量卡片</button><button class="ltab" role="tab" aria-selected="false" data-img="images/site/zh/layout-paper.png" data-desc="暖色纸张，左边点页码直接翻页。" data-alt="纸页本外观">纸页本</button><button class="ltab" role="tab" aria-selected="false" data-img="images/site/zh/layout-original.png" data-desc="按钮最全，编辑、移动、删除都在手边。" data-alt="原始外观">原始外观</button></div>
+    <div class="stage reveal">
+      <img id="look" src="images/site/zh/layout-clean.png" width="878" height="552" alt="清爽卡片外观">
+      <p id="look-cap" aria-live="polite">白底细线，最简洁。</p>
+    </div>
+  </div>
+</section>
+
+<section id="more" style="padding-top:60px">
+  <div class="wrap">
+    <div class="reveal"><span class="tag" style="background:var(--mint)">还有</span><h2>小事也替你想好了</h2></div>
+    <div class="bento"><div class="tile reveal" style="background:#fff3b0;transition-delay:0ms"><span style="color:#b88a00"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="M7 14h10" stroke-width="3"/></svg></span><h3>全天日程</h3><p>考试周、假期，跨几天都行。</p></div><div class="tile reveal" style="background:#ffe4d6;transition-delay:60ms"><span style="color:#e8643c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13 7 4 4"/></svg></span><h3>双击就改</h3><p>改完点别处，自动保存。</p></div><div class="tile reveal" style="background:#d9f2e6;transition-delay:120ms"><span style="color:#2f6f53"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="16" width="18" height="5" rx="2"/><rect x="10" y="17.5" width="4" height="2" rx="1" fill="currentColor"/><rect x="5" y="3" width="14" height="10" rx="2"/></svg></span><h3>一键唤出</h3><p>单击任务栏按钮，组件浮到最前。</p></div><div class="tile reveal" style="background:#dfe5ff;transition-delay:180ms"><span style="color:#4b63d6"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 21h4"/></svg></span><h3>准时提醒</h3><p>提前量逐项设置，错过会补发。</p></div><div class="tile reveal" style="background:#f3e8ff;transition-delay:240ms"><span style="color:#8a5bd6"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18"/><text x="12" y="18.5" text-anchor="middle" font-size="7.5" font-weight="800" fill="currentColor" stroke="none" font-family="Segoe UI">6</text></svg></span><h3>教学周</h3><p>日历上直接显示第几周。</p></div><div class="tile reveal" style="background:#e6f4f7;transition-delay:300ms"><span style="color:#2a8aa0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h9M8.5 3v2M6 5c0 4 3 7 6 8M11 5c0 4-3 8-7 9"/><path d="m13 21 4-9 4 9M14.5 18h5"/></svg></span><h3>中文 / English</h3><p>界面一键切换。</p></div></div>
+  </div>
+</section>
+
+<div class="final">
+  <div class="wrap">
+    <div class="trust reveal"><span><i></i>开源 · MIT</span><span><i></i>无需账号</span><span><i></i>默认不联网</span><span><i></i>数据只在本机</span><span><i></i>768 项自动化测试</span></div>
+    <h2 class="reveal" style="margin-top:70px">这学期，<br>换个方式记 DDL</h2>
+    <a class="btn reveal" href="https://github.com/ElinaMa500/DeskStudy/releases/download/v1.6/DeskStudy-1.6-Windows.zip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="m7 11 5 5 5-5"/><path d="M5 20h14"/></svg>免费下载 Windows 版</a>
+    <p class="small">v1.6 · Windows 10 / 11 · 约 630 KB · 解压即用<br>首次运行若被 Windows 拦截：「更多信息」→「仍要运行」</p>
+  </div>
+</div>
 </main>
 
-<footer>
-  <div class="wrap">桌面课笺 DeskStudy · MIT 许可证开源 · <a href="https://github.com/ElinaMa500/DeskStudy">GitHub</a> · <a href="https://github.com/ElinaMa500/DeskStudy/blob/main/USER_GUIDE.md">使用指南</a> · <a href="en/" hreflang="en">English</a> · 界面截图均为示例数据</div>
-</footer>
-
+<footer><div class="wrap"><a href="https://github.com/ElinaMa500/DeskStudy">GitHub</a>·<a href="https://github.com/ElinaMa500/DeskStudy/blob/main/USER_GUIDE.md">使用指南</a>·<a href="https://github.com/ElinaMa500/DeskStudy/releases">所有版本</a>·<a href="en/" hreflang="en">English</a></div></footer>
+<script>window.TXT = {"dueToday": "今天截止", "dueTomorrow": "明天截止", "daysLeft": "剩余 {0} 天", "newDdl": "新的 DDL", "wd": ["周日", "周一", "周二", "周三", "周四", "周五", "周六"], "ddl": [["会议论文截稿", 3], ["返修意见回复", 1], ["物理实验报告", 5], ["奖学金申请材料", 9]], "own": [["高等数学", 0, 8, 9.75, "教学楼 A201"], ["线性代数", 1, 10, 11.75, "A305"], ["高等数学", 2, 8, 9.75, "教学楼 A201"], ["线性代数", 3, 10, 11.75, "A305"], ["物理实验", 4, 14, 16.5, "实验楼"]], "ext": [["学术讲座", 1, 14, 15.5, "报告厅"], ["导师答疑", 0, 15.5, 16.5, ""], ["导师答疑", 3, 15.5, 16.5, ""], ["学院例会", 2, 12.5, 13.5, ""], ["运动会", -1, 3, 5]]}; window.CHECK = "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"m5 12 5 5 9-10\"/></svg>";</script>
 <script>
-(function () {
-  var nav = document.querySelector('.nav');
-  addEventListener('scroll', function () { nav.classList.toggle('scrolled', scrollY > 8); }, { passive: true });
-  var items = document.querySelectorAll('.reveal');
-  if ('IntersectionObserver' in window) {
-    var io = new IntersectionObserver(function (entries) {
-      entries.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
-    }, { threshold: 0.1 });
-    items.forEach(function (el) { io.observe(el); });
-  } else { items.forEach(function (el) { el.classList.add('in'); }); }
-  var personaTabs = document.querySelectorAll('#persona-tabs button');
-  personaTabs.forEach(function (tab) {
-    tab.addEventListener('click', function () {
-      personaTabs.forEach(function (t) {
-        var on = t === tab;
-        t.setAttribute('aria-selected', String(on));
-        var panel = document.getElementById(t.dataset.panel);
-        panel.hidden = !on;
-        if (on) panel.classList.add('in');
-      });
-    });
+(function(){
+var T = window.TXT, reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+var nav = document.querySelector('.nav');
+addEventListener('scroll', function(){ nav.classList.toggle('scrolled', scrollY > 8); }, {passive:true});
+
+/* reveal on scroll */
+var io = 'IntersectionObserver' in window ? new IntersectionObserver(function(es){ es.forEach(function(e){ if (e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } }); }, {threshold:.12}) : null;
+document.querySelectorAll('.reveal').forEach(function(el){ io ? io.observe(el) : el.classList.add('in'); });
+
+/* hero: drag the widgets around like on a real desktop */
+var z = 10, hint = document.querySelector('.hint');
+document.querySelectorAll('.w').forEach(function(w){
+  var sx, sy, ox = 0, oy = 0, rot = w.dataset.rot || 0;
+  w.style.transform = 'translate(0px,0px) rotate(' + rot + 'deg)';
+  w.addEventListener('pointerdown', function(e){
+    if (e.pointerType === 'touch') return;
+    e.preventDefault(); w.setPointerCapture(e.pointerId); w.classList.add('drag'); w.style.zIndex = ++z;
+    sx = e.clientX - ox; sy = e.clientY - oy;
+    w.style.transform = 'translate(' + ox + 'px,' + oy + 'px) rotate(0deg) scale(1.03)';
+    if (hint) hint.classList.add('gone');
   });
-  var img = document.getElementById('look'), name = document.getElementById('look-name'), desc = document.getElementById('look-desc');
-  var lookTabs = document.querySelectorAll('#look-tabs button');
-  lookTabs.forEach(function (tab) {
-    tab.addEventListener('click', function () {
-      lookTabs.forEach(function (t) { t.setAttribute('aria-selected', String(t === tab)); });
-      img.classList.add('swap');
-      setTimeout(function () {
-        img.src = tab.dataset.img; img.alt = tab.dataset.alt;
-        name.textContent = tab.dataset.name; desc.textContent = tab.dataset.desc;
-        img.classList.remove('swap');
-      }, 180);
-    });
+  w.addEventListener('pointermove', function(e){
+    if (!w.classList.contains('drag')) return;
+    ox = e.clientX - sx; oy = e.clientY - sy;
+    w.style.transform = 'translate(' + ox + 'px,' + oy + 'px) rotate(0deg) scale(1.03)';
   });
+  function drop(){ if (!w.classList.contains('drag')) return; w.classList.remove('drag'); w.style.transform = 'translate(' + ox + 'px,' + oy + 'px) rotate(' + rot * .4 + 'deg)'; }
+  w.addEventListener('pointerup', drop); w.addEventListener('pointercancel', drop);
+});
+
+/* DDL demo: sorts itself, flags the week, ticks sink to the bottom */
+var today = new Date(); today.setHours(0,0,0,0);
+var items = T.ddl.map(function(d, i){ return { id: i, text: d[0], days: d[1], done: false }; }), nextId = items.length, pick = 1;
+var list = document.getElementById('ddl-list'), week = document.getElementById('ddl-week');
+function dateOf(n){ var d = new Date(today); d.setDate(d.getDate() + n); return d; }
+function dueText(n){ return n === 0 ? T.dueToday : n === 1 ? T.dueTomorrow : T.daysLeft.replace('{0}', n); }
+function dateText(n){ var d = dateOf(n); return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + T.wd[d.getDay()]; }
+for (var i = 0; i < 7; i++) {
+  var d = dateOf(i), el = document.createElement('div');
+  el.className = 'day' + (i === 0 ? ' today' : ''); el.dataset.n = i;
+  el.innerHTML = T.wd[d.getDay()] + '<b>' + d.getDate() + '</b><span class="flag"></span>';
+  el.addEventListener('click', function(){
+    var n = +this.dataset.n;
+    items.forEach(function(it){ if (it.days === n && !it.done) { var node = list.querySelector('[data-id="' + it.id + '"]'); node.classList.add('hl'); setTimeout(function(){ node.classList.remove('hl'); }, 1200); } });
+  });
+  week.appendChild(el);
+}
+function node(it){
+  var n = document.createElement('div'); n.className = 'item'; n.dataset.id = it.id;
+  n.innerHTML = '<span class="box" role="checkbox" tabindex="0" aria-checked="false">' + window.CHECK + '</span><div class="t"><div></div><small></small></div><span class="due"></span>';
+  n.querySelector('.t div').textContent = it.text;
+  function toggle(){ it.done = !it.done; render(); }
+  n.querySelector('.box').addEventListener('click', toggle);
+  n.querySelector('.box').addEventListener('keydown', function(e){ if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); toggle(); } });
+  return n;
+}
+function render(fresh){
+  var before = {};
+  list.querySelectorAll('.item').forEach(function(n){ before[n.dataset.id] = n.getBoundingClientRect().top; });
+  items.sort(function(a, b){ return (a.done - b.done) || (a.days - b.days) || (a.id - b.id); });
+  items.forEach(function(it){
+    var n = list.querySelector('[data-id="' + it.id + '"]') || node(it);
+    n.classList.toggle('done', it.done);
+    n.querySelector('.box').setAttribute('aria-checked', it.done);
+    n.querySelector('small').textContent = dateText(it.days);
+    var due = n.querySelector('.due'); due.textContent = dueText(it.days); due.classList.toggle('hot', it.days <= 1);
+    list.appendChild(n);
+  });
+  if (!reduce) list.querySelectorAll('.item').forEach(function(n){
+    var was = before[n.dataset.id], now = n.getBoundingClientRect().top;
+    if (was === undefined) { if (fresh) n.animate([{opacity:0, transform:'translateY(-12px) scale(.97)', background:'#fff3b0'}, {opacity:1, transform:'none', background:'#fff3b0', offset:.4}, {background:'#fff'}], {duration:1100, easing:'cubic-bezier(.2,.8,.2,1)'}); }
+    else if (was !== now) n.animate([{transform:'translateY(' + (was - now) + 'px)'}, {transform:'none'}], {duration:450, easing:'cubic-bezier(.2,.8,.2,1)'});
+  });
+  week.querySelectorAll('.day').forEach(function(el){
+    var c = items.filter(function(it){ return !it.done && it.days === +el.dataset.n; }).length;
+    el.classList.toggle('has', c > 0); el.querySelector('.flag').textContent = '⚑ ' + c;
+  });
+}
+render();
+var input = document.getElementById('ddl-input');
+document.querySelectorAll('#ddl-chips .chip').forEach(function(c){
+  c.addEventListener('click', function(){ pick = +c.dataset.days; document.querySelectorAll('#ddl-chips .chip').forEach(function(o){ o.setAttribute('aria-pressed', o === c); }); });
+});
+function add(){
+  var text = input.value.trim() || T.newDdl;
+  items.push({ id: nextId++, text: text, days: pick, done: false });
+  if (items.length > 7) { var old = items.filter(function(it){ return it.done; })[0] || items[items.length - 2]; items.splice(items.indexOf(old), 1); var gone = list.querySelector('[data-id="' + old.id + '"]'); if (gone) gone.remove(); }
+  input.value = ''; render(true);
+}
+document.getElementById('ddl-add').addEventListener('click', add);
+input.addEventListener('keydown', function(e){ if (e.key === 'Enter') add(); });
+
+/* Outlook demo */
+var box = document.getElementById('ol'), palette = ['#cfe0ff|#5b8def', '#ffd9e6|#e0709a', '#d6f2e4|#3fae7f', '#ffe8c4|#e09a2c', '#e6dcff|#8a6be0'];
+var colorOf = {};
+T.ext.forEach(function(e, i){ if (!(e[0] in colorOf)) colorOf[e[0]] = Object.keys(colorOf).length % palette.length; });
+var cols = box.querySelectorAll('.col'), allday = box.querySelector('.allday');
+function px(h){ return (h - 8) / 10 * 300; }
+function place(e, ext){
+  var el = document.createElement('div'); el.className = 'ev ' + (ext ? 'ext' : 'own');
+  el.innerHTML = '<b></b><span></span>'; el.querySelector('b').textContent = e[0];
+  if (e[1] < 0) { el.classList.add('bar'); el.style.left = (e[2] * 20) + '%'; el.style.right = (100 - e[3] * 20) + '%'; el.querySelector('span').remove(); allday.appendChild(el); }
+  else { el.style.top = px(e[2]) + 'px'; el.style.height = (px(e[3]) - px(e[2]) - 2) + 'px'; el.querySelector('span').textContent = e[4] || ''; cols[e[1]].appendChild(el); }
+  if (ext) { el.dataset.name = e[0]; el.style.transitionDelay = (Math.random() * .25).toFixed(2) + 's'; el.addEventListener('click', function(){ colorOf[e[0]] = (colorOf[e[0]] + 1) % palette.length; paint(); }); }
+}
+function paint(){ box.querySelectorAll('.ev.ext').forEach(function(el){ var c = palette[colorOf[el.dataset.name]].split('|'); el.style.background = c[0]; el.style.borderColor = c[1]; }); }
+T.own.forEach(function(e){ place(e, false); }); T.ext.forEach(function(e){ place(e, true); }); paint();
+var sw = document.getElementById('ol-switch');
+function flip(){ var on = !box.classList.contains('on'); box.classList.toggle('on', on); sw.setAttribute('aria-checked', on); }
+sw.addEventListener('click', flip); sw.addEventListener('keydown', function(e){ if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); flip(); } });
+if (io) { var auto = new IntersectionObserver(function(es){ if (es[0].isIntersecting) { setTimeout(function(){ if (!box.classList.contains('on') && !box.dataset.touched) flip(); }, 700); auto.disconnect(); } }, {threshold:.6}); auto.observe(box); }
+sw.addEventListener('pointerdown', function(){ box.dataset.touched = 1; });
+
+/* looks */
+var img = document.getElementById('look'), cap = document.getElementById('look-cap'), tabs = document.querySelectorAll('.ltab');
+tabs.forEach(function(t){
+  t.addEventListener('click', function(){
+    if (t.getAttribute('aria-selected') === 'true') return;
+    tabs.forEach(function(o){ o.setAttribute('aria-selected', o === t); });
+    var next = new Image(); next.src = t.dataset.img;
+    img.classList.add('out');
+    setTimeout(function(){ var show = function(){ img.src = t.dataset.img; img.alt = t.dataset.alt; cap.textContent = t.dataset.desc; img.classList.remove('out'); }; next.complete ? show() : (next.onload = show); }, 200);
+  });
+});
+tabs.forEach(function(t){ var p = new Image(); p.src = t.dataset.img; });
 })();
 </script>
 </body>

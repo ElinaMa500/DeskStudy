@@ -15,6 +15,9 @@ using DeskStudy;
 public static class SiteShots
 {
     [DllImport("user32.dll")] static extern bool PrintWindow(IntPtr hwnd, IntPtr dc, uint flags);
+    [DllImport("user32.dll")] static extern int GetWindowRgn(IntPtr hwnd, IntPtr region);
+    [DllImport("gdi32.dll")] static extern IntPtr CreateRectRgn(int left, int top, int right, int bottom);
+    [DllImport("gdi32.dll")] static extern bool DeleteObject(IntPtr handle);
     static void Pump(int ms) { var clock = Stopwatch.StartNew(); while (clock.ElapsedMilliseconds < ms) { Application.DoEvents(); Thread.Sleep(10); } }
     static IEnumerable<Control> All(Control root) { foreach (Control c in root.Controls) { yield return c; foreach (Control d in All(c)) yield return d; } }
     static string folder; static bool en;
@@ -34,7 +37,18 @@ public static class SiteShots
             using (var g = Graphics.FromImage(canvas))
             {
                 g.Clear(Color.FromArgb(214, 222, 218));
-                foreach (var w in widgets) using (var b = Picture(w)) g.DrawImage(b, w.Left - all.Left + 16, w.Top - all.Top + 16);
+                foreach (var w in widgets) using (var b = Picture(w))
+                {
+                    int x = w.Left - all.Left + 16, y = w.Top - all.Top + 16;
+                    // Rounded widgets are clipped by a window region; PrintWindow leaves the cut-off corners black, so paste
+                    // the picture through the same region.
+                    IntPtr rgn = CreateRectRgn(0, 0, 0, 0);
+                    if (GetWindowRgn(w.Handle, rgn) > 1)
+                        using (var clip = Region.FromHrgn(rgn)) { clip.Translate(x, y); g.SetClip(clip, System.Drawing.Drawing2D.CombineMode.Replace); }
+                    DeleteObject(rgn);
+                    g.DrawImage(b, x, y);
+                    g.ResetClip();
+                }
             }
             canvas.Save(Path.Combine(folder, name + ".png"));
         }
