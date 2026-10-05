@@ -67,6 +67,6 @@
 - `src/Collapse.cs`：折叠与展开。
 - `src/PlacementLogic.cs`、`src/Placement.cs`：贴齐、弹回与不重叠的计算，以及接到窗口消息和设置操作上的部分。
 - `tests`：核心、布局与桌面集成测试。
-- `build.ps1`：默认构建至 `release-1.5.1`；`package.ps1`：构建并生成分发包。
+- `build.ps1`：默认构建至 `release-1.6`；`package.ps1`：构建并生成分发包。
 - `README.md`：使用说明；`LAYOUTS.md`：便签布局说明；`VERIFICATION.md`：实际验证事实与限制。
 - `DeskStudy-1.5.1-Windows.zip`：最终便携分发包（含 `screenshots`）。
