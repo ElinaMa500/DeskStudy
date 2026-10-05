@@ -149,6 +149,26 @@ public static class PageTurnChecks
                 Assert(page.Tasks.Any(t => t.Text == "新任务 " + layout), layout + ": the quick entry adds the task");
             }
         }
+        // Ticking a deadline: the list re-sorts and the calendar's deadline marks change. With a large Outlook calendar.
+        var ddl = (NotebookForm)app.Widgets.First(w => w.WidgetKey == "ddl");
+        var ddlBook = app.Data.Books.First(b => b.Id == "ddl");
+        var ddlPage = ddlBook.Pages.First(p => p.Id == ddlBook.CurrentPageId);
+        ddlPage.Tasks.Clear();
+        for (int i = 0; i < 6; i++) ddlPage.Tasks.Add(new TaskItem { Text = "截止事项 " + (i + 1), DueLocal = DateTime.Today.AddDays(i + 1).ToString("yyyy-MM-dd") + "T18:00:00" });
+        app.Outlook.Events.Clear();
+        for (int i = 0; i < 650; i++) app.Outlook.Events.Add(new OutlookEvent { Uid = "u" + (i % 30), Title = "Lecture " + (i % 30), Start = DateTime.Today.AddDays(i % 200 - 30).ToString("yyyy-MM-dd") + "T" + (8 + i % 9).ToString("00") + ":00:00", End = DateTime.Today.AddDays(i % 200 - 30).ToString("yyyy-MM-dd") + "T" + (9 + i % 9).ToString("00") + ":00:00" });
+        app.Data.Settings.SortDeadlines = true; app.Data.Settings.Calendar.Outlook.Url = "https://example.invalid/c.ics"; app.OutlookDownload = delegate(string unused) { throw new System.Net.WebException("offline"); };
+        foreach (string layout in new[] { "Journal", "Clean", "Original" })
+        {
+            app.Data.Settings.NotebookLayout = layout; app.SettingsChanged(); Pump(400);
+            var first = DeadlineLogic.Ordered(ddlPage.Tasks).First(t => !t.Completed);
+            var tick = All(ddl).OfType<CheckBox>().First(c => c.Name == "task-checkbox-" + first.Id);
+            // Where the rows' text is drawn during the repaint: on screen, or into an off-screen picture.
+            Change(layout + " deadline ticked (list re-sorts, calendar updates)", delegate { tick.Checked = true; }, 40);
+            Assert(Shown(ddl).Last().StartsWith(first.Text) && first.Completed, layout + ": the ticked deadline moves to the bottom");
+        }
+        app.Outlook.Events.Clear(); app.Data.Settings.Calendar.Outlook.Url = ""; app.SettingsChanged(); Pump(200);
+
         // Settings that change the look still restyle.
         int restyles = WidgetForm.Restyles;
         app.Data.Settings.GlobalAppearance.FontSize = 10; app.SettingsChanged(); Pump(300);
