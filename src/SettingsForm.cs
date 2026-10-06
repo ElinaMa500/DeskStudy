@@ -32,7 +32,8 @@ namespace DeskStudy
         private Label hotkeyStatus;
         private NumericUpDown opacity, fontSize, leadMinutes, outlookLead;
         private TextBox outlookUrl; private Label outlookStatus; private FlowLayoutPanel outlookCategories; private string outlookCategorySignature = ""; private CheckBox outlookShow, outlookRemind; private ComboBox outlookRefresh;
-        private CheckBox followingGlobal, quietEnabled, soundEnabled, startup, showDeadlines, sortDeadlines, taskbarIcon;
+        private CheckBox followingGlobal, quietEnabled, soundEnabled, startup, showDeadlines, sortDeadlines, taskbarIcon, desktopShortcut, startMenuShortcut;
+        private Label shortcutNote;
         private Button backgroundColor;
         private readonly List<NotebookLayoutPreview> notebookLayouts = new List<NotebookLayoutPreview>();
         private DateTimePicker semesterStart, semesterEnd, teachingWeekOne, quietStart, quietEnd, dateOnlyReminder;
@@ -308,6 +309,11 @@ namespace DeskStudy
             taskbarIcon = Check("taskbar-icon", Lang.T("在任务栏显示「桌面课笺」图标")); Field(mode, Lang.T("任务栏"), taskbarIcon);
             taskbarIcon.CheckedChanged += delegate { if (!syncing) Run(delegate { app.SetTaskbarIcon(taskbarIcon.Checked); }); };
             Add(mode, Ui.Label(Lang.T("桌面组件模式下生效：单击任务栏图标把组件浮到前面，再单击一次收回去。右键图标选「固定到任务栏」，没运行时点它也能打开。"), 8.5F, Ui.Muted));
+            desktopShortcut = Check("desktop-shortcut", Lang.T("在桌面创建快捷方式")); startMenuShortcut = Check("start-menu-shortcut", Lang.T("添加到开始菜单"));
+            Field(mode, Lang.T("快捷方式"), Buttons(desktopShortcut, startMenuShortcut));
+            desktopShortcut.CheckedChanged += delegate { if (!syncing) Run(delegate { app.SetShortcut("desktop", desktopShortcut.Checked); RefreshData(); }); };
+            startMenuShortcut.CheckedChanged += delegate { if (!syncing) Run(delegate { app.SetShortcut("startmenu", startMenuShortcut.Checked); RefreshData(); }); };
+            shortcutNote = Ui.Label("", 8.5F, Ui.Muted); Add(mode, shortcutNote);
             var operations = Card(page, Lang.T("布局管理"));
             Add(operations, Buttons(ActionButton("save-layout", Lang.T("保存当前布局"), app.SaveLayout), ActionButton("restore-saved-layout", Lang.T("恢复已保存布局"), app.RestoreSavedLayout), ActionButton("reset-layout", Lang.T("恢复默认布局"), app.ResetLayout), ActionButton("rescue-windows", Lang.T("将组件找回当前屏幕"), app.RescueWindows)));
             layoutSaved = Ui.Label("", 8.5F, Ui.Muted); layoutSaved.Margin = new Padding(0, 8, 0, 0); Add(operations, layoutSaved);
@@ -636,6 +642,13 @@ namespace DeskStudy
                 }
                 SelectId(uiLanguage, app.Data.Settings.Language); UpdateLanguageNote();
                 SelectId(widgetMode, app.Data.Settings.WidgetMode); SelectId(widgetCorners, app.Data.Settings.WidgetCorners); taskbarIcon.Checked = app.Data.Settings.ShowTaskbarIcon;
+                // The boxes show what is really on the desktop and in the Start menu, including shortcuts deleted by hand.
+                desktopShortcut.Checked = app.HasShortcut("desktop"); startMenuShortcut.Checked = app.HasShortcut("startmenu");
+                bool canMake = app.ShortcutsManaged && !app.RunningFromTemporaryFolder;
+                desktopShortcut.Enabled = canMake || desktopShortcut.Checked; startMenuShortcut.Enabled = canMake || startMenuShortcut.Checked;
+                shortcutNote.Text = !app.ShortcutsManaged ? Lang.T("使用其他数据目录（例如测试）时，不会改动桌面和开始菜单。")
+                    : app.RunningFromTemporaryFolder ? Lang.T("程序正从临时文件夹运行（可能是直接在压缩包里打开的）。请先把压缩包解压到固定的文件夹，再创建快捷方式。")
+                    : Lang.T("快捷方式指向当前这份程序；把文件夹挪到别处后，下次启动会自动跟上。");
                 hotkeyBox.Text = app.Data.Settings.ShowHotkey == "" ? Lang.T("已停用") : app.Data.Settings.ShowHotkey;
                 hotkeyStatus.Text = app.HotkeyStatus ?? "";
                 layoutSaved.Text = String.IsNullOrEmpty(app.Data.Settings.SavedLayoutUtc) ? Lang.T("尚未保存自定义布局。重置与找回不会影响内容。") : Lang.T("已保存布局：{0}。重置与找回不会影响内容。", LocalStamp(app.Data.Settings.SavedLayoutUtc));

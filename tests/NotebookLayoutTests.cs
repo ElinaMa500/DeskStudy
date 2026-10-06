@@ -410,7 +410,8 @@ public static class NotebookLayoutTests
         try
         {
             // "langfresh": a brand-new user whose Windows display language is English.
-            if (mode == "langfresh" || mode == "english" || mode == "guide-en" || mode == "site-en") Thread.CurrentThread.CurrentUICulture = System.Globalization.CultureInfo.GetCultureInfo("en-US");
+            if (mode == "langfresh" || mode == "english" || mode == "guide-en" || mode == "site-en" || mode == "shortcut-en") Thread.CurrentThread.CurrentUICulture = System.Globalization.CultureInfo.GetCultureInfo("en-US");
+            if (mode.StartsWith("shortcut", StringComparison.Ordinal)) ShortcutChecks.Prepare(path);
             using (var app = new AppController(path, null, false))
             {
                 Pump(150);
@@ -438,6 +439,8 @@ public static class NotebookLayoutTests
                 else if (mode == "outlookread") OutlookChecks.Read(app);
                 else if (mode == "outlookimport") OutlookChecks.Import(app);
                 else if (mode == "taskbarread") TaskbarChecks.Read(app);
+                else if (mode == "shortcut" || mode == "shortcut-en") ShortcutChecks.Run(app, path);
+                else if (mode == "shortcutread") ShortcutChecks.Read(app);
                 else if (mode == "titlegap") TitleGapShot.Run(app, path, args[2]);
                 else if (mode == "langfresh") LangChecks.FreshEnglish(app);
                 else if (mode == "inline" || mode == "inlineread") InlineEditChecks.Run(app, path, mode == "inlineread");

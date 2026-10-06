@@ -34,6 +34,7 @@ $suites = @(
     @{ Name = 'english';      Script = 'run-layouts.ps1';         Args = @{ English = $true } },
     @{ Name = 'ddl';          Script = 'run-layouts.ps1';         Args = @{ Deadline = $true } },
     @{ Name = 'taskbar';      Script = 'run-layouts.ps1';         Args = @{ Taskbar = $true } },
+    @{ Name = 'shortcut';     Script = 'run-layouts.ps1';         Args = @{ Shortcut = $true } },
     @{ Name = 'outlook';      Script = 'run-layouts.ps1';         Args = @{ Outlook = $true } },
     @{ Name = 'allday';       Script = 'run-layouts.ps1';         Args = @{ AllDay = $true } },
     @{ Name = 'pageturn';     Script = 'run-layouts.ps1';         Args = @{ PageTurn = 'check' } },

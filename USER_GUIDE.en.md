@@ -18,12 +18,13 @@ Everything stays on your computer and there is no account. DeskStudy does not go
 
 1. Unzip the download into a folder that stays put, e.g. `D:\DeskStudy`. Do not run it from inside the zip.
 2. Double-click `DeskStudy.exe`. There is nothing to install and no administrator rights are needed.
-3. The first time, the calendar and both notebooks are empty: just start adding things.
+3. The first time, the calendar and both notebooks are empty: just start adding things. A moment later a small window asks whether to **Create a desktop shortcut** and **Add to the Start menu**; tick what you want and choose **OK**.
 
 - Windows 10 or Windows 11 is required.
 - If Windows shows "Windows protected your PC", choose **More info → Run anyway**. The program is not code-signed; the warning does not mean anything is wrong.
 - Keep `DeskStudy.exe.config` in the same folder as `DeskStudy.exe`.
 - To start DeskStudy with Windows: **Settings → Data and app → Start when I sign in to Windows**.
+- To change the shortcuts later: **Settings → Display and layout → Shortcuts**. If you move the program folder, the shortcuts follow it at the next start. Opened straight from the zip, DeskStudy creates no shortcuts, because that copy is only temporary.
 - The interface follows your Windows display language the first time. To switch later, see section 7, Appearance and language.
 
 ---

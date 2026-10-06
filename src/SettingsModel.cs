@@ -28,6 +28,8 @@ namespace DeskStudy
         public bool SortDeadlines { get; set; }
         // Desktop mode: one taskbar button that brings the widgets forward or sends them back.
         public bool ShowTaskbarIcon { get; set; }
+        // The first start by hand has offered desktop and Start-menu shortcuts (1.6.1). Data from before asks once too.
+        public bool ShortcutsOffered { get; set; }
         // Global shortcut that raises or lowers all widgets, e.g. "Ctrl+Alt+Shift+D". Empty disables it.
         public string ShowHotkey { get; set; }
         // Set when the file predates WidgetMode: its window bounds still include the system frame.

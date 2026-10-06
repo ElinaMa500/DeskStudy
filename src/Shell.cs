@@ -388,7 +388,15 @@ namespace DeskStudy
             reopenTimer = new System.Windows.Forms.Timer { Interval = 700 };
             reopenTimer.Tick += delegate { if (showSignal != null && showSignal.WaitOne(0)) ShowAll(); }; reopenTimer.Start();
             var startup = new System.Windows.Forms.Timer { Interval = 1000 };
-            startup.Tick += delegate { startup.Stop(); startup.Dispose(); if (!Exiting) { CheckReminders(DateTime.UtcNow); if (!String.IsNullOrEmpty(Store.LoadWarning)) MessageBox.Show(Store.LoadWarning, Lang.T("数据恢复"), MessageBoxButtons.OK, MessageBoxIcon.Warning); } }; startup.Start();
+            startup.Tick += delegate
+            {
+                startup.Stop(); startup.Dispose(); if (Exiting) return;
+                CheckReminders(DateTime.UtcNow);
+                if (!String.IsNullOrEmpty(Store.LoadWarning)) MessageBox.Show(Store.LoadWarning, Lang.T("数据恢复"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                // Started at sign-in: no questions; they wait for a start by hand.
+                if (!quietStart) OfferShortcuts();
+            };
+            startup.Start();
         }
         public void Save() { QueueSave(); PublishChanges(); }
         public void QueueSave() { if (Exiting) return; bool changed = !dirty; dirty = true; saveTimer.Stop(); saveTimer.Start(); if (changed && SaveStateChanged != null) SaveStateChanged(); }

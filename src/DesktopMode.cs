@@ -121,6 +121,7 @@ namespace DeskStudy
         private void FinishStartup(bool quiet)
         {
             if (UsesSystemStartup) { try { StartupRegistration.Refresh(); } catch (Exception) { } }
+            RefreshShortcuts();
             RegisterShowHotkey();
             UpdateTaskbarButton();
             StartOutlook();

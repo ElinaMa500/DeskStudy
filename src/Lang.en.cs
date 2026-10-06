@@ -550,6 +550,19 @@ namespace DeskStudy
             // Taskbar button.
             { "在任务栏显示「桌面课笺」图标", "Show a DeskStudy button on the taskbar" },
             { "任务栏", "Taskbar" },
+            // Desktop and Start-menu shortcuts.
+            { "快捷方式", "Shortcuts" },
+            { "在桌面创建快捷方式", "Create a desktop shortcut" },
+            { "添加到开始菜单", "Add to the Start menu" },
+            { "欢迎使用桌面课笺", "Welcome to DeskStudy" },
+            { "要创建快捷方式，方便以后打开吗？", "Create shortcuts so DeskStudy is easy to open later?" },
+            { "以后可在「设置 → 显示与布局」中更改。", "You can change this later in Settings → Display and layout." },
+            { "好的", "OK" },
+            { "课表、Todo 与 DDL 桌面组件", "Timetable, to-do and deadline widgets" },
+            { "程序正从临时文件夹运行（可能是直接在压缩包里打开的）。请先把压缩包解压到固定的文件夹，再创建快捷方式。", "DeskStudy is running from a temporary folder (perhaps straight from the zip). Unzip it into a folder that stays put, then create the shortcuts." },
+            { "使用其他数据目录（例如测试）时，不会改动桌面和开始菜单。", "With a different data folder (for example in tests), the desktop and Start menu are left alone." },
+            { "快捷方式指向当前这份程序；把文件夹挪到别处后，下次启动会自动跟上。", "Shortcuts point at this copy of DeskStudy; if you move the folder, they follow it at the next start." },
+            { "没能创建快捷方式，可以稍后在设置中心重试。\n\n", "The shortcuts could not be created. You can try again later in Settings.\n\n" },
             { "桌面组件模式下生效：单击任务栏图标把组件浮到前面，再单击一次收回去。右键图标选「固定到任务栏」，没运行时点它也能打开。", "In desktop mode: click the taskbar button to bring the widgets forward, click again to send them back. Right-click it and choose Pin to taskbar to start DeskStudy from there too." },
             // Outlook calendar.
             { "全天", "All day" },
