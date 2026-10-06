@@ -403,10 +403,39 @@ public static class NotebookLayoutTests
         Switch(app, "Card"); Pump(100); Capture(ddl, Path.Combine(path, "frame-ddl-card.png"));
         app.Save(); Assert(app.Flush(), "window mode changes saved");
     }
+    delegate bool EnumWindowsProc(IntPtr hwnd, IntPtr lparam);
+    [DllImport("user32.dll")] static extern bool EnumWindows(EnumWindowsProc callback, IntPtr lparam);
+    [DllImport("user32.dll")] static extern int GetWindowThreadProcessId(IntPtr hwnd, out int processId);
+    [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr hwnd);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int InternalGetWindowText(IntPtr hwnd, System.Text.StringBuilder text, int max);
+    // The checks drive real windows on the user's desktop. A stray click or key (for example on 页面目录) opens a modal
+    // dialog that no check closes, and the process would wait forever. Fail instead, naming the open windows.
+    // DESKSTUDY_TEST_TIMEOUT (seconds) overrides the limit.
+    static void StartWatchdog(string mode)
+    {
+        int seconds; if (!int.TryParse(Environment.GetEnvironmentVariable("DESKSTUDY_TEST_TIMEOUT"), out seconds) || seconds <= 0) seconds = 300;
+        var watchdog = new Thread(delegate()
+        {
+            Thread.Sleep(seconds * 1000);
+            int self = Process.GetCurrentProcess().Id; var titles = new List<string>();
+            // InternalGetWindowText sends no message, so it answers even while the UI thread is stuck.
+            EnumWindows(delegate(IntPtr hwnd, IntPtr unused)
+            {
+                int owner; GetWindowThreadProcessId(hwnd, out owner);
+                if (owner == self && IsWindowVisible(hwnd)) { var text = new System.Text.StringBuilder(256); InternalGetWindowText(hwnd, text, text.Capacity); titles.Add(text.ToString()); }
+                return true;
+            }, IntPtr.Zero);
+            Console.Error.WriteLine("TIMEOUT: " + mode + " did not finish within " + seconds + " s. Open windows: " + string.Join(", ", titles.Select(t => "\"" + t + "\"").ToArray()));
+            Console.Error.Flush(); Console.Out.Flush();
+            Environment.Exit(2);
+        });
+        watchdog.IsBackground = true; watchdog.Start();
+    }
     [STAThread] public static int Main(string[] args)
     {
         Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
         string path = Path.GetFullPath(args[0]), mode = args[1]; Directory.CreateDirectory(path);
+        StartWatchdog(mode);
         try
         {
             // "langfresh": a brand-new user whose Windows display language is English.
