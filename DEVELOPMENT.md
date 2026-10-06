@@ -41,6 +41,7 @@
 
 - 使用指南截图：`tests\run-layouts.ps1 -Guide zh` 和 `-Guide en` 用示例数据生成（不截真实屏幕），复制到 `docs\images\guide\zh|en` 后运行 `tools\shrink-png.ps1 -Path docs\images\guide`。该脚本把截图转为 256 色调色板 PNG；只有体积变小、且每个像素的颜色偏差不超过 72 时才替换，大约能小 40%。
 - 一键回归：`powershell -File tests\run-all.ps1`。脚本逐个运行全部测试套件（桌面类测试会打开真实窗口，所以不并行），每个套件一行结果。套件是否失败，以脚本是否抛错、测试程序是否返回非零为准，不看输出里的文字。单个套件超时（默认 600 秒）会被停止并记为失败。超时只会结束 `artifacts` 下的测试进程，不会动到正在使用的程序。有失败时退出码为 1，完整日志写入 `artifacts\run-all-时间.log`。`-Only core,outlook` 只跑指定套件，`-Packaged` 会另外打包，并跑打包版冒烟测试。
+- 快速模式：`powershell -File tests\run-all.ps1 -Quick`。5 组核心测试（不开窗口，约 30 秒）总是跑；桌面类测试只跑与改动文件相关的几组。改动文件指尚未提交的修改和新文件；`-Since origin/main` 改为比较自那次提交以来的全部改动。文件与套件的对应表在 `tests\quick-suites.ps1`，运行时会逐个打印每个文件选中了哪些套件。表里没有的源码或测试文件会让它改跑全部套件，所以新加文件时记得补进表里。文档、图片、`tools` 等不触发桌面测试。发布前仍跑全量。
 
 - 核心测试覆盖循环日期与例外、时区、任务完成与提醒去重、数据完整性、旧版迁移、设置校验和备份恢复。
 - 绘制规则：数据改动（任务、页面、日程）只刷新组件内容，不重新上样式；只有外观相关设置变化（`AppController.LookSignature`）才整体重排。刷新内容放在 `RedrawPause` 里，一次画出。`tests/run-layouts.ps1 -PageTurn check` 会检查翻页、双击编辑、打勾、添加时没有重排、一次画出。

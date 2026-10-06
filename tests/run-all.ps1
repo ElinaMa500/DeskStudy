@@ -4,7 +4,11 @@ param(
     # A suite that runs longer than this is stopped and counted as failed.
     [int]$TimeoutSeconds = 600,
     # Also build the package and run the packaged smoke test.
-    [switch]$Packaged
+    [switch]$Packaged,
+    # Quick: the core suites plus only the desktop suites related to the changed files (uncommitted changes,
+    # or the changes since -Since, e.g. -Since origin/main). Before a release, run everything.
+    [switch]$Quick,
+    [string]$Since = ''
 )
 # Runs every test suite one after another (the desktop suites open real windows, so never in parallel)
 # and prints one line per suite. A suite fails when its script throws or a test runner exits non-zero;
@@ -43,6 +47,7 @@ $suites = @(
     @{ Name = 'restart';      Script = 'run-restart.ps1';         Args = @{} }
 )
 if ($Packaged) { $suites += @{ Name = 'packaged'; Script = 'run-settings.ps1'; Args = @{ Packaged = $true }; Before = 'package' } }
+if ($Quick -or $Since -ne '') { $Only = @(& (Join-Path $here 'quick-suites.ps1') -Since $Since) + @(if ($Packaged) { 'packaged' }) }
 if ($Only.Count -gt 0) { $suites = @($suites | Where-Object { $Only -contains $_.Name }) }
 
 # Test runners and test copies of the app all live under artifacts; the installed app is never touched.
