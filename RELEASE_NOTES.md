@@ -1,3 +1,25 @@
+# 桌面课笺 1.6.1 更新说明
+
+下载 `DeskStudy-1.6.1-Windows.zip`，解压后双击 `DeskStudy.exe`。
+
+- **桌面快捷方式**：第一次打开时会问你要不要「在桌面创建快捷方式」和「添加到开始菜单」，只问一次。以后可在「设置 → 显示与布局 → 快捷方式」随时开关。
+- 把程序文件夹挪到别处、或换成新版本后，快捷方式会在下次启动时自动指向新位置。
+- 直接在压缩包里双击运行时，不会创建快捷方式（那只是一份临时副本），请先解压。
+
+从 1.6 升级：退出旧版后直接运行新版即可，数据自动读取。1.6 的完整更新内容见下文。
+
+# DeskStudy 1.6.1 release notes
+
+Download `DeskStudy-1.6.1-Windows.zip`, unzip it and double-click `DeskStudy.exe`.
+
+- **Desktop shortcut**: the first time you open DeskStudy, it asks whether to create a desktop shortcut and add it to the Start menu, once. Change it any time under **Settings → Display and layout → Shortcuts**.
+- If you move the program folder or switch to a newer version, the shortcuts follow it at the next start.
+- Opened straight from the zip, DeskStudy creates no shortcuts (that copy is temporary); unzip it first.
+
+Upgrading from 1.6: quit the old version and run the new one; your data is read automatically. The full 1.6 notes follow.
+
+---
+
 # 桌面课笺 1.6 更新说明
 
 > 1.4、1.5、1.5.1 没有单独发布，以下是相对 1.3 的全部变化。English below.

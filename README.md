@@ -1,23 +1,23 @@
-# 桌面课笺 1.6
+# 桌面课笺 1.6.1
 
 本地 Windows 桌面应用，包含可同时显示的日历、Todo 和 DDL 三个独立组件，以及统一设置中心。数据只保存在本机；默认不联网，只有订阅 Outlook 日历时才会访问你填写的那一个链接。
 
 ![日历、Todo 与 DDL 三个桌面组件](docs/images/overview.png)
 
 - **介绍页**：<https://elinama500.github.io/DeskStudy/>
-- **下载**：在 [Releases](https://github.com/ElinaMa500/DeskStudy/releases/latest) 页面下载 `DeskStudy-1.6-Windows.zip`，解压后双击 `DeskStudy.exe`。
+- **下载**：在 [Releases](https://github.com/ElinaMa500/DeskStudy/releases/latest) 页面下载 `DeskStudy-1.6.1-Windows.zip`，解压后双击 `DeskStudy.exe`。
 - **使用指南**：[USER_GUIDE.md](USER_GUIDE.md)（压缩包内为 `使用指南.html`）；English: [USER_GUIDE.en.md](USER_GUIDE.en.md)（压缩包内为 `User Guide.html`）。
 - **五种便签外观**：[LAYOUTS.md](LAYOUTS.md)。
 
 ## 启动与升级
 
-从源码构建时，程序输出到 `release-1.6` 文件夹，分发包为项目根目录的 `DeskStudy-1.6-Windows.zip`（由 `package.ps1` 生成）。解压后双击其中的 `DeskStudy.exe` 即可，无需安装或管理员权限。请保留程序同目录的 `DeskStudy.exe.config`。运行环境为 Windows 10/11 与 .NET Framework 4.8 或更新版本。
+从源码构建时，程序输出到 `release-1.6.1` 文件夹，分发包为项目根目录的 `DeskStudy-1.6.1-Windows.zip`（由 `package.ps1` 生成）。解压后双击其中的 `DeskStudy.exe` 即可，无需安装或管理员权限。请保留程序同目录的 `DeskStudy.exe.config`。运行环境为 Windows 10/11 与 .NET Framework 4.8 或更新版本。
 
 第一次使用是空白课表和两本各有一页的便签。应用不连接云端；只有在设置中心订阅 Outlook 日历后，才会下载你填写的那一个链接。
 
 快捷方式（1.6.1）：第一次手动启动约 1 秒后，程序询问是否「在桌面创建快捷方式」（默认勾选）和「添加到开始菜单」（默认不勾），只问一次；升级的用户也会问一次，已经有快捷方式的直接跳过。登录 Windows 时的自动启动不弹窗，等下次手动打开再问。从临时文件夹运行（直接在压缩包里打开）时不问也不创建。之后可在「显示与布局」→「快捷方式」开关，勾选状态按桌面和开始菜单里实际有没有快捷方式显示。程序文件夹挪动或换了新版本后，启动时会把自己的快捷方式改指向当前程序；同名但指向别的程序的快捷方式不动。只有使用默认数据目录的正式运行才会改动桌面和开始菜单，测试用自己的文件夹。
 
-从旧版升级时，先从旧程序的托盘菜单选择「保存并退出」，再启动 1.6。各版默认使用同一个本地数据目录。首次读取 1.0 数据会保留 `migration-v1-*.json`；读取尚无便签布局字段的 1.1 数据会保留 `migration-notebook-layouts-*.json`；1.2 到 1.5.1 的数据可直接读取。不要用旧版再次读写已升级的数据；需要回退时使用升级前的备份。开发目录保留旧构建，本版使用 `release-1.6`。
+从旧版升级时，先从旧程序的托盘菜单选择「保存并退出」，再启动 1.6.1。各版默认使用同一个本地数据目录。首次读取 1.0 数据会保留 `migration-v1-*.json`；读取尚无便签布局字段的 1.1 数据会保留 `migration-notebook-layouts-*.json`；1.2 到 1.6 的数据可直接读取。不要用旧版再次读写已升级的数据；需要回退时使用升级前的备份。开发目录保留旧构建，本版使用 `release-1.6.1`。
 
 选用 1.3 新增的「清爽卡片」或「手账纸页」后，数据会标记为 1.3 格式：1.2 打开时会提示「不支持此数据版本」并退出，数据保持不变。切回前三种布局后，1.2 可以再次读取。
 
